@@ -1,5 +1,11 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import RubricViewSet
+
+# Create a router and register viewsets
+router = DefaultRouter()
+router.register(r'rubrics', RubricViewSet, basename='rubric')
 
 urlpatterns = [
-    # URLs will be added here
+    path('', include(router.urls)),
 ]
