@@ -115,8 +115,9 @@ class Rubric(models.Model):
     
     def _has_significant_changes(self, old_rubric):
         """Check if there are significant changes that warrant a version bump."""
-        # Compare significant fields
+        # Compare significant fields including state changes (draft->published)
         return (
+            self.state != old_rubric.state or
             self.question_text != old_rubric.question_text or
             self.reference_answer != old_rubric.reference_answer or
             self.total_marks != old_rubric.total_marks or

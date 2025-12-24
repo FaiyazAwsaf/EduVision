@@ -30,7 +30,7 @@ class RubricSerializer(serializers.ModelSerializer):
             'evaluation_rules', 'created_by', 'created_at',
             'updated_at', 'versions'
         ]
-        read_only_fields = ['id', 'version', 'created_at', 'updated_at', 'versions']
+        read_only_fields = ['id', 'version', 'created_by', 'created_at', 'updated_at', 'versions']
     
     def validate_evaluation_rules(self, value):
         """Validate evaluation rules using Pydantic schemas."""
@@ -47,7 +47,8 @@ class RubricSerializer(serializers.ModelSerializer):
             try:
                 # Validate each rule using Pydantic EvaluationRule schema
                 rule = EvaluationRule(**rule_data)
-                validated_rules.append(rule.model_dump())
+                # Use mode='json' to properly serialize UUID and other special types
+                validated_rules.append(rule.model_dump(mode='json'))
                 total_rule_marks += rule.marks
             except PydanticValidationError as e:
                 raise serializers.ValidationError(
@@ -111,13 +112,7 @@ class RubricSerializer(serializers.ModelSerializer):
         # Ensure created_by is set from the request user
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
-            # Convert user ID to UUID if needed
-            user_id = request.user.id
-            if isinstance(user_id, int):
-                # If using integer user IDs, convert to UUID format
-                validated_data['created_by'] = uuid.uuid4()
-            else:
-                validated_data['created_by'] = user_id
+            validated_data['created_by'] = request.user.id
         
         # Ensure state is draft for new rubrics
         validated_data['state'] = Rubric.STATE_DRAFT

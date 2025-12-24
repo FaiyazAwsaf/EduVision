@@ -71,8 +71,8 @@ class RubricViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         
-        # Check ownership
-        if str(instance.created_by) != str(request.user.id):
+        # Check ownership - compare UUID's integer value with user ID
+        if instance.created_by.int != request.user.id:
             return Response(
                 {"detail": "You do not have permission to edit this rubric."},
                 status=status.HTTP_403_FORBIDDEN
@@ -97,8 +97,8 @@ class RubricViewSet(viewsets.ModelViewSet):
         """
         instance = self.get_object()
         
-        # Check ownership
-        if str(instance.created_by) != str(request.user.id):
+        # Check ownership - compare UUID's integer value with user ID
+        if instance.created_by.int != request.user.id:
             return Response(
                 {"detail": "You do not have permission to delete this rubric."},
                 status=status.HTTP_403_FORBIDDEN
@@ -118,11 +118,18 @@ class RubricViewSet(viewsets.ModelViewSet):
     def publish(self, request, pk=None):
         """
         Publish a draft rubric. Published rubrics become read-only.
+        
+        Logic:
+        - Validate sum of rule marks == total_marks
+        - Change state from draft → published
+        - Increment version
+        - Save full rubric snapshot into rubric_versions
+        - Prevent further edits after publishing
         """
         instance = self.get_object()
         
-        # Check ownership
-        if str(instance.created_by) != str(request.user.id):
+        # Check ownership - compare UUID's integer value with user ID
+        if instance.created_by.int != request.user.id:
             return Response(
                 {"detail": "You do not have permission to publish this rubric."},
                 status=status.HTTP_403_FORBIDDEN
@@ -135,7 +142,25 @@ class RubricViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Update state to published
+        # Validate that sum of rule marks equals total_marks
+        if instance.evaluation_rules:
+            rules_total = sum(float(rule.get('marks', 0)) for rule in instance.evaluation_rules)
+            total_marks = float(instance.total_marks)
+            
+            if abs(rules_total - total_marks) > 0.01:  # Allow small floating point differences
+                return Response(
+                    {
+                        "detail": f"Cannot publish: Sum of rule marks ({rules_total}) must equal total marks ({total_marks})"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            return Response(
+                {"detail": "Cannot publish: At least one evaluation rule is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Change state to published (version bump will be handled by model's save method)
         instance.state = Rubric.STATE_PUBLISHED
         instance.save()
         
@@ -149,8 +174,8 @@ class RubricViewSet(viewsets.ModelViewSet):
         """
         instance = self.get_object()
         
-        # Check ownership
-        if str(instance.created_by) != str(request.user.id):
+        # Check ownership - compare UUID's integer value with user ID
+        if instance.created_by.int != request.user.id:
             return Response(
                 {"detail": "You do not have permission to archive this rubric."},
                 status=status.HTTP_403_FORBIDDEN
