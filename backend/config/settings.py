@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     # Local apps
     "apps.user.apps.UserConfig",
     "apps.evaluation.apps.EvaluationConfig",
+    "apps.rubrics.apps.RubricsConfig",
 ]
 
 MIDDLEWARE = [
