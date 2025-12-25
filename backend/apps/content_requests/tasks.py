@@ -3,17 +3,8 @@ Background Tasks for Content Request Processing
 
 This module defines Celery tasks for asynchronous processing of content requests.
 
-Phase 1 Scope:
-- Stub implementation that simulates processing
-- Status transitions (PENDING -> PROCESSING -> COMPLETED)
-- Error handling and retry logic
-- Logging for observability
-
-Phase 2+ Extensions:
-- Call actual AI generation service
-- Handle file storage for generated content
-- Send notifications to users
-- Implement cleanup tasks
+Phase 1: Stub implementation
+Phase 2: Actual AI generation using configured provider
 
 Design principles:
 - Idempotent tasks (can safely retry)
@@ -21,12 +12,15 @@ Design principles:
 - Comprehensive error handling
 - Structured logging for monitoring
 """
-import time
 import logging
+import os
 from celery import shared_task
 from uuid import UUID
 
 from .services.content_service import get_content_request_service
+from .services.ai_provider import get_ai_provider, AIProviderError, AIProviderRateLimitError
+from .services.content_formatter import get_content_formatter, ContentFormatterError
+from .persistence.repository import GeneratedContentRepository
 from .domain.enums import RequestStatus
 
 logger = logging.getLogger(__name__)
@@ -42,8 +36,7 @@ def process_content_request(self, request_id: str):
     """
     Process a content generation request asynchronously.
     
-    Phase 1: Stub implementation that simulates processing.
-    Phase 2+: Will call AI service to generate actual content.
+    Phase 2: Calls AI provider to generate actual content.
     
     Args:
         request_id: UUID string of the request to process
@@ -53,11 +46,15 @@ def process_content_request(self, request_id: str):
         
     Workflow:
         1. Update status to PROCESSING
-        2. Simulate work (sleep)
-        3. Update status to COMPLETED
-        4. Handle errors by updating to FAILED
+        2. Fetch request details
+        3. Call AI provider to generate content
+        4. Format content according to output_format
+        5. Persist generated content
+        6. Update status to COMPLETED
+        7. Handle errors by updating to FAILED
     """
     service = get_content_request_service()
+    content_repo = GeneratedContentRepository()
     
     try:
         request_uuid = UUID(request_id)
@@ -75,9 +72,94 @@ def process_content_request(self, request_id: str):
         
         logger.info(f"[Task] Request {request_id} status updated to PROCESSING")
         
-        # Phase 1: Simulate processing work
-        # Phase 2+: Call AI service here
-        time.sleep(2)  # Simulate work
+        # Fetch the request details
+        request = service.get_request_by_id(request_uuid)
+        if not request:
+            logger.error(f"[Task] Request {request_id} not found")
+            service.update_request_status(request_uuid, RequestStatus.FAILED)
+            return {
+                'success': False,
+                'request_id': request_id,
+                'error': 'Request not found'
+            }
+        
+        # Get AI provider (from environment or config)
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            logger.error("[Task] GEMINI_API_KEY not configured")
+            service.update_request_status(request_uuid, RequestStatus.FAILED)
+            return {
+                'success': False,
+                'request_id': request_id,
+                'error': 'AI provider not configured'
+            }
+        
+        try:
+            # Initialize AI provider
+            ai_provider = get_ai_provider('gemini', api_key=api_key)
+            
+            # Generate content
+            logger.info(f"[Task] Generating content for request {request_id}")
+            generated = ai_provider.generate_content(request)
+            
+            logger.info(
+                f"[Task] Content generated successfully "
+                f"({len(generated.content_text)} chars)"
+            )
+            
+            # Add request metadata to generation metadata
+            generation_metadata = {
+                **generated.metadata,
+                'topic': request.topic,
+                'content_type': request.content_type.value,
+                'style': request.style.value,
+                'difficulty': request.difficulty.value if request.difficulty else None,
+            }
+            
+            # Persist generated content
+            content_model = content_repo.create(
+                request_id=request_uuid,
+                content_text=generated.content_text,
+                output_format=request.output_format,
+                metadata=generation_metadata
+            )
+            
+            logger.info(
+                f"[Task] Generated content persisted with ID {content_model.id}"
+            )
+            
+        except AIProviderRateLimitError as e:
+            logger.warning(f"[Task] Rate limit hit for request {request_id}: {str(e)}")
+            # Retry with exponential backoff
+            raise self.retry(exc=e, countdown=120)  # 2 minutes
+            
+        except AIProviderError as e:
+            logger.error(f"[Task] AI provider error for request {request_id}: {str(e)}")
+            service.update_request_status(request_uuid, RequestStatus.FAILED)
+            return {
+                'success': False,
+                'request_id': request_id,
+                'error': f'AI generation failed: {str(e)}'
+            }
+        
+        # Update status to COMPLETED
+        success = service.update_request_status(request_uuid, RequestStatus.COMPLETED)
+        if not success:
+            logger.error(f"[Task] Failed to update status to COMPLETED for {request_id}")
+            return {
+                'success': False,
+                'request_id': request_id,
+                'error': 'Failed to update status to COMPLETED'
+            }
+        
+        logger.info(f"[Task] Request {request_id} processing completed successfully")
+        
+        return {
+            'success': True,
+            'request_id': request_id,
+            'content_id': str(content_model.id),
+            'status': 'completed'
+        }
         
         # Update status to COMPLETED
         success = service.update_request_status(request_uuid, RequestStatus.COMPLETED)

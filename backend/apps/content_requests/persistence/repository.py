@@ -232,3 +232,113 @@ class ContentRequestRepository:
             id=request_id
         ).delete()
         return deleted_count > 0
+
+
+class GeneratedContentRepository:
+    """
+    Repository for GeneratedContent entities.
+    
+    This class provides data access methods for generated content,
+    handling persistence and retrieval of AI-generated content.
+    """
+    
+    def create(
+        self,
+        request_id: UUID,
+        content_text: str,
+        output_format: OutputFormat,
+        metadata: dict
+    ) -> 'GeneratedContentModel':
+        """
+        Create and persist generated content.
+        
+        Args:
+            request_id: UUID of the content request
+            content_text: Generated content text
+            output_format: Output format
+            metadata: Generation metadata
+            
+        Returns:
+            Created GeneratedContentModel instance
+        """
+        from ..models import GeneratedContentModel
+        
+        content = GeneratedContentModel.objects.create(
+            request_id=request_id,
+            content_text=content_text,
+            output_format=output_format.value,
+            metadata=metadata
+        )
+        return content
+    
+    def get_by_request_id(self, request_id: UUID) -> Optional['GeneratedContentModel']:
+        """
+        Retrieve generated content for a request.
+        
+        Args:
+            request_id: UUID of the content request
+            
+        Returns:
+            GeneratedContentModel if found, None otherwise
+        """
+        from ..models import GeneratedContentModel
+        
+        try:
+            return GeneratedContentModel.objects.filter(
+                request_id=request_id
+            ).order_by('-created_at').first()
+        except GeneratedContentModel.DoesNotExist:
+            return None
+    
+    def get_all_by_request_id(self, request_id: UUID) -> List['GeneratedContentModel']:
+        """
+        Retrieve all generated content versions for a request.
+        
+        Useful for versioning or regeneration scenarios.
+        
+        Args:
+            request_id: UUID of the content request
+            
+        Returns:
+            List of GeneratedContentModel instances
+        """
+        from ..models import GeneratedContentModel
+        
+        return list(
+            GeneratedContentModel.objects.filter(
+                request_id=request_id
+            ).order_by('-created_at')
+        )
+    
+    def exists_for_request(self, request_id: UUID) -> bool:
+        """
+        Check if generated content exists for a request.
+        
+        Args:
+            request_id: UUID of the content request
+            
+        Returns:
+            True if content exists, False otherwise
+        """
+        from ..models import GeneratedContentModel
+        
+        return GeneratedContentModel.objects.filter(
+            request_id=request_id
+        ).exists()
+    
+    def delete_by_request_id(self, request_id: UUID) -> int:
+        """
+        Delete all generated content for a request.
+        
+        Args:
+            request_id: UUID of the content request
+            
+        Returns:
+            Number of deleted records
+        """
+        from ..models import GeneratedContentModel
+        
+        deleted_count, _ = GeneratedContentModel.objects.filter(
+            request_id=request_id
+        ).delete()
+        return deleted_count

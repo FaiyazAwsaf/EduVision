@@ -26,10 +26,13 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Auto-discover tasks from all registered Django apps
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 
+# Explicitly include tasks (ensures they are discovered)
+app.autodiscover_tasks(['apps.content_requests'])
+
 
 # Task routing configuration (optional, for advanced use)
 app.conf.task_routes = {
-    'apps.content_requests.tasks.*': {'queue': 'content_generation'},
+    'content_requests.process_request': {'queue': 'celery'},
     # Add more routes as other modules are implemented
 }
 

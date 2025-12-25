@@ -6,13 +6,14 @@ Provides serialization and validation for content request operations:
 - ContentRequestResponseSerializer: For GET responses (detail view)
 - ContentRequestListSerializer: For GET responses (list view)
 - ContentRequestUpdateSerializer: For internal status updates
+- GeneratedContentSerializer: For generated content responses (Phase 2)
 - ErrorResponseSerializer: For error handling
 """
 
 from rest_framework import serializers
 from typing import Dict, Any
 
-from apps.content_requests.models import ContentRequestModel
+from apps.content_requests.models import ContentRequestModel, GeneratedContentModel
 from apps.content_requests.domain.enums import (
     ContentType,
     Style,
@@ -186,6 +187,35 @@ class ContentRequestUpdateSerializer(serializers.ModelSerializer):
                 )
         
         return value
+
+
+class GeneratedContentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for generated content responses.
+    
+    Phase 2: Returns AI-generated content with metadata.
+    """
+    
+    request_id = serializers.UUIDField(source='request.id', read_only=True)
+    topic = serializers.CharField(source='request.topic', read_only=True)
+    content_type = serializers.CharField(source='request.content_type', read_only=True)
+    style = serializers.CharField(source='request.style', read_only=True)
+    
+    class Meta:
+        model = GeneratedContentModel
+        fields = [
+            'id',
+            'request_id',
+            'topic',
+            'content_type',
+            'style',
+            'content_text',
+            'output_format',
+            'metadata',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
 
 
 class ErrorResponseSerializer(serializers.Serializer):
