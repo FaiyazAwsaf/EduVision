@@ -4,7 +4,7 @@ Django Admin Configuration for Content Requests Module
 Provides administrative interface for managing content requests and generated content.
 """
 from django.contrib import admin
-from .models import ContentRequestModel, GeneratedContentModel
+from .models import ContentRequestModel, GeneratedContentModel, FeedbackModel
 
 
 @admin.register(ContentRequestModel)
@@ -106,7 +106,69 @@ class GeneratedContentAdmin(admin.ModelAdmin):
         return True
 
 
-# Phase 3+ admin interfaces will be added here
+@admin.register(FeedbackModel)
+class FeedbackAdmin(admin.ModelAdmin):
+    """Admin interface for FeedbackModel (Phase 3)"""
+    
+    list_display = (
+        'id',
+        'content_topic',
+        'usefulness_rating',
+        'difficulty_rating',
+        'correctness_flag',
+        'submitted_at'
+    )
+    list_filter = (
+        'usefulness_rating',
+        'difficulty_rating',
+        'correctness_flag',
+        'submitted_at'
+    )
+    search_fields = (
+        'id',
+        'generated_content__content_request__topic',
+        'missing_topics',
+        'freeform_comment'
+    )
+    readonly_fields = ('id', 'generated_content', 'submitted_at')
+    ordering = ('-submitted_at',)
+    
+    fieldsets = (
+        ('Feedback Information', {
+            'fields': (
+                'id',
+                'generated_content',
+                'usefulness_rating',
+                'difficulty_rating',
+                'correctness_flag'
+            )
+        }),
+        ('Additional Feedback', {
+            'fields': ('missing_topics', 'freeform_comment'),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('submitted_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def content_topic(self, obj):
+        """Display the topic of the related content request"""
+        return obj.generated_content.content_request.topic[:50]
+    content_topic.short_description = 'Content Topic'
+    
+    def has_add_permission(self, request):
+        """Prevent adding feedback through admin (should use API)"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion for data management"""
+        return True
+
+
+# Phase 4+ admin interfaces will be added here
 # Examples:
-# - UserFeedbackAdmin: for reviewing user feedback
 # - ContentVersionAdmin: for managing content versions
+# - AnalyticsDashboard: for feedback analytics
+

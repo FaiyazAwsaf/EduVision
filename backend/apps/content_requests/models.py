@@ -9,7 +9,7 @@ analytics, versioning) without requiring schema migrations.
 """
 import uuid
 from django.db import models
-from django.core.validators import MinLengthValidator, MaxLengthValidator
+from django.core.validators import MinLengthValidator, MaxLengthValidator, MinValueValidator, MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 
 from .domain.enums import ContentType, Style, OutputFormat, Difficulty, RequestStatus
@@ -222,7 +222,107 @@ class GeneratedContentModel(models.Model):
         )
 
 
-# Phase 3+ models will be added here
+# ============================================================================
+# Phase 3: Feedback Models
+# ============================================================================
+
+class DifficultyRating(models.TextChoices):
+    """Perceived difficulty level of generated content"""
+    TOO_EASY = 'TOO_EASY', 'Too Easy'
+    APPROPRIATE = 'APPROPRIATE', 'Appropriate'
+    TOO_HARD = 'TOO_HARD', 'Too Hard'
+
+
+class FeedbackModel(models.Model):
+    """
+    Structured feedback for generated content (Phase 3).
+    
+    Captures user feedback on AI-generated content quality.
+    This data will be consumed by analytics modules in future phases.
+    
+    Design decisions:
+    - One feedback per generated content (enforced at DB level)
+    - All fields except comment are required for data quality
+    - Cascade delete when content is deleted
+    - No user association (pre-auth phase)
+    
+    Future extensions:
+    - Add user_id when auth is implemented
+    - Add feedback_version for schema evolution
+    - Add moderation_status for quality control
+    """
+    
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    
+    generated_content = models.OneToOneField(
+        'GeneratedContentModel',
+        on_delete=models.CASCADE,
+        related_name='feedback',
+        help_text='The generated content being rated'
+    )
+    
+    usefulness_rating = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text='How useful was this content? (1-5)'
+    )
+    
+    difficulty_rating = models.CharField(
+        max_length=20,
+        choices=DifficultyRating.choices,
+        help_text='Was the difficulty level appropriate?'
+    )
+    
+    correctness_flag = models.BooleanField(
+        help_text='Was the content factually correct?'
+    )
+    
+    missing_topics = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Topics that should have been included (optional)'
+    )
+    
+    freeform_comment = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Additional feedback or suggestions (optional)'
+    )
+    
+    submitted_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When feedback was submitted'
+    )
+    
+    class Meta:
+        db_table = 'feedback'
+        ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['generated_content']),
+            models.Index(fields=['submitted_at']),
+            models.Index(fields=['usefulness_rating']),
+        ]
+        # Enforce one feedback per content at database level
+        constraints = [
+            models.UniqueConstraint(
+                fields=['generated_content'],
+                name='unique_feedback_per_content'
+            )
+        ]
+    
+    def __str__(self):
+        return f"Feedback for {self.generated_content_id} - {self.usefulness_rating}/5"
+    
+    @property
+    def is_positive(self):
+        """Helper to determine if feedback is generally positive"""
+        return self.usefulness_rating >= 4 and self.correctness_flag
+
+
+# Phase 4+ models will be added here
 # Examples:
-# - UserFeedbackModel: stores user feedback on content quality
 # - ContentVersionModel: tracks content revisions
+

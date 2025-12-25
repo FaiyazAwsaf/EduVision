@@ -51,7 +51,7 @@ class GeminiProvider(AIProvider):
     # Default configuration
     DEFAULT_MODEL = "gemini-2.5-flash"
     DEFAULT_TEMPERATURE = 0.7
-    DEFAULT_MAX_TOKENS = 2048
+    DEFAULT_MAX_TOKENS = 8192
     DEFAULT_RETRY_ATTEMPTS = 3
     DEFAULT_RETRY_DELAY = 2  # seconds
     

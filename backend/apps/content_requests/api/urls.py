@@ -5,17 +5,22 @@ Defines URL routing for content request endpoints.
 Uses Django URL patterns for explicit routing.
 
 Endpoints:
-- POST   /api/content-requests/                - Create new request
-- GET    /api/content-requests/                - List all requests
-- GET    /api/content-requests/<id>/           - Retrieve request details
-- GET    /api/content-requests/<id>/content    - Retrieve generated content (Phase 2)
+- POST   /api/content-requests/                       - Create new request
+- GET    /api/content-requests/                       - List all requests
+- GET    /api/content-requests/<id>/                  - Retrieve request details
+- GET    /api/content-requests/<id>/content/          - Retrieve generated content (Phase 2)
+- GET    /api/content-requests/<id>/content/download/ - Download as PDF
+- POST   /api/generated-content/<id>/feedback/        - Submit feedback (Phase 3)
+- GET    /api/generated-content/<id>/feedback/        - Retrieve feedback (Phase 3)
 """
 from django.urls import path
 from .views import (
     ContentRequestListCreateView,
     ContentRequestDetailView,
-    GeneratedContentView
+    GeneratedContentView,
+    download_generated_content_view
 )
+from .views_feedback import FeedbackView
 
 
 app_name = 'content_requests'
@@ -37,8 +42,29 @@ urlpatterns = [
     
     # Retrieve generated content (Phase 2)
     path(
-        '<str:request_id>/content',
+        '<str:request_id>/content/',
         GeneratedContentView.as_view(),
         name='generated-content'
     ),
+    
+    # Download formatted content (PDF/Worksheet)
+    path(
+        '<str:request_id>/content/download/',
+        download_generated_content_view,
+        name='download-content'
+    ),
 ]
+
+# Feedback endpoints (Phase 3) - separate base URL
+# These use generated_content_id, not request_id
+feedback_urlpatterns = [
+    # Submit and retrieve feedback for generated content
+    path(
+        'generated-content/<str:content_id>/feedback/',
+        FeedbackView.as_view(),
+        name='feedback'
+    ),
+]
+
+# Combine all URL patterns
+urlpatterns = urlpatterns + feedback_urlpatterns

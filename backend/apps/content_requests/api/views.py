@@ -25,7 +25,18 @@ from uuid import UUID
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.http import Http404
+from rest_framework.renderers import JSONRenderer, BaseRenderer
+from django.http import Http404, HttpResponse
+
+class BinaryFileRenderer(BaseRenderer):
+    """Renderer for binary file responses (PDF, etc.)"""
+    media_type = 'application/pdf'
+    format = 'pdf'
+    charset = None
+    render_style = 'binary'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 from ..models import ContentRequestModel
 from ..services.content_service import get_content_request_service
@@ -273,6 +284,8 @@ class GeneratedContentView(APIView):
         Retrieve generated content for a request
     """
     
+    renderer_classes = [JSONRenderer, BinaryFileRenderer]
+    
     def get(self, request, request_id):
         """
         Retrieve generated content for a specific request.
@@ -325,6 +338,13 @@ class GeneratedContentView(APIView):
                     message = 'Content is being generated'
                 elif content_request.status == RequestStatus.FAILED:
                     message = 'Content generation failed'
+                elif content_request.status == RequestStatus.COMPLETED:
+                    # This is an error state - status is COMPLETED but no content exists
+                    logger.error(
+                        f"Request {request_id} marked as COMPLETED but no generated content found. "
+                        "This indicates a data inconsistency."
+                    )
+                    message = 'Content not yet generated'
                 else:
                     message = 'Content not yet available'
                 
@@ -343,6 +363,8 @@ class GeneratedContentView(APIView):
             
             # Get format parameter (default to text for API response)
             output_format = request.query_params.get('format', 'text').lower()
+            
+            logger.info(f"Processing content request with format={output_format}")
             
             # If requesting raw JSON
             if output_format == 'json' or output_format == 'text':
@@ -371,19 +393,18 @@ class GeneratedContentView(APIView):
                         metadata=generated_content.metadata
                     )
                     
-                    # Return formatted content
-                    from django.http import HttpResponse
+                    logger.info(
+                        f"Returning formatted content for request {request_id} "
+                        f"(format: {output_format})"
+                    )
+                    
+                    # Return formatted content using HttpResponse with proper headers
                     response = HttpResponse(
                         formatted['content'],
                         content_type=formatted['mime_type']
                     )
                     response['Content-Disposition'] = (
                         f'attachment; filename="{formatted["filename"]}"'
-                    )
-                    
-                    logger.info(
-                        f"Returning formatted content for request {request_id} "
-                        f"(format: {output_format})"
                     )
                     return response
                     
@@ -417,6 +438,85 @@ class GeneratedContentView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+def download_generated_content_view(request, request_id):
+    """
+    Plain Django view for downloading formatted content (PDF/Worksheet).
+    Bypasses DRF to handle binary file downloads properly.
+    """
+    try:
+        # Validate UUID
+        try:
+            uuid_obj = UUID(request_id)
+        except ValueError:
+            return HttpResponse(
+                '{"error": "Invalid request ID"}',
+                content_type='application/json',
+                status=400
+            )
+        
+        # Get format parameter
+        output_format = request.GET.get('format', 'pdf').lower()
+        
+        logger.info(f"Download request for {request_id}, format={output_format}")
+        
+        # Check if content exists
+        content_repo = GeneratedContentRepository()
+        generated_content = content_repo.get_by_request_id(uuid_obj)
+        
+        if not generated_content:
+            return HttpResponse(
+                '{"error": "Content not found"}',
+                content_type='application/json',
+                status=404
+            )
+        
+        # Map format to enum
+        from ..domain.enums import OutputFormat
+        if output_format == 'pdf':
+            format_enum = OutputFormat.PDF
+        elif output_format == 'worksheet':
+            format_enum = OutputFormat.WORKSHEET
+        else:
+            return HttpResponse(
+                '{"error": "Invalid format. Use pdf or worksheet"}',
+                content_type='application/json',
+                status=400
+            )
+        
+        # Format the content
+        formatter = get_content_formatter()
+        formatted = formatter.format_content(
+            content_text=generated_content.content_text,
+            output_format=format_enum,
+            metadata=generated_content.metadata
+        )
+        
+        # Return the formatted file
+        response = HttpResponse(
+            formatted['content'],
+            content_type=formatted['mime_type']
+        )
+        response['Content-Disposition'] = f'attachment; filename="{formatted["filename"]}"'
+        
+        logger.info(f"Returning {output_format} for request {request_id}")
+        return response
+        
+    except ContentFormatterError as e:
+        logger.error(f"Formatting error: {str(e)}")
+        return HttpResponse(
+            f'{{"error": "Formatting failed", "detail": "{str(e)}"}}',
+            content_type='application/json',
+            status=500
+        )
+    except Exception as e:
+        logger.exception(f"Error downloading content: {str(e)}")
+        return HttpResponse(
+            '{"error": "Internal server error"}',
+            content_type='application/json',
+            status=500
+        )
 
 
 # Phase 3+ views will be added here when additional features are implemented

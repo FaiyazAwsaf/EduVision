@@ -126,6 +126,7 @@ class RequestStatus(str, Enum):
         - PENDING -> PROCESSING
         - PROCESSING -> COMPLETED
         - PROCESSING -> FAILED
+        - FAILED -> PENDING (for retry)
         
         Args:
             from_status: Current status
@@ -138,6 +139,6 @@ class RequestStatus(str, Enum):
             cls.PENDING: {cls.PROCESSING},
             cls.PROCESSING: {cls.COMPLETED, cls.FAILED},
             cls.COMPLETED: set(),  # Terminal state
-            cls.FAILED: set(),  # Terminal state
+            cls.FAILED: {cls.PENDING},  # Allow retry
         }
         return to_status in valid_transitions.get(from_status, set())

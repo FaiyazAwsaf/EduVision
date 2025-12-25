@@ -128,6 +128,25 @@ def process_content_request(self, request_id: str):
                 f"[Task] Generated content persisted with ID {content_model.id}"
             )
             
+            # Update status to COMPLETED after content is saved
+            success = service.update_request_status(request_uuid, RequestStatus.COMPLETED)
+            if not success:
+                logger.error(f"[Task] Failed to update status to COMPLETED for {request_id}")
+                return {
+                    'success': False,
+                    'request_id': request_id,
+                    'error': 'Failed to update status to COMPLETED'
+                }
+            
+            logger.info(f"[Task] Request {request_id} processing completed successfully")
+            
+            return {
+                'success': True,
+                'request_id': request_id,
+                'content_id': str(content_model.id),
+                'status': 'completed'
+            }
+            
         except AIProviderRateLimitError as e:
             logger.warning(f"[Task] Rate limit hit for request {request_id}: {str(e)}")
             # Retry with exponential backoff
@@ -141,43 +160,6 @@ def process_content_request(self, request_id: str):
                 'request_id': request_id,
                 'error': f'AI generation failed: {str(e)}'
             }
-        
-        # Update status to COMPLETED
-        success = service.update_request_status(request_uuid, RequestStatus.COMPLETED)
-        if not success:
-            logger.error(f"[Task] Failed to update status to COMPLETED for {request_id}")
-            return {
-                'success': False,
-                'request_id': request_id,
-                'error': 'Failed to update status to COMPLETED'
-            }
-        
-        logger.info(f"[Task] Request {request_id} processing completed successfully")
-        
-        return {
-            'success': True,
-            'request_id': request_id,
-            'content_id': str(content_model.id),
-            'status': 'completed'
-        }
-        
-        # Update status to COMPLETED
-        success = service.update_request_status(request_uuid, RequestStatus.COMPLETED)
-        if not success:
-            logger.error(f"[Task] Failed to update status to COMPLETED for {request_id}")
-            return {
-                'success': False,
-                'request_id': request_id,
-                'error': 'Failed to update status to COMPLETED'
-            }
-        
-        logger.info(f"[Task] Request {request_id} processing completed successfully")
-        
-        return {
-            'success': True,
-            'request_id': request_id,
-            'status': 'completed'
-        }
         
     except ValueError as e:
         # Invalid UUID

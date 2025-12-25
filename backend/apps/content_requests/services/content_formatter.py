@@ -3,7 +3,7 @@ Content Formatting Service
 
 This module handles formatting of generated content into different output formats:
 - TEXT: Raw text content
-- PDF: PDF document generation
+- PDF: PDF document generation with Markdown parsing
 - WORKSHEET: Structured worksheet format
 
 The formatting logic is separated from AI generation to allow:
@@ -15,13 +15,15 @@ import logging
 from typing import Dict, Any, Optional
 from io import BytesIO
 import base64
+import re
 
 # PDF generation
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER
+from reportlab.lib.colors import HexColor
 
 from ..domain.enums import OutputFormat, ContentType, Style
 
@@ -127,16 +129,16 @@ class ContentFormatter:
         metadata: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Format content as PDF document.
+        Format Markdown content as PDF document.
         
         Args:
-            content_text: Raw generated content
+            content_text: Raw generated content (Markdown format)
             metadata: Content metadata
             
         Returns:
             PDF bytes and metadata
         """
-        logger.debug("Formatting as PDF")
+        logger.debug("Formatting Markdown as PDF")
         
         try:
             # Create PDF buffer
@@ -157,23 +159,73 @@ class ContentFormatter:
             
             # Define styles
             styles = getSampleStyleSheet()
+            
+            # Custom styles for Markdown elements
             styles.add(ParagraphStyle(
                 name='Justify',
                 parent=styles['BodyText'],
-                alignment=TA_JUSTIFY
+                alignment=TA_JUSTIFY,
+                fontSize=11,
+                leading=16
             ))
             
-            # Add title if available
+            styles.add(ParagraphStyle(
+                name='MarkdownH1',
+                parent=styles['Heading1'],
+                fontSize=20,
+                textColor=HexColor('#1a73e8'),
+                spaceAfter=12,
+                spaceBefore=20
+            ))
+            
+            styles.add(ParagraphStyle(
+                name='MarkdownH2',
+                parent=styles['Heading2'],
+                fontSize=16,
+                textColor=HexColor('#1a73e8'),
+                spaceAfter=10,
+                spaceBefore=16
+            ))
+            
+            styles.add(ParagraphStyle(
+                name='MarkdownH3',
+                parent=styles['Heading3'],
+                fontSize=14,
+                spaceAfter=8,
+                spaceBefore=12
+            ))
+            
+            styles.add(ParagraphStyle(
+                name='CodeBlock',
+                parent=styles['Code'],
+                fontSize=9,
+                leading=12,
+                leftIndent=20,
+                rightIndent=20,
+                textColor=HexColor('#333333'),
+                backColor=HexColor('#f5f5f5')
+            ))
+            
+            styles.add(ParagraphStyle(
+                name='ListItem',
+                parent=styles['BodyText'],
+                fontSize=11,
+                leftIndent=20,
+                bulletIndent=10
+            ))
+            
+            # Add metadata header if available
             if metadata.get('topic'):
                 title_style = ParagraphStyle(
                     'CustomTitle',
                     parent=styles['Heading1'],
-                    fontSize=18,
-                    textColor='#1a73e8',
+                    fontSize=22,
+                    textColor=HexColor('#1a73e8'),
                     spaceAfter=12,
-                    alignment=TA_CENTER
+                    alignment=TA_CENTER,
+                    fontName='Helvetica-Bold'
                 )
-                story.append(Paragraph(metadata['topic'], title_style))
+                story.append(Paragraph(self._escape_html(metadata['topic']), title_style))
                 story.append(Spacer(1, 12))
             
             # Add metadata section
@@ -191,32 +243,98 @@ class ContentFormatter:
                     'MetaStyle',
                     parent=styles['Normal'],
                     fontSize=10,
-                    textColor='#5f6368',
+                    textColor=HexColor('#5f6368'),
                     alignment=TA_CENTER
                 )
                 story.append(Paragraph(meta_text, meta_style))
                 story.append(Spacer(1, 20))
             
-            # Add horizontal line
-            story.append(Spacer(1, 12))
+            # Parse and convert Markdown content
+            lines = content_text.split('\n')
+            i = 0
+            in_code_block = False
+            code_buffer = []
             
-            # Add content paragraphs
-            # Split by double newlines to preserve paragraph structure
-            paragraphs = content_text.split('\n\n')
-            
-            for para in paragraphs:
-                if para.strip():
-                    # Clean up the paragraph
-                    para = para.strip().replace('\n', '<br/>')
-                    
-                    # Check if it looks like a heading (short, no punctuation at end)
-                    if len(para) < 100 and not para.endswith(('.', '!', '?')):
-                        style = styles['Heading2']
+            while i < len(lines):
+                line = lines[i]
+                
+                # Handle code blocks
+                if line.strip().startswith('```'):
+                    if in_code_block:
+                        # End of code block
+                        if code_buffer:
+                            code_text = '\n'.join(code_buffer)
+                            story.append(Preformatted(self._escape_html(code_text), styles['CodeBlock']))
+                            story.append(Spacer(1, 12))
+                        code_buffer = []
+                        in_code_block = False
                     else:
-                        style = styles['Justify']
+                        # Start of code block
+                        in_code_block = True
+                    i += 1
+                    continue
+                
+                if in_code_block:
+                    code_buffer.append(line)
+                    i += 1
+                    continue
+                
+                # Skip empty lines
+                if not line.strip():
+                    story.append(Spacer(1, 6))
+                    i += 1
+                    continue
+                
+                # Handle headers
+                if line.startswith('# '):
+                    text = line[2:].strip()
+                    story.append(Paragraph(self._escape_html(text), styles['MarkdownH1']))
+                    story.append(Spacer(1, 8))
+                elif line.startswith('## '):
+                    text = line[3:].strip()
+                    story.append(Paragraph(self._escape_html(text), styles['MarkdownH2']))
+                    story.append(Spacer(1, 6))
+                elif line.startswith('### '):
+                    text = line[4:].strip()
+                    story.append(Paragraph(self._escape_html(text), styles['MarkdownH3']))
+                    story.append(Spacer(1, 4))
+                
+                # Handle lists
+                elif line.strip().startswith(('- ', '* ', '+ ')):
+                    text = line.strip()[2:].strip()
+                    bullet_text = f"• {self._escape_html(text)}"
+                    story.append(Paragraph(bullet_text, styles['ListItem']))
+                    story.append(Spacer(1, 4))
+                
+                # Handle numbered lists
+                elif re.match(r'^\d+\.\s', line.strip()):
+                    text = re.sub(r'^\d+\.\s', '', line.strip())
+                    story.append(Paragraph(self._escape_html(text), styles['ListItem']))
+                    story.append(Spacer(1, 4))
+                
+                # Handle inline code
+                elif '`' in line:
+                    # Convert inline code to monospace
+                    text = self._convert_inline_markdown(line)
+                    story.append(Paragraph(text, styles['Justify']))
+                    story.append(Spacer(1, 8))
+                
+                # Regular paragraph
+                else:
+                    # Collect multi-line paragraph
+                    para_lines = [line]
+                    j = i + 1
+                    while j < len(lines) and lines[j].strip() and not self._is_markdown_element(lines[j]):
+                        para_lines.append(lines[j])
+                        j += 1
                     
-                    story.append(Paragraph(para, style))
-                    story.append(Spacer(1, 12))
+                    para_text = ' '.join(para_lines)
+                    para_text = self._convert_inline_markdown(para_text)
+                    story.append(Paragraph(para_text, styles['Justify']))
+                    story.append(Spacer(1, 10))
+                    i = j - 1
+                
+                i += 1
             
             # Build PDF
             doc.build(story)
@@ -225,7 +343,7 @@ class ContentFormatter:
             pdf_bytes = buffer.getvalue()
             buffer.close()
             
-            logger.info(f"Generated PDF ({len(pdf_bytes)} bytes)")
+            logger.info(f"Generated PDF from Markdown ({len(pdf_bytes)} bytes)")
             
             return {
                 'content': pdf_bytes,
@@ -236,6 +354,39 @@ class ContentFormatter:
         except Exception as e:
             logger.error(f"Failed to generate PDF: {str(e)}")
             raise ContentFormatterError(f"PDF generation failed: {str(e)}")
+    
+    def _is_markdown_element(self, line: str) -> bool:
+        """Check if line is a markdown element (header, list, code block, etc.)"""
+        stripped = line.strip()
+        return (
+            stripped.startswith('#') or
+            stripped.startswith(('- ', '* ', '+ ')) or
+            stripped.startswith('```') or
+            re.match(r'^\d+\.\s', stripped)
+        )
+    
+    def _escape_html(self, text: str) -> str:
+        """Escape HTML special characters for ReportLab"""
+        return (text
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;'))
+    
+    def _convert_inline_markdown(self, text: str) -> str:
+        """Convert inline Markdown (bold, italic, code) to ReportLab markup"""
+        # Escape HTML first
+        text = self._escape_html(text)
+        
+        # Convert **bold** to <b>bold</b>
+        text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+        
+        # Convert *italic* to <i>italic</i>
+        text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
+        
+        # Convert `code` to monospace
+        text = re.sub(r'`(.+?)`', r'<font face="Courier">\1</font>', text)
+        
+        return text
     
     def _format_as_worksheet(
         self,

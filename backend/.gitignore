@@ -82,3 +82,6 @@ pgdata/
 
 # md files
 *.md
+
+# node modules
+node_modules/
