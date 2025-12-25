@@ -1,23 +1,32 @@
 """
-Content Request Service
+Content Request Service - Phase 1
 
-This module implements business logic for handling content requests.
-It follows the Service Layer pattern to separate business logic from
-API controllers and maintain clean separation of concerns.
+This service orchestrates business logic for content request lifecycle:
+- Request creation and validation
+- Status management
+- Background queue integration
+- Request retrieval and listing
 
-The service orchestrates:
-- Content request creation and management
-- AI content generation coordination
-- Status tracking and updates
-- Integration with background tasks
+Extension points:
+- Phase 2: Add AI generation integration
+- Phase 3: Add user association when authentication exists
+- Phase 4: Add analytics and personalization
+
+Design principles:
+- Business logic is centralized here, not in controllers or models
+- Domain rules are enforced through domain entities
+- Service is stateless and can be easily tested
+- No direct dependency on HTTP layer or framework
 """
 import logging
 from typing import Dict, Any, Optional, List
-from django.db import transaction
-from django.core.exceptions import ValidationError
+from uuid import UUID
 
-from ..models import ContentRequest, GeneratedContent, UserFeedback
-from .ai_generator import get_ai_generator, AIGenerationError, ContentType
+from ..domain.content_request import ContentRequest
+from ..domain.enums import ContentType, Style, OutputFormat, Difficulty, RequestStatus
+from ..domain.exceptions import InvalidStatusTransitionError
+from ..persistence.repository import ContentRequestRepository
+from .validators import ContentRequestValidator, ValidationError
 
 
 logger = logging.getLogger(__name__)
@@ -25,270 +34,235 @@ logger = logging.getLogger(__name__)
 
 class ContentRequestService:
     """
-    Service class for managing content requests.
+    Service for content request business logic.
     
-    This service handles all business logic related to content requests,
-    including creation, status management, and coordination with AI services.
+    This service coordinates between:
+    - Validation layer (input validation)
+    - Domain layer (business rules)
+    - Persistence layer (data access)
+    - Queue layer (background processing)
     
-    Design Principles:
-    - Single Responsibility: Focuses only on content request business logic
-    - Dependency Injection: AI generator can be injected for testing
-    - Transaction Management: Uses database transactions for data consistency
+    All business operations go through this service.
     """
     
-    def __init__(self, ai_generator=None):
+    def __init__(self, repository: Optional[ContentRequestRepository] = None):
         """
-        Initialize the content request service.
+        Initialize the service with optional repository injection.
         
         Args:
-            ai_generator: Optional AI generator instance (useful for testing)
+            repository: ContentRequestRepository instance (for testing/DI)
         """
-        self.ai_generator = ai_generator or get_ai_generator('mock')
+        self.repository = repository or ContentRequestRepository()
+        self.validator = ContentRequestValidator()
     
     def create_request(
         self,
         topic: str,
+        content_type: str,
         style: str,
-        format: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        user=None
+        output_format: str,
+        difficulty: Optional[str] = None,
+        notes: Optional[str] = None,
     ) -> ContentRequest:
         """
         Create a new content request.
         
+        Validates input, creates domain entity, persists it, and enqueues for processing.
+        
         Args:
-            topic (str): The subject/topic for content generation
-            style (str): Content style (brief, detailed, step_by_step)
-            format (str): Output format (text, pdf, worksheet)
-            metadata (dict): Additional request parameters
-            user: User instance (when auth is implemented)
+            topic: Subject matter for content generation
+            content_type: Type of content (from ContentType enum)
+            style: Generation style (from Style enum)
+            output_format: Desired output format (from OutputFormat enum)
+            difficulty: Optional difficulty level (from Difficulty enum)
+            notes: Optional additional instructions
             
         Returns:
-            ContentRequest: The created request instance
+            Created ContentRequest domain entity
             
         Raises:
-            ValidationError: If input validation fails
+            ValidationError: If validation fails
         """
+        # Prepare data for validation
+        data = {
+            'topic': topic,
+            'content_type': content_type,
+            'style': style,
+            'output_format': output_format,
+            'difficulty': difficulty,
+            'notes': notes,
+        }
+        
+        # Sanitize and validate input
+        sanitized = self.validator.sanitize_input(data)
+        self.validator.validate_and_raise(sanitized)
+        
+        # Create domain entity
         try:
-            # Create the request
-            request = ContentRequest.objects.create(
-                topic=topic,
-                style=style,
-                format=format,
-                metadata=metadata or {},
-                # user=user  # Uncomment when auth is implemented
+            request = ContentRequest(
+                topic=sanitized['topic'],
+                content_type=ContentType(sanitized['content_type']),
+                style=Style(sanitized['style']),
+                output_format=OutputFormat(sanitized['output_format']),
+                difficulty=Difficulty(sanitized['difficulty']) if sanitized.get('difficulty') else None,
+                notes=sanitized.get('notes'),
+                status=RequestStatus.PENDING,  # Initial status
             )
-            
-            logger.info(f"Created content request #{request.id} for topic: {topic}")
-            return request
-            
+        except ValueError as e:
+            logger.error(f"Domain validation failed: {str(e)}")
+            raise ValidationError({'domain': [str(e)]})
+        
+        # Persist the request
+        persisted = self.repository.create(request)
+        
+        logger.info(
+            f"Created content request {persisted.id} - "
+            f"topic: {persisted.topic[:50]}, type: {persisted.content_type.value}"
+        )
+        
+        # Enqueue for background processing
+        # Import here to avoid circular dependency
+        from ..tasks import process_content_request
+        try:
+            process_content_request.delay(str(persisted.id))
+            logger.info(f"Enqueued content request {persisted.id} for processing")
         except Exception as e:
-            logger.error(f"Failed to create content request: {str(e)}")
-            raise ValidationError(f"Failed to create request: {str(e)}")
+            logger.error(
+                f"Failed to enqueue request {persisted.id} for processing: {str(e)}"
+            )
+            # Don't fail the request creation if queueing fails
+            # Worker can pick up pending requests later
+        
+        return persisted
     
-    def get_request(self, request_id: int) -> Optional[ContentRequest]:
+    def get_request_by_id(self, request_id: UUID) -> Optional[ContentRequest]:
         """
         Retrieve a content request by ID.
         
         Args:
-            request_id (int): The request ID
+            request_id: UUID of the request
             
         Returns:
-            ContentRequest: The request instance or None
+            ContentRequest if found, None otherwise
         """
-        try:
-            return ContentRequest.objects.prefetch_related(
-                'generated_contents',
-                'feedbacks'
-            ).get(id=request_id)
-        except ContentRequest.DoesNotExist:
-            logger.warning(f"Content request #{request_id} not found")
-            return None
+        request = self.repository.get_by_id(request_id)
+        if request:
+            logger.debug(f"Retrieved content request {request_id}")
+        else:
+            logger.warning(f"Content request {request_id} not found")
+        return request
     
     def list_requests(
         self,
-        status: Optional[str] = None,
-        limit: int = 50,
+        status: Optional[RequestStatus] = None,
+        limit: int = 100,
         offset: int = 0
     ) -> List[ContentRequest]:
         """
         List content requests with optional filtering.
         
         Args:
-            status (str): Filter by status (optional)
-            limit (int): Maximum number of results
-            offset (int): Offset for pagination
+            status: Optional status filter
+            limit: Maximum number of results (default: 100)
+            offset: Number of results to skip (default: 0)
             
         Returns:
-            List[ContentRequest]: List of content requests
+            List of ContentRequest entities
         """
-        queryset = ContentRequest.objects.all()
-        
         if status:
-            queryset = queryset.filter(status=status)
-        
-        return list(queryset[offset:offset + limit])
-    
-    @transaction.atomic
-    def generate_content_sync(self, request_id: int) -> GeneratedContent:
-        """
-        Generate content synchronously for a request.
-        
-        This method should typically be called from a background task
-        to avoid blocking the API response.
-        
-        Args:
-            request_id (int): The content request ID
-            
-        Returns:
-            GeneratedContent: The generated content instance
-            
-        Raises:
-            ValidationError: If request not found or generation fails
-        """
-        # Fetch the request
-        request = self.get_request(request_id)
-        if not request:
-            raise ValidationError(f"Content request #{request_id} not found")
-        
-        # Check if already processed
-        if request.status == ContentRequest.StatusChoices.COMPLETED:
-            logger.info(f"Request #{request_id} already completed")
-            return request.generated_contents.first()
-        
-        try:
-            # Update status to processing
-            request.mark_processing()
-            logger.info(f"Started processing request #{request_id}")
-            
-            # Determine content type and generate
-            content_data = self._generate_content_by_type(request)
-            
-            # Create generated content record
-            generated_content = GeneratedContent.objects.create(
-                request=request,
-                content_text=content_data['content'],
-                format=self._map_to_content_format(request.format),
-                metadata=content_data['metadata']
+            requests = self.repository.list_by_status(status, limit, offset)
+            logger.debug(
+                f"Listed {len(requests)} requests with status {status.value}"
             )
-            
-            # Update request status to completed
-            request.mark_completed()
-            logger.info(f"Completed processing request #{request_id}")
-            
-            return generated_content
-            
-        except AIGenerationError as e:
-            logger.error(f"AI generation failed for request #{request_id}: {str(e)}")
-            request.mark_failed()
-            raise ValidationError(f"Content generation failed: {str(e)}")
-        
-        except Exception as e:
-            logger.error(f"Unexpected error processing request #{request_id}: {str(e)}")
-            request.mark_failed()
-            raise ValidationError(f"Failed to generate content: {str(e)}")
-    
-    def _generate_content_by_type(self, request: ContentRequest) -> Dict[str, Any]:
-        """
-        Generate content based on request parameters.
-        
-        Args:
-            request (ContentRequest): The content request
-            
-        Returns:
-            dict: Generated content data
-        """
-        topic = request.topic
-        style = request.style
-        metadata = request.metadata
-        
-        # Map request format to content type
-        # This is a simplified mapping - extend as needed
-        content_type = self._map_to_content_format(request.format)
-        
-        # Generate based on content type
-        if content_type == GeneratedContent.FormatChoices.SUMMARY:
-            return self.ai_generator.generate_summary(topic, style, metadata)
-        
-        elif content_type == GeneratedContent.FormatChoices.WORKED_EXAMPLE:
-            return self.ai_generator.generate_worked_example(topic, metadata)
-        
-        elif content_type == GeneratedContent.FormatChoices.FORMULA_SHEET:
-            return self.ai_generator.generate_formula_sheet(topic, metadata)
-        
-        elif content_type == GeneratedContent.FormatChoices.STUDY_PLAN:
-            return self.ai_generator.generate_study_plan(topic, metadata)
-        
-        elif content_type == GeneratedContent.FormatChoices.CONCEPT_EXPLANATION:
-            return self.ai_generator.generate_concept_explanation(topic, style, metadata)
-        
         else:
-            # Default to summary
-            return self.ai_generator.generate_summary(topic, style, metadata)
-    
-    def _map_to_content_format(self, request_format: str) -> str:
-        """
-        Map request format to generated content format.
+            requests = self.repository.list_all(limit, offset)
+            logger.debug(f"Listed {len(requests)} requests (all statuses)")
         
-        Args:
-            request_format (str): Request format from user
-            
-        Returns:
-            str: GeneratedContent format choice
-        """
-        # This mapping can be extended based on business requirements
-        format_mapping = {
-            'text': GeneratedContent.FormatChoices.SUMMARY,
-            'pdf': GeneratedContent.FormatChoices.SUMMARY,
-            'worksheet': GeneratedContent.FormatChoices.WORKED_EXAMPLE,
-        }
-        
-        return format_mapping.get(request_format, GeneratedContent.FormatChoices.SUMMARY)
+        return requests
     
-    def add_feedback(
+    def update_request_status(
         self,
-        request_id: int,
-        feedback_type: str,
-        notes: str = "",
-        user=None
-    ) -> UserFeedback:
+        request_id: UUID,
+        new_status: RequestStatus
+    ) -> Optional[ContentRequest]:
         """
-        Add user feedback for a content request.
+        Update the status of a content request.
+        
+        This enforces domain rules for valid status transitions.
         
         Args:
-            request_id (int): The content request ID
-            feedback_type (str): Type of feedback
-            notes (str): Feedback notes
-            user: User instance (when auth is implemented)
+            request_id: UUID of the request
+            new_status: New status to transition to
             
         Returns:
-            UserFeedback: The created feedback instance
+            Updated ContentRequest if successful, None if not found
             
         Raises:
-            ValidationError: If request not found or validation fails
+            InvalidStatusTransitionError: If transition is not valid
         """
-        # Verify request exists
-        request = self.get_request(request_id)
-        if not request:
-            raise ValidationError(f"Content request #{request_id} not found")
-        
         try:
-            feedback = UserFeedback.objects.create(
-                request=request,
-                feedback_type=feedback_type,
-                notes=notes,
-                # user=user  # Uncomment when auth is implemented
-            )
+            updated = self.repository.update_status(request_id, new_status)
+            if updated:
+                logger.info(
+                    f"Updated request {request_id} status to {new_status.value}"
+                )
+            else:
+                logger.warning(
+                    f"Cannot update status: request {request_id} not found"
+                )
+            return updated
+        except InvalidStatusTransitionError as e:
+            logger.error(f"Invalid status transition for {request_id}: {str(e)}")
+            raise
+    
+    def count_by_status(self, status: RequestStatus) -> int:
+        """
+        Count requests by status.
+        
+        Useful for monitoring and dashboard metrics.
+        
+        Args:
+            status: Status to count
             
-            logger.info(
-                f"Added {feedback_type} feedback for request #{request_id}"
-            )
+        Returns:
+            Number of requests with the specified status
+        """
+        count = self.repository.count_by_status(status)
+        logger.debug(f"Counted {count} requests with status {status.value}")
+        return count
+    
+    def request_exists(self, request_id: UUID) -> bool:
+        """
+        Check if a request exists.
+        
+        Args:
+            request_id: UUID of the request
             
-            return feedback
-            
-        except Exception as e:
-            logger.error(f"Failed to add feedback: {str(e)}")
-            raise ValidationError(f"Failed to add feedback: {str(e)}")
+        Returns:
+            True if request exists, False otherwise
+        """
+        return self.repository.exists(request_id)
+
+
+# Singleton instance for application use
+_service_instance = None
+
+
+def get_content_request_service() -> ContentRequestService:
+    """
+    Get or create singleton ContentRequestService instance.
+    
+    This provides a consistent service instance across the application
+    while allowing dependency injection for testing.
+    
+    Returns:
+        ContentRequestService instance
+    """
+    global _service_instance
+    if _service_instance is None:
+        _service_instance = ContentRequestService()
+    return _service_instance
+
     
     def get_request_content(self, request_id: int) -> Optional[GeneratedContent]:
         """

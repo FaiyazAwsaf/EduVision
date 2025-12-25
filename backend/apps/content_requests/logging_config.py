@@ -1,11 +1,16 @@
 """
-Logging Configuration for EduVision Backend
+Logging Configuration for Content Request System - Phase 1
 
 Centralized logging configuration following best practices:
 - Structured logging with context
-- Different log levels for different environments
-- File rotation for production logs
-- Separate loggers for different components
+- Separate loggers for API, services, tasks
+- File rotation for production
+- Configurable log levels
+
+Extension points:
+- Add JSON logging for ELK stack integration
+- Add distributed tracing headers
+- Add performance metrics collection
 """
 
 LOGGING_CONFIG = {
@@ -22,9 +27,15 @@ LOGGING_CONFIG = {
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
-        'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '%(asctime)s %(name)s %(levelname)s %(message)s',
+        'api': {
+            'format': '[API] [{levelname}] {asctime} - {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'task': {
+            'format': '[TASK] [{levelname}] {asctime} - {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
         },
     },
     'filters': {
@@ -44,7 +55,7 @@ LOGGING_CONFIG = {
         'file': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/eduvision.log',
+            'filename': 'logs/content_requests.log',
             'maxBytes': 1024 * 1024 * 10,  # 10 MB
             'backupCount': 5,
             'formatter': 'verbose',

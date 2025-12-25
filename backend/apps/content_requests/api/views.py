@@ -1,358 +1,268 @@
 """
-Django REST Framework Views for Content Requests API
+REST API Views for Content Request System - Phase 1
 
-This module implements RESTful API endpoints for the content request system.
-Uses DRF ViewSets for standard CRUD operations and custom actions.
+This module implements thin controllers that handle HTTP requests and responses.
+Controllers are responsible for:
+- Request deserialization and validation (using serializers)
+- Delegating business logic to the service layer
+- Response serialization and HTTP status codes
+- Error handling and logging
 
-API Endpoints:
-- POST   /api/content-requests/          - Create new request
-- GET    /api/content-requests/          - List requests
-- GET    /api/content-requests/:id/      - Retrieve request details
-- GET    /api/content-requests/:id/content/ - Get generated content
-- POST   /api/content-requests/:id/feedback/ - Submit feedback
-- POST   /api/content-requests/:id/cancel/ - Cancel request
+Extension points:
+- Add authentication decorators when auth is implemented
+- Add permission classes for authorization
+- Add rate limiting for production
+- Add caching for frequently accessed resources
+
+Design principles:
+- Controllers are thin - no business logic here
+- All logic delegated to service layer
+- Consistent error responses
+- RESTful design patterns
 """
 import logging
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from uuid import UUID
+from rest_framework import status
+from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError, NotFound
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import Http404
 
-from ..models import ContentRequest, GeneratedContent, UserFeedback
+from ..models import ContentRequestModel
+from ..services.content_service import get_content_request_service
+from ..services.validators import ValidationError as DomainValidationError
+from ..domain.exceptions import InvalidStatusTransitionError
 from .serializers import (
     ContentRequestCreateSerializer,
+    ContentRequestResponseSerializer,
     ContentRequestListSerializer,
-    ContentRequestDetailSerializer,
-    GeneratedContentSerializer,
-    FeedbackCreateSerializer,
-    UserFeedbackSerializer
+    ErrorResponseSerializer,
 )
-from ..services.content_service import ContentRequestService
 
 
 logger = logging.getLogger(__name__)
 
 
-class ContentRequestViewSet(viewsets.ModelViewSet):
+class ContentRequestListCreateView(APIView):
     """
-    ViewSet for managing content requests.
+    API endpoint for listing and creating content requests.
     
-    Provides standard CRUD operations plus custom actions:
-    - list: Get all requests (with optional filtering)
-    - create: Create a new request and trigger async generation
-    - retrieve: Get request details with nested data
-    - content: Get generated content for a request
-    - feedback: Submit feedback on generated content
-    - cancel: Cancel a pending request
-    
-    The ViewSet uses different serializers for different actions
-    to optimize data transfer and validation.
+    POST /api/content-requests
+        Create a new content request
+        
+    GET /api/content-requests
+        List all content requests (with optional filtering)
     """
     
-    queryset = ContentRequest.objects.all().order_by('-created_at')
-    
-    # Dependency injection for service layer (easier testing)
-    service_class = ContentRequestService
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.service = self.service_class()
-    
-    def get_serializer_class(self):
+    def post(self, request):
         """
-        Return appropriate serializer class based on action.
+        Create a new content request.
+        
+        Request body:
+            {
+                "topic": "string",
+                "content_type": "SUMMARY|WORKED_EXAMPLES|FORMULA_SHEET",
+                "style": "BRIEF|DETAILED|STEP_BY_STEP",
+                "output_format": "TEXT|PDF|WORKSHEET",
+                "difficulty": "EASY|MEDIUM|HARD" (optional),
+                "notes": "string" (optional)
+            }
         
         Returns:
-            Serializer class for the current action
+            201: Created with request details
+            400: Validation error
+            500: Internal server error
         """
-        if self.action == 'list':
-            return ContentRequestListSerializer
-        elif self.action == 'create':
-            return ContentRequestCreateSerializer
-        elif self.action == 'retrieve':
-            return ContentRequestDetailSerializer
-        elif self.action == 'feedback':
-            return FeedbackCreateSerializer
+        serializer = ContentRequestCreateSerializer(data=request.data)
         
-        return ContentRequestDetailSerializer
-    
-    def list(self, request, *args, **kwargs):
-        """
-        List content requests with optional filtering.
+        if not serializer.is_valid():
+            logger.warning(f"Validation failed: {serializer.errors}")
+            return Response(
+                {
+                    'error': 'Validation failed',
+                    'errors': serializer.errors
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        Query Parameters:
-            - status: Filter by status (pending, processing, completed, failed)
-            - limit: Maximum results to return (default: 50)
-            - offset: Pagination offset (default: 0)
+        try:
+            service = get_content_request_service()
+            content_request = service.create_request(**serializer.validated_data)
             
+            # Get the model instance from repository using the domain entity's ID
+            model_instance = ContentRequestModel.objects.get(id=content_request.id)
+            response_serializer = ContentRequestResponseSerializer(model_instance)
+            
+            logger.info(f"Created content request {content_request.id}")
+            return Response(
+                response_serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+        
+        except DomainValidationError as e:
+            logger.error(f"Domain validation error: {e.errors}")
+            return Response(
+                {
+                    'error': 'Validation failed',
+                    'errors': e.errors
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        except Exception as e:
+            logger.exception(f"Unexpected error creating content request: {str(e)}")
+            return Response(
+                {
+                    'error': 'Internal server error',
+                    'detail': 'Failed to create content request'
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def get(self, request):
+        """
+        List content requests.
+        
+        Query parameters:
+            - status: Filter by status (optional)
+            - limit: Max results (default: 100, max: 1000)
+            - offset: Pagination offset (default: 0)
+        
         Returns:
-            Response: List of content requests
+            200: List of requests
+            400: Invalid query parameters
+            500: Internal server error
         """
         try:
             # Get query parameters
             status_filter = request.query_params.get('status')
-            limit = int(request.query_params.get('limit', 50))
+            limit = min(int(request.query_params.get('limit', 100)), 1000)
             offset = int(request.query_params.get('offset', 0))
             
-            # Validate limit
-            if limit > 100:
-                limit = 100  # Maximum limit
+            # Validate status if provided
+            if status_filter:
+                from ..domain.enums import RequestStatus
+                try:
+                    # Accept both uppercase and lowercase
+                    status_enum = RequestStatus(status_filter.upper())
+                except ValueError:
+                    return Response(
+                        {
+                            'error': 'Invalid status value',
+                            'detail': f'Status must be one of: {", ".join(RequestStatus.values())}'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                service = get_content_request_service()
+                requests = service.list_requests(
+                    status=status_enum,
+                    limit=limit,
+                    offset=offset
+                )
+            else:
+                service = get_content_request_service()
+                requests = service.list_requests(limit=limit, offset=offset)
             
-            # Get filtered requests from service
-            requests = self.service.list_requests(
-                status=status_filter,
-                limit=limit,
-                offset=offset
-            )
+            serializer = ContentRequestListSerializer(requests, many=True)
             
-            # Serialize and return
-            serializer = self.get_serializer(requests, many=True)
-            
-            return Response({
-                'count': len(requests),
-                'results': serializer.data
-            })
-            
-        except Exception as e:
-            logger.error(f"Error listing requests: {str(e)}")
+            logger.debug(f"Listed {len(requests)} content requests")
             return Response(
-                {'error': 'Failed to retrieve requests'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {
+                    'results': serializer.data,
+                    'count': len(serializer.data)
+                },
+                status=status.HTTP_200_OK
             )
-    
-    def create(self, request, *args, **kwargs):
-        """
-        Create a new content request.
         
-        Request Body:
-            {
-                "topic": "string",
-                "style": "brief|detailed|step_by_step",
-                "format": "text|pdf|worksheet",
-                "metadata": {} (optional)
-            }
-            
-        Returns:
-            Response: Created request details with status 201
-        """
-        try:
-            # Validate input
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            
-            # Create request via service
-            content_request = self.service.create_request(
-                topic=serializer.validated_data['topic'],
-                style=serializer.validated_data['style'],
-                format=serializer.validated_data['format'],
-                metadata=serializer.validated_data.get('metadata', {}),
-                # user=request.user  # Uncomment when auth is implemented
-            )
-            
-            # Trigger async content generation
-            # This will be implemented with Celery tasks
-            from ..tasks import generate_content_task
-            generate_content_task.delay(content_request.id)
-            
-            # Return created request
-            response_serializer = ContentRequestDetailSerializer(content_request)
-            
-            logger.info(f"Created content request #{content_request.id}")
-            
+        except ValueError as e:
             return Response(
-                response_serializer.data,
-                status=status.HTTP_201_CREATED
-            )
-            
-        except DjangoValidationError as e:
-            logger.warning(f"Validation error creating request: {str(e)}")
-            return Response(
-                {'error': str(e)},
+                {
+                    'error': 'Invalid query parameters',
+                    'detail': str(e)
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         except Exception as e:
-            logger.error(f"Error creating request: {str(e)}")
+            logger.exception(f"Unexpected error listing content requests: {str(e)}")
             return Response(
-                {'error': 'Failed to create request'},
+                {
+                    'error': 'Internal server error',
+                    'detail': 'Failed to list content requests'
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class ContentRequestDetailView(APIView):
+    """
+    API endpoint for retrieving individual content request details.
     
-    def retrieve(self, request, pk=None, *args, **kwargs):
+    GET /api/content-requests/{id}
+        Retrieve full details of a content request
+    """
+    
+    def get(self, request, request_id):
         """
-        Retrieve detailed information about a content request.
+        Retrieve a content request by ID.
         
-        Path Parameters:
-            - pk: Request ID
-            
+        Path parameters:
+            - request_id: UUID of the content request
+        
         Returns:
-            Response: Request details with nested content and feedback
+            200: Request details
+            404: Request not found
+            400: Invalid UUID
+            500: Internal server error
         """
         try:
-            content_request = self.service.get_request(pk)
-            
-            if not content_request:
-                raise NotFound(f"Content request #{pk} not found")
-            
-            serializer = self.get_serializer(content_request)
-            
-            return Response(serializer.data)
-            
-        except NotFound:
-            raise
-        
-        except Exception as e:
-            logger.error(f"Error retrieving request #{pk}: {str(e)}")
-            return Response(
-                {'error': 'Failed to retrieve request'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=True, methods=['get'], url_path='content')
-    def content(self, request, pk=None):
-        """
-        Retrieve generated content for a request.
-        
-        Path Parameters:
-            - pk: Request ID
-            
-        Returns:
-            Response: Generated content or 404 if not yet available
-        """
-        try:
-            generated_content = self.service.get_request_content(pk)
-            
-            if not generated_content:
+            # Validate UUID
+            try:
+                uuid_obj = UUID(request_id)
+            except ValueError:
                 return Response(
                     {
-                        'message': 'Content not yet available',
-                        'status': 'Check request status for progress'
+                        'error': 'Invalid request ID',
+                        'detail': 'Request ID must be a valid UUID'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Fetch request
+            service = get_content_request_service()
+            content_request = service.get_request_by_id(uuid_obj)
+            
+            if not content_request:
+                logger.warning(f"Content request {request_id} not found")
+                return Response(
+                    {
+                        'error': 'Not found',
+                        'detail': f'Content request {request_id} does not exist'
                     },
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            serializer = GeneratedContentSerializer(generated_content)
+            serializer = ContentRequestResponseSerializer(content_request)
             
-            return Response(serializer.data)
-            
-        except Exception as e:
-            logger.error(f"Error retrieving content for request #{pk}: {str(e)}")
-            return Response(
-                {'error': 'Failed to retrieve content'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @action(detail=True, methods=['post'], url_path='feedback')
-    def feedback(self, request, pk=None):
-        """
-        Submit feedback for a content request.
-        
-        Path Parameters:
-            - pk: Request ID
-            
-        Request Body:
-            {
-                "feedback_type": "positive|negative|report_issue|suggestion",
-                "notes": "string" (optional but required for some types)
-            }
-            
-        Returns:
-            Response: Created feedback with status 201
-        """
-        try:
-            # Validate input
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            
-            # Create feedback via service
-            feedback = self.service.add_feedback(
-                request_id=pk,
-                feedback_type=serializer.validated_data['feedback_type'],
-                notes=serializer.validated_data.get('notes', ''),
-                # user=request.user  # Uncomment when auth is implemented
-            )
-            
-            # Return created feedback
-            response_serializer = UserFeedbackSerializer(feedback)
-            
-            logger.info(f"Added feedback for request #{pk}")
-            
-            return Response(
-                response_serializer.data,
-                status=status.HTTP_201_CREATED
-            )
-            
-        except DjangoValidationError as e:
-            logger.warning(f"Validation error adding feedback: {str(e)}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            logger.debug(f"Retrieved content request {request_id}")
+            return Response(serializer.data, status=status.HTTP_200_OK)
         
         except Exception as e:
-            logger.error(f"Error adding feedback for request #{pk}: {str(e)}")
-            return Response(
-                {'error': 'Failed to add feedback'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            logger.exception(
+                f"Unexpected error retrieving content request {request_id}: {str(e)}"
             )
-    
-    @action(detail=True, methods=['post'], url_path='cancel')
-    def cancel(self, request, pk=None):
-        """
-        Cancel a pending content request.
-        
-        Path Parameters:
-            - pk: Request ID
-            
-        Returns:
-            Response: Success message or error
-        """
-        try:
-            success = self.service.cancel_request(pk)
-            
-            if success:
-                return Response({
-                    'message': f'Request #{pk} cancelled successfully'
-                })
-            else:
-                return Response(
-                    {'error': 'Failed to cancel request'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-        except DjangoValidationError as e:
-            logger.warning(f"Validation error cancelling request: {str(e)}")
             return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        except Exception as e:
-            logger.error(f"Error cancelling request #{pk}: {str(e)}")
-            return Response(
-                {'error': 'Failed to cancel request'},
+                {
+                    'error': 'Internal server error',
+                    'detail': 'Failed to retrieve content request'
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
-class HealthCheckViewSet(viewsets.ViewSet):
-    """
-    Simple health check endpoint for monitoring.
-    
-    Used to verify the API is running and responsive.
-    """
-    
-    @action(detail=False, methods=['get'], url_path='health')
-    def health(self, request):
-        """
-        Health check endpoint.
-        
-        Returns:
-            Response: Service health status
-        """
-        return Response({
-            'status': 'healthy',
-            'service': 'content-requests-api',
-            'version': '1.0.0'
-        })
+# Phase 2+ views will be added here when additional features are implemented
+# Examples:
+# - ContentGenerationStatusView: for polling generation status
+# - ContentDownloadView: for downloading generated PDFs/worksheets
+# - FeedbackSubmissionView: for submitting user feedback
+# - RequestStatisticsView: for analytics and monitoring

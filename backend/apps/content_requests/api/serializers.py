@@ -1,246 +1,146 @@
 """
-Django REST Framework Serializers for Content Requests Module
+Content Request API Serializers.
 
-This module provides serializers for validating API requests and
-formatting API responses. Follows DRF best practices for input validation,
-output formatting, and nested relationships.
+Provides serialization and validation for content request operations:
+- ContentRequestCreateSerializer: For POST requests (creation)
+- ContentRequestResponseSerializer: For GET responses (detail view)
+- ContentRequestListSerializer: For GET responses (list view)
+- ContentRequestUpdateSerializer: For internal status updates
+- ErrorResponseSerializer: For error handling
 """
+
 from rest_framework import serializers
-from ..models import ContentRequest, GeneratedContent, UserFeedback
+from typing import Dict, Any
+
+from apps.content_requests.models import ContentRequestModel
+from apps.content_requests.domain.enums import (
+    ContentType,
+    Style,
+    OutputFormat,
+    Difficulty,
+    RequestStatus
+)
 
 
-class GeneratedContentSerializer(serializers.ModelSerializer):
+class ContentRequestCreateSerializer(serializers.Serializer):
     """
-    Serializer for GeneratedContent model.
+    Serializer for creating a new content request.
     
-    Handles serialization of AI-generated content, including
-    the content text, format, and metadata.
-    """
-    
-    class Meta:
-        model = GeneratedContent
-        fields = [
-            'id',
-            'format',
-            'content_text',
-            'metadata',
-            'created_at'
-        ]
-        read_only_fields = ['id', 'created_at']
-
-
-class UserFeedbackSerializer(serializers.ModelSerializer):
-    """
-    Serializer for UserFeedback model.
-    
-    Validates and serializes user feedback on generated content.
+    Accepts user input for creating educational content generation requests.
     """
     
-    class Meta:
-        model = UserFeedback
-        fields = [
-            'id',
-            'feedback_type',
-            'notes',
-            'created_at'
-        ]
-        read_only_fields = ['id', 'created_at']
+    topic = serializers.CharField(
+        max_length=500,
+        required=True,
+        help_text="The topic or subject for content generation"
+    )
     
-    def validate_notes(self, value):
+    content_type = serializers.ChoiceField(
+        choices=ContentType.choices(),
+        required=True,
+        help_text="Type of content to generate"
+    )
+    
+    style = serializers.ChoiceField(
+        choices=Style.choices(),
+        required=True,
+        help_text="Teaching/learning style"
+    )
+    
+    output_format = serializers.ChoiceField(
+        choices=OutputFormat.choices(),
+        required=True,
+        help_text="Desired output format"
+    )
+    
+    difficulty = serializers.ChoiceField(
+        choices=Difficulty.choices(),
+        required=True,
+        help_text="Content difficulty level"
+    )
+    
+    notes = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=2000,
+        help_text="Additional notes or requirements"
+    )
+    
+    def validate_topic(self, value: str) -> str:
+        """Validate topic field."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Topic cannot be empty.")
+        return value.strip()
+    
+    def validate_notes(self, value: str) -> str:
+        """Validate notes field."""
+        if value:
+            return value.strip()
+        return ""
+    
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate feedback notes.
+        Validate the entire request data.
         
         Args:
-            value (str): The feedback notes text
+            attrs: Dictionary of attributes
             
         Returns:
-            str: Validated notes
-            
-        Raises:
-            ValidationError: If notes exceed maximum length
+            Validated attributes
         """
-        if len(value) > 2000:
-            raise serializers.ValidationError(
-                "Feedback notes cannot exceed 2000 characters."
-            )
-        return value
+        # Ensure all enum values are valid
+        try:
+            ContentType(attrs['content_type'])
+            Style(attrs['style'])
+            OutputFormat(attrs['output_format'])
+            Difficulty(attrs['difficulty'])
+        except ValueError as e:
+            raise serializers.ValidationError(f"Invalid enum value: {str(e)}")
+        
+        return attrs
+
+
+class ContentRequestResponseSerializer(serializers.ModelSerializer):
+    """
+    Serializer for content request detail responses.
+    
+    Provides complete information for a single request.
+    """
+    
+    class Meta:
+        model = ContentRequestModel
+        fields = [
+            'id',
+            'topic',
+            'content_type',
+            'style',
+            'output_format',
+            'difficulty',
+            'notes',
+            'status',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
 
 
 class ContentRequestListSerializer(serializers.ModelSerializer):
     """
-    Lightweight serializer for listing content requests.
+    Serializer for content request list responses.
     
-    Used for list views where we don't need full nested relationships.
+    Provides summary information for multiple requests.
     """
     
     class Meta:
-        model = ContentRequest
+        model = ContentRequestModel
         fields = [
             'id',
             'topic',
-            'style',
-            'format',
+            'content_type',
             'status',
             'created_at',
-            'updated_at'
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
-
-
-class ContentRequestDetailSerializer(serializers.ModelSerializer):
-    """
-    Detailed serializer for ContentRequest with nested relationships.
-    
-    Includes generated contents and feedbacks when retrieving
-    a specific request.
-    """
-    
-    generated_contents = GeneratedContentSerializer(many=True, read_only=True)
-    feedbacks = UserFeedbackSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = ContentRequest
-        fields = [
-            'id',
-            'topic',
-            'style',
-            'format',
-            'status',
-            'metadata',
-            'created_at',
-            'updated_at',
-            'generated_contents',
-            'feedbacks'
-        ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
-
-
-class ContentRequestCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating new content requests.
-    
-    Validates input data and provides detailed error messages.
-    Metadata field is optional and can contain custom parameters.
-    """
-    
-    class Meta:
-        model = ContentRequest
-        fields = [
-            'topic',
-            'style',
-            'format',
-            'metadata'
-        ]
-    
-    def validate_topic(self, value):
-        """
-        Validate the topic field.
-        
-        Args:
-            value (str): The topic text
-            
-        Returns:
-            str: Validated and cleaned topic
-            
-        Raises:
-            ValidationError: If topic is invalid
-        """
-        # Strip whitespace
-        value = value.strip()
-        
-        # Minimum length check
-        if len(value) < 3:
-            raise serializers.ValidationError(
-                "Topic must be at least 3 characters long."
-            )
-        
-        # Maximum length check
-        if len(value) > 500:
-            raise serializers.ValidationError(
-                "Topic cannot exceed 500 characters."
-            )
-        
-        return value
-    
-    def validate_metadata(self, value):
-        """
-        Validate metadata field.
-        
-        Args:
-            value (dict): Metadata dictionary
-            
-        Returns:
-            dict: Validated metadata
-            
-        Raises:
-            ValidationError: If metadata structure is invalid
-        """
-        if not isinstance(value, dict):
-            raise serializers.ValidationError(
-                "Metadata must be a valid JSON object."
-            )
-        
-        # Add validation for specific metadata keys if needed
-        # For now, accept any valid dict
-        
-        return value
-    
-    def create(self, validated_data):
-        """
-        Create a new ContentRequest instance.
-        
-        Args:
-            validated_data (dict): Validated request data
-            
-        Returns:
-            ContentRequest: Created instance
-        """
-        # Set initial status to pending
-        validated_data['status'] = ContentRequest.StatusChoices.PENDING
-        
-        # Future: Add user from request context when auth is implemented
-        # validated_data['user'] = self.context['request'].user
-        
-        return super().create(validated_data)
-
-
-class FeedbackCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating user feedback.
-    
-    Validates feedback submission and links it to a content request.
-    """
-    
-    class Meta:
-        model = UserFeedback
-        fields = [
-            'feedback_type',
-            'notes'
-        ]
-    
-    def validate(self, attrs):
-        """
-        Validate feedback data.
-        
-        Args:
-            attrs (dict): Feedback attributes
-            
-        Returns:
-            dict: Validated attributes
-            
-        Raises:
-            ValidationError: If validation fails
-        """
-        # Ensure notes are provided for certain feedback types
-        feedback_type = attrs.get('feedback_type')
-        notes = attrs.get('notes', '').strip()
-        
-        if feedback_type in ['report_issue', 'suggestion'] and not notes:
-            raise serializers.ValidationError({
-                'notes': f'Notes are required for {feedback_type} feedback.'
-            })
-        
-        return attrs
+        read_only_fields = fields
 
 
 class ContentRequestUpdateSerializer(serializers.ModelSerializer):
@@ -251,18 +151,18 @@ class ContentRequestUpdateSerializer(serializers.ModelSerializer):
     """
     
     class Meta:
-        model = ContentRequest
+        model = ContentRequestModel
         fields = ['status']
     
-    def validate_status(self, value):
+    def validate_status(self, value: str) -> str:
         """
         Validate status transitions.
         
         Args:
-            value (str): New status
+            value: New status
             
         Returns:
-            str: Validated status
+            Validated status
             
         Raises:
             ValidationError: If status transition is invalid
@@ -274,11 +174,10 @@ class ContentRequestUpdateSerializer(serializers.ModelSerializer):
             
             # Define valid status transitions
             valid_transitions = {
-                'pending': ['processing', 'cancelled'],
-                'processing': ['completed', 'failed'],
-                'completed': [],  # Terminal state
-                'failed': ['pending'],  # Allow retry
-                'cancelled': []  # Terminal state
+                RequestStatus.PENDING: [RequestStatus.PROCESSING, RequestStatus.FAILED],
+                RequestStatus.PROCESSING: [RequestStatus.COMPLETED, RequestStatus.FAILED],
+                RequestStatus.COMPLETED: [],  # Terminal state
+                RequestStatus.FAILED: [RequestStatus.PENDING],  # Allow retry
             }
             
             if value not in valid_transitions.get(current_status, []):
@@ -287,3 +186,21 @@ class ContentRequestUpdateSerializer(serializers.ModelSerializer):
                 )
         
         return value
+
+
+class ErrorResponseSerializer(serializers.Serializer):
+    """
+    Serializer for error responses.
+    
+    Provides consistent error response format across the API.
+    """
+    
+    error = serializers.CharField()
+    details = serializers.DictField(required=False)
+    
+    def format_error(self, error_message: str, details: Dict = None) -> Dict[str, Any]:
+        """Format error response."""
+        response = {'error': error_message}
+        if details:
+            response['details'] = details
+        return response

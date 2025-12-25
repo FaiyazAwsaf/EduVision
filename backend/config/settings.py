@@ -49,9 +49,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     
-    # Custom middleware
+    # Custom middleware for content requests
     "apps.content_requests.middleware.RequestLoggingMiddleware",
-    "apps.content_requests.middleware.ErrorHandlingMiddleware",
+    "apps.content_requests.middleware.ContentRequestErrorHandlingMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

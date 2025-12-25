@@ -1,23 +1,32 @@
 """
-URL Configuration for Content Requests API
+URL Configuration for Content Request API - Phase 1
 
-Defines URL routing for the content requests module.
-Uses Django REST Framework's router for automatic URL generation.
+Defines URL routing for content request endpoints.
+Uses Django URL patterns for explicit routing.
+
+Endpoints:
+- POST   /api/content-requests/        - Create new request
+- GET    /api/content-requests/        - List all requests
+- GET    /api/content-requests/<id>/   - Retrieve request details
 """
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import ContentRequestViewSet, HealthCheckViewSet
+from django.urls import path
+from .views import ContentRequestListCreateView, ContentRequestDetailView
 
 
-# Create a router and register viewsets
-router = DefaultRouter()
-router.register(r'requests', ContentRequestViewSet, basename='content-request')
-router.register(r'', HealthCheckViewSet, basename='health')
-
-# App name for namespacing
 app_name = 'content_requests'
 
-# URL patterns
 urlpatterns = [
-    path('', include(router.urls)),
+    # List and create content requests
+    path(
+        '',
+        ContentRequestListCreateView.as_view(),
+        name='content-request-list-create'
+    ),
+    
+    # Retrieve content request details
+    path(
+        '<str:request_id>/',
+        ContentRequestDetailView.as_view(),
+        name='content-request-detail'
+    ),
 ]

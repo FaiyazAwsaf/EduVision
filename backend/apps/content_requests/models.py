@@ -1,265 +1,143 @@
 """
 Database Models for Content Requests Module
 
-This module defines the core data structures for the AI-Assisted Content Request System:
-- ContentRequest: Stores user requests for AI-generated content
-- GeneratedContent: Stores the AI-generated content responses
-- UserFeedback: Stores user feedback on generated content quality
+This module defines the persistence layer for the AI-Assisted Content Request System.
+It maps domain models to database tables using Django ORM.
+
+The model is designed to be extensible for future phases (e.g., user associations,
+analytics, versioning) without requiring schema migrations.
 """
+import uuid
 from django.db import models
-from django.core.validators import MinLengthValidator
+from django.core.validators import MinLengthValidator, MaxLengthValidator
 from django.utils.translation import gettext_lazy as _
 
+from .domain.enums import ContentType, Style, OutputFormat, Difficulty, RequestStatus
 
-class ContentRequest(models.Model):
+
+class ContentRequestModel(models.Model):
     """
-    Model representing a user's request for AI-generated educational content.
+    ORM model for persisting ContentRequest domain entities.
     
-    This model stores all information about what content the user wants,
-    in what style and format, and tracks the processing status.
+    This is a thin persistence layer that stores domain model data.
+    Business logic should NOT live here - it belongs in domain models and services.
     
-    Attributes:
-        topic (str): The subject/topic for which content is requested
-        style (str): Content generation style (brief, detailed, step-by-step)
-        format (str): Output format (text, pdf, worksheet)
-        status (str): Current processing status of the request
-        metadata (dict): Additional request parameters and configuration
-        created_at (datetime): Timestamp when request was created
-        updated_at (datetime): Timestamp when request was last modified
+    The model uses domain enums for consistency across the system.
+    All status transitions must follow domain rules enforced in the service layer.
+    
+    Extension points:
+    - user_id field can be added when authentication is implemented
+    - metadata JSON field can store additional context for future features
+    - generated_content_url can link to stored artifacts
+    
+    Indexing strategy:
+    - Primary key (id) is UUID for distributed systems compatibility
+    - status indexed for efficient filtering of pending/processing requests
+    - created_at indexed for time-based queries
     """
     
-    class StyleChoices(models.TextChoices):
-        """Available content generation styles"""
-        BRIEF = 'brief', _('Brief')
-        DETAILED = 'detailed', _('Detailed')
-        STEP_BY_STEP = 'step_by_step', _('Step-by-Step')
+    # Primary key - UUID for distributed system friendliness
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text=_("Unique identifier for the request")
+    )
     
-    class FormatChoices(models.TextChoices):
-        """Available output formats"""
-        TEXT = 'text', _('Text')
-        PDF = 'pdf', _('PDF')
-        WORKSHEET = 'worksheet', _('Worksheet')
-    
-    class StatusChoices(models.TextChoices):
-        """Request processing status"""
-        PENDING = 'pending', _('Pending')
-        PROCESSING = 'processing', _('Processing')
-        COMPLETED = 'completed', _('Completed')
-        FAILED = 'failed', _('Failed')
-        CANCELLED = 'cancelled', _('Cancelled')
-    
-    # Core fields
+    # Required fields
     topic = models.CharField(
         max_length=500,
-        validators=[MinLengthValidator(3)],
-        help_text="The subject or topic for content generation",
-        db_index=True
+        validators=[MinLengthValidator(1)],
+        help_text=_("Subject matter for content generation")
+    )
+    
+    content_type = models.CharField(
+        max_length=50,
+        choices=ContentType.choices(),
+        help_text=_("Type of content to generate")
     )
     
     style = models.CharField(
-        max_length=20,
-        choices=StyleChoices.choices,
-        default=StyleChoices.DETAILED,
-        help_text="Content generation style preference"
+        max_length=50,
+        choices=Style.choices(),
+        help_text=_("Generation style preference")
     )
     
-    format = models.CharField(
-        max_length=20,
-        choices=FormatChoices.choices,
-        default=FormatChoices.TEXT,
-        help_text="Desired output format"
+    output_format = models.CharField(
+        max_length=50,
+        choices=OutputFormat.choices(),
+        help_text=_("Desired output format")
     )
     
-    status = models.CharField(
-        max_length=20,
-        choices=StatusChoices.choices,
-        default=StatusChoices.PENDING,
-        help_text="Current processing status",
-        db_index=True
-    )
-    
-    # Metadata and extensibility
-    metadata = models.JSONField(
-        default=dict,
+    # Optional fields
+    difficulty = models.CharField(
+        max_length=50,
+        choices=Difficulty.choices(),
+        null=True,
         blank=True,
-        help_text="Additional request parameters (e.g., difficulty level, prerequisites)"
+        help_text=_("Optional difficulty level")
+    )
+    
+    notes = models.TextField(
+        max_length=2000,
+        null=True,
+        blank=True,
+        help_text=_("Optional additional instructions or context")
+    )
+    
+    # System-managed fields
+    status = models.CharField(
+        max_length=50,
+        choices=RequestStatus.choices(),
+        default=RequestStatus.PENDING.value,
+        db_index=True,
+        help_text=_("Current lifecycle status (system-managed)")
     )
     
     # Timestamps
     created_at = models.DateTimeField(
         auto_now_add=True,
-        help_text="Timestamp when the request was created",
-        db_index=True
+        db_index=True,
+        help_text=_("Timestamp when request was created")
     )
     
     updated_at = models.DateTimeField(
         auto_now=True,
-        help_text="Timestamp when the request was last updated"
+        help_text=_("Timestamp when request was last updated")
     )
     
-    # Future extensibility: Add user foreign key when auth module is implemented
-    # user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='content_requests')
+    # Extension point for future phases
+    # When authentication is implemented, add:
+    # user = models.ForeignKey('user.User', on_delete=models.CASCADE, null=True, blank=True)
+    
+    # When content generation is implemented, add:
+    # generated_content_url = models.URLField(null=True, blank=True)
+    # error_message = models.TextField(null=True, blank=True)
     
     class Meta:
         db_table = 'content_requests'
-        verbose_name = 'Content Request'
-        verbose_name_plural = 'Content Requests'
+        verbose_name = _('Content Request')
+        verbose_name_plural = _('Content Requests')
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['-created_at', 'status'], name='cr_created_status_idx'),
-            models.Index(fields=['status', 'updated_at'], name='cr_status_updated_idx'),
+            # Efficient querying for pending requests
+            models.Index(fields=['status', 'created_at'], name='cr_status_created_idx'),
+            # Time-based queries
+            models.Index(fields=['-created_at'], name='cr_created_idx'),
         ]
     
     def __str__(self):
-        return f"Request #{self.id}: {self.topic[:50]} ({self.status})"
+        return f"ContentRequest({self.id}): {self.topic[:50]} [{self.status}]"
     
-    def mark_processing(self):
-        """Update status to processing"""
-        self.status = self.StatusChoices.PROCESSING
-        self.save(update_fields=['status', 'updated_at'])
-    
-    def mark_completed(self):
-        """Update status to completed"""
-        self.status = self.StatusChoices.COMPLETED
-        self.save(update_fields=['status', 'updated_at'])
-    
-    def mark_failed(self):
-        """Update status to failed"""
-        self.status = self.StatusChoices.FAILED
-        self.save(update_fields=['status', 'updated_at'])
+    def __repr__(self):
+        return (
+            f"<ContentRequestModel id={self.id} status={self.status} "
+            f"topic='{self.topic[:30]}...'>"
+        )
 
 
-class GeneratedContent(models.Model):
-    """
-    Model storing AI-generated content responses.
-    
-    This model holds the actual content generated by the AI system
-    in response to a ContentRequest, along with metadata about the generation.
-    
-    Attributes:
-        request (ForeignKey): Link to the originating ContentRequest
-        content_text (str): The generated content body
-        format (str): Format of the generated content
-        metadata (dict): Generation metadata (model used, tokens, etc.)
-        created_at (datetime): Timestamp when content was generated
-    """
-    
-    class FormatChoices(models.TextChoices):
-        """Available content formats"""
-        SUMMARY = 'summary', _('Summary')
-        WORKED_EXAMPLE = 'worked_example', _('Worked Example')
-        FORMULA_SHEET = 'formula_sheet', _('Formula Sheet')
-        STUDY_PLAN = 'study_plan', _('Study Plan')
-        CONCEPT_EXPLANATION = 'concept_explanation', _('Concept Explanation')
-    
-    # Foreign key to content request
-    request = models.ForeignKey(
-        ContentRequest,
-        on_delete=models.CASCADE,
-        related_name='generated_contents',
-        help_text="The content request this content fulfills"
-    )
-    
-    # Content data
-    content_text = models.TextField(
-        help_text="The generated content body"
-    )
-    
-    format = models.CharField(
-        max_length=30,
-        choices=FormatChoices.choices,
-        default=FormatChoices.SUMMARY,
-        help_text="Type of generated content"
-    )
-    
-    # Metadata about generation
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Metadata about content generation (model, tokens, parameters)"
-    )
-    
-    # Timestamp
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Timestamp when content was generated",
-        db_index=True
-    )
-    
-    class Meta:
-        db_table = 'generated_content'
-        verbose_name = 'Generated Content'
-        verbose_name_plural = 'Generated Contents'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['request', '-created_at'], name='gc_request_created_idx'),
-        ]
-    
-    def __str__(self):
-        return f"Content for Request #{self.request_id}: {self.format}"
-
-
-class UserFeedback(models.Model):
-    """
-    Model for storing user feedback on generated content.
-    
-    This model captures user satisfaction and issues with generated content,
-    enabling continuous improvement of the AI system.
-    
-    Attributes:
-        request (ForeignKey): Link to the ContentRequest being reviewed
-        feedback_type (str): Type of feedback (positive, negative, report)
-        notes (str): Detailed feedback comments
-        created_at (datetime): Timestamp when feedback was submitted
-    """
-    
-    class FeedbackTypeChoices(models.TextChoices):
-        """Types of feedback"""
-        POSITIVE = 'positive', _('Positive')
-        NEGATIVE = 'negative', _('Negative')
-        REPORT_ISSUE = 'report_issue', _('Report Issue')
-        SUGGESTION = 'suggestion', _('Suggestion')
-    
-    # Foreign key to content request
-    request = models.ForeignKey(
-        ContentRequest,
-        on_delete=models.CASCADE,
-        related_name='feedbacks',
-        help_text="The content request being reviewed"
-    )
-    
-    # Feedback data
-    feedback_type = models.CharField(
-        max_length=20,
-        choices=FeedbackTypeChoices.choices,
-        help_text="Type of feedback provided",
-        db_index=True
-    )
-    
-    notes = models.TextField(
-        blank=True,
-        help_text="Detailed feedback comments or suggestions"
-    )
-    
-    # Timestamp
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Timestamp when feedback was submitted",
-        db_index=True
-    )
-    
-    # Future extensibility: Add user foreign key when auth module is implemented
-    # user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='content_feedbacks')
-    
-    class Meta:
-        db_table = 'user_feedback'
-        verbose_name = 'User Feedback'
-        verbose_name_plural = 'User Feedbacks'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['request', '-created_at'], name='uf_request_created_idx'),
-            models.Index(fields=['feedback_type', '-created_at'], name='uf_type_created_idx'),
-        ]
-    
-    def __str__(self):
-        return f"Feedback for Request #{self.request_id}: {self.feedback_type}"
+# Phase 2+ models will be added here when content generation is implemented
+# Examples:
+# - GeneratedContentModel: stores AI-generated content
+# - UserFeedbackModel: stores user feedback on content quality
+# - ContentVersionModel: tracks content revisions

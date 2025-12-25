@@ -1,270 +1,185 @@
 """
-Celery Tasks for Content Requests Module
+Background Tasks for Content Request Processing
 
-This module defines asynchronous background tasks for content generation.
-Tasks are executed by Celery workers and communicate via Redis.
+This module defines Celery tasks for asynchronous processing of content requests.
 
-Task Types:
-- Content generation tasks (primary)
-- Batch processing tasks (future)
-- Cleanup tasks (future)
+Phase 1 Scope:
+- Stub implementation that simulates processing
+- Status transitions (PENDING -> PROCESSING -> COMPLETED)
+- Error handling and retry logic
+- Logging for observability
+
+Phase 2+ Extensions:
+- Call actual AI generation service
+- Handle file storage for generated content
+- Send notifications to users
+- Implement cleanup tasks
+
+Design principles:
+- Idempotent tasks (can safely retry)
+- Atomic status updates
+- Comprehensive error handling
+- Structured logging for monitoring
 """
+import time
 import logging
 from celery import shared_task
-from django.core.exceptions import ValidationError
+from uuid import UUID
 
-from .services.content_service import ContentRequestService
-from .models import ContentRequest
-
+from .services.content_service import get_content_request_service
+from .domain.enums import RequestStatus
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task(
     bind=True,
-    name='content_requests.generate_content',
+    name='content_requests.process_request',
     max_retries=3,
-    default_retry_delay=60
+    default_retry_delay=60,  # 60 seconds
 )
-def generate_content_task(self, request_id: int):
+def process_content_request(self, request_id: str):
     """
-    Asynchronous task to generate content for a request.
+    Process a content generation request asynchronously.
     
-    This task is triggered when a new content request is created.
-    It processes the request in the background to avoid blocking
-    the API response.
+    Phase 1: Stub implementation that simulates processing.
+    Phase 2+: Will call AI service to generate actual content.
     
     Args:
-        request_id (int): The ContentRequest ID to process
+        request_id: UUID string of the request to process
         
     Returns:
-        dict: Task result with success status and generated content ID
+        dict: Processing result with success status
         
-    Raises:
-        Exception: If generation fails after retries
+    Workflow:
+        1. Update status to PROCESSING
+        2. Simulate work (sleep)
+        3. Update status to COMPLETED
+        4. Handle errors by updating to FAILED
     """
+    service = get_content_request_service()
+    
     try:
-        logger.info(f"Starting content generation task for request #{request_id}")
+        request_uuid = UUID(request_id)
+        logger.info(f"[Task] Starting processing for request {request_id}")
         
-        # Initialize service
-        service = ContentRequestService()
+        # Update status to PROCESSING
+        success = service.update_request_status(request_uuid, RequestStatus.PROCESSING)
+        if not success:
+            logger.error(f"[Task] Failed to update status to PROCESSING for {request_id}")
+            return {
+                'success': False,
+                'request_id': request_id,
+                'error': 'Failed to update status to PROCESSING'
+            }
         
-        # Generate content synchronously (within the async task)
-        generated_content = service.generate_content_sync(request_id)
+        logger.info(f"[Task] Request {request_id} status updated to PROCESSING")
         
-        logger.info(
-            f"Successfully generated content #{generated_content.id} "
-            f"for request #{request_id}"
-        )
+        # Phase 1: Simulate processing work
+        # Phase 2+: Call AI service here
+        time.sleep(2)  # Simulate work
+        
+        # Update status to COMPLETED
+        success = service.update_request_status(request_uuid, RequestStatus.COMPLETED)
+        if not success:
+            logger.error(f"[Task] Failed to update status to COMPLETED for {request_id}")
+            return {
+                'success': False,
+                'request_id': request_id,
+                'error': 'Failed to update status to COMPLETED'
+            }
+        
+        logger.info(f"[Task] Request {request_id} processing completed successfully")
         
         return {
             'success': True,
             'request_id': request_id,
-            'content_id': generated_content.id,
-            'message': 'Content generated successfully'
+            'status': 'completed'
         }
         
-    except ValidationError as e:
-        logger.error(
-            f"Validation error generating content for request #{request_id}: {str(e)}"
-        )
-        
-        # Don't retry validation errors
+    except ValueError as e:
+        # Invalid UUID
+        logger.error(f"[Task] Invalid request ID format: {request_id} - {str(e)}")
         return {
             'success': False,
             'request_id': request_id,
-            'error': str(e)
+            'error': f'Invalid UUID: {str(e)}'
         }
-    
-    except Exception as exc:
+        
+    except Exception as e:
+        logger.exception(f"[Task] Error processing request {request_id}: {str(e)}")
+        
+        # Update status to FAILED
+        try:
+            request_uuid = UUID(request_id)
+            service.update_request_status(request_uuid, RequestStatus.FAILED)
+            logger.info(f"[Task] Request {request_id} marked as FAILED")
+        except Exception as status_error:
+            logger.error(
+                f"[Task] Failed to update status to FAILED for {request_id}: "
+                f"{str(status_error)}"
+            )
+        
+        # Retry the task if we haven't exceeded max retries
+        if self.request.retries < self.max_retries:
+            logger.info(
+                f"[Task] Retrying request {request_id} "
+                f"(attempt {self.request.retries + 1}/{self.max_retries})"
+            )
+            raise self.retry(exc=e, countdown=60)
+        
         logger.error(
-            f"Error generating content for request #{request_id}: {str(exc)}"
+            f"[Task] Max retries exceeded for request {request_id}"
         )
         
-        # Retry the task with exponential backoff
-        try:
-            # Exponential backoff: 1min, 2min, 4min
-            countdown = 60 * (2 ** self.request.retries)
-            raise self.retry(exc=exc, countdown=countdown)
-        except self.MaxRetriesExceededError:
-            logger.error(
-                f"Max retries exceeded for request #{request_id}. "
-                f"Marking as failed."
-            )
-            
-            # Mark request as failed
-            try:
-                request = ContentRequest.objects.get(id=request_id)
-                request.mark_failed()
-            except ContentRequest.DoesNotExist:
-                pass
-            
-            return {
-                'success': False,
-                'request_id': request_id,
-                'error': 'Max retries exceeded'
-            }
+        return {
+            'success': False,
+            'request_id': request_id,
+            'error': str(e),
+            'max_retries_exceeded': True
+        }
 
 
-@shared_task(
-    name='content_requests.batch_generate',
-    bind=True
-)
-def batch_generate_content_task(self, request_ids: list):
+@shared_task(name='content_requests.cleanup_old_requests')
+def cleanup_old_requests(days: int = 90):
     """
-    Batch process multiple content requests.
+    Periodic task to clean up old completed/failed requests.
     
-    This task is useful for processing multiple requests efficiently,
-    such as when importing bulk requests or scheduled processing.
+    Phase 1: Not implemented (stub)
+    Phase 2+: Archive old requests, cleanup file storage
+    
+    This task can be scheduled with Celery Beat to run periodically.
     
     Args:
-        request_ids (list): List of ContentRequest IDs to process
+        days: Number of days to retain requests (default: 90)
         
     Returns:
-        dict: Batch processing results
+        dict: Cleanup result summary
     """
-    logger.info(f"Starting batch content generation for {len(request_ids)} requests")
-    
-    results = {
-        'total': len(request_ids),
-        'successful': 0,
-        'failed': 0,
-        'details': []
-    }
-    
-    for request_id in request_ids:
-        try:
-            # Trigger individual generation task
-            result = generate_content_task.delay(request_id)
-            results['successful'] += 1
-            results['details'].append({
-                'request_id': request_id,
-                'status': 'queued',
-                'task_id': result.id
-            })
-        except Exception as e:
-            logger.error(f"Failed to queue request #{request_id}: {str(e)}")
-            results['failed'] += 1
-            results['details'].append({
-                'request_id': request_id,
-                'status': 'failed',
-                'error': str(e)
-            })
-    
-    logger.info(
-        f"Batch processing complete. "
-        f"Successful: {results['successful']}, Failed: {results['failed']}"
-    )
-    
-    return results
-
-
-@shared_task(
-    name='content_requests.cleanup_old_requests',
-    bind=True
-)
-def cleanup_old_requests_task(self, days: int = 90):
-    """
-    Cleanup old completed requests (scheduled task).
-    
-    This task can be scheduled to run periodically to clean up
-    old requests and free up database space.
-    
-    Args:
-        days (int): Delete requests older than this many days
-        
-    Returns:
-        dict: Cleanup statistics
-    """
-    from django.utils import timezone
-    from datetime import timedelta
-    
-    logger.info(f"Starting cleanup of requests older than {days} days")
-    
-    cutoff_date = timezone.now() - timedelta(days=days)
-    
-    # Find old completed requests
-    old_requests = ContentRequest.objects.filter(
-        status=ContentRequest.StatusChoices.COMPLETED,
-        updated_at__lt=cutoff_date
-    )
-    
-    count = old_requests.count()
-    
-    # Delete old requests (cascade will delete related content)
-    old_requests.delete()
-    
-    logger.info(f"Deleted {count} old requests")
-    
+    logger.info(f"[Task] Cleanup task called (not implemented in Phase 1) - days={days}")
     return {
-        'deleted_count': count,
-        'cutoff_date': cutoff_date.isoformat()
+        'message': 'Cleanup not implemented in Phase 1',
+        'days': days
     }
 
 
-@shared_task(
-    name='content_requests.retry_failed_requests',
-    bind=True
-)
-def retry_failed_requests_task(self):
+# Extension point for Phase 2+
+@shared_task(name='content_requests.generate_content')
+def generate_content(request_id: str):
     """
-    Retry failed content requests (scheduled task).
+    Generate actual content using AI service.
     
-    This task finds requests that failed due to transient errors
-    and retries them automatically.
+    Phase 1: Not implemented
+    Phase 2+: Call OpenAI/other AI service to generate content
     
+    Args:
+        request_id: UUID string of the request
+        
     Returns:
-        dict: Retry statistics
+        dict: Generation result
     """
-    logger.info("Starting retry of failed requests")
-    
-    # Find failed requests (could add time-based filtering)
-    failed_requests = ContentRequest.objects.filter(
-        status=ContentRequest.StatusChoices.FAILED
-    )[:50]  # Limit to avoid overwhelming the system
-    
-    results = {
-        'total_failed': ContentRequest.objects.filter(
-            status=ContentRequest.StatusChoices.FAILED
-        ).count(),
-        'retried': 0,
-        'queued_ids': []
+    logger.info(f"[Task] Content generation called for {request_id} (not implemented)")
+    return {
+        'message': 'AI generation not implemented in Phase 1',
+        'request_id': request_id
     }
-    
-    for request in failed_requests:
-        try:
-            # Reset status to pending
-            request.status = ContentRequest.StatusChoices.PENDING
-            request.save()
-            
-            # Queue for processing
-            generate_content_task.delay(request.id)
-            
-            results['retried'] += 1
-            results['queued_ids'].append(request.id)
-            
-        except Exception as e:
-            logger.error(f"Failed to retry request #{request.id}: {str(e)}")
-    
-    logger.info(f"Queued {results['retried']} failed requests for retry")
-    
-    return results
-
-
-# Periodic task schedule (configure in Django settings)
-# Example configuration to add to settings.py:
-"""
-from celery.schedules import crontab
-
-CELERY_BEAT_SCHEDULE = {
-    'cleanup-old-requests': {
-        'task': 'content_requests.cleanup_old_requests',
-        'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
-        'args': (90,)  # Delete requests older than 90 days
-    },
-    'retry-failed-requests': {
-        'task': 'content_requests.retry_failed_requests',
-        'schedule': crontab(minute='*/30'),  # Run every 30 minutes
-    },
-}
-"""

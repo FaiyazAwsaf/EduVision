@@ -1,73 +1,63 @@
 """
-Django Admin Configuration for Content Requests Module
+Django Admin Configuration for Content Requests Module - Phase 1
 
-Provides administrative interface for managing content requests,
-generated content, and user feedback.
+Provides administrative interface for managing content requests.
+Future phases will add more models (GeneratedContent, UserFeedback, etc.)
 """
 from django.contrib import admin
-from .models import ContentRequest, GeneratedContent, UserFeedback
+from .models import ContentRequestModel
 
 
-@admin.register(ContentRequest)
+@admin.register(ContentRequestModel)
 class ContentRequestAdmin(admin.ModelAdmin):
-    """Admin interface for ContentRequest model"""
+    """Admin interface for ContentRequestModel"""
     
-    list_display = ('id', 'topic', 'style', 'format', 'status', 'created_at', 'updated_at')
-    list_filter = ('status', 'format', 'style', 'created_at')
-    search_fields = ('topic', 'metadata')
-    readonly_fields = ('created_at', 'updated_at')
+    list_display = (
+        'id', 
+        'topic_preview', 
+        'content_type', 
+        'style', 
+        'output_format', 
+        'status', 
+        'created_at'
+    )
+    list_filter = ('status', 'content_type', 'style', 'output_format', 'difficulty', 'created_at')
+    search_fields = ('id', 'topic', 'notes')
+    readonly_fields = ('id', 'created_at', 'updated_at')
     ordering = ('-created_at',)
     
     fieldsets = (
         ('Request Information', {
-            'fields': ('topic', 'style', 'format', 'status')
+            'fields': ('id', 'topic', 'content_type', 'style', 'output_format', 'difficulty')
         }),
-        ('Metadata', {
-            'fields': ('metadata',),
+        ('Additional Details', {
+            'fields': ('notes',),
             'classes': ('collapse',)
+        }),
+        ('Status', {
+            'fields': ('status',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
-
-
-@admin.register(GeneratedContent)
-class GeneratedContentAdmin(admin.ModelAdmin):
-    """Admin interface for GeneratedContent model"""
     
-    list_display = ('id', 'request', 'format', 'created_at')
-    list_filter = ('format', 'created_at')
-    search_fields = ('content_text', 'metadata')
-    readonly_fields = ('created_at',)
-    ordering = ('-created_at',)
-    raw_id_fields = ('request',)
+    def topic_preview(self, obj):
+        """Display truncated topic for list view"""
+        return obj.topic[:50] + '...' if len(obj.topic) > 50 else obj.topic
+    topic_preview.short_description = 'Topic'
     
-    fieldsets = (
-        ('Content Information', {
-            'fields': ('request', 'format', 'content_text')
-        }),
-        ('Metadata', {
-            'fields': ('metadata',),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at',)
-        }),
-    )
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion in admin"""
+        return True
 
 
-@admin.register(UserFeedback)
-class UserFeedbackAdmin(admin.ModelAdmin):
-    """Admin interface for UserFeedback model"""
-    
-    list_display = ('id', 'request', 'feedback_type', 'created_at')
-    list_filter = ('feedback_type', 'created_at')
-    search_fields = ('notes',)
-    readonly_fields = ('created_at',)
-    ordering = ('-created_at',)
-    raw_id_fields = ('request',)
+# Phase 2+ admin interfaces will be added here
+# Examples:
+# - GeneratedContentAdmin: for managing generated content
+# - UserFeedbackAdmin: for reviewing user feedback
+
     
     fieldsets = (
         ('Feedback Information', {
