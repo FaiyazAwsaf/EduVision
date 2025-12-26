@@ -14,6 +14,18 @@ Endpoints:
 - GET    /api/content-requests/<id>/context/          - Retrieve learning context (Phase 4)
 - POST   /api/generated-content/<id>/feedback/        - Submit feedback (Phase 3)
 - GET    /api/generated-content/<id>/feedback/        - Retrieve feedback (Phase 3)
+
+Phase 5 - Study Plans (registered at main URL level):
+- POST   /api/study-plans/                            - Create study plan
+- GET    /api/study-plans/                            - List study plans
+- GET    /api/study-plans/<id>/                       - Get study plan with items
+- PATCH  /api/study-plans/<id>/                       - Update study plan
+- DELETE /api/study-plans/<id>/                       - Delete study plan
+- POST   /api/study-plans/<id>/items/                 - Add item to study plan
+- GET    /api/study-plan-items/                       - List items (filterable)
+- GET    /api/study-plan-items/<id>/                  - Get item details
+- PATCH  /api/study-plan-items/<id>/                  - Update item
+- DELETE /api/study-plan-items/<id>/                  - Delete item
 """
 from django.urls import path
 from .views import (

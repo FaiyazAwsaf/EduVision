@@ -199,6 +199,9 @@ CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/
 # Celery result backend (Redis)
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 
+# Broker connection retry on startup (Celery 6.0 compatibility)
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
 # Task serialization
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

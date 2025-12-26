@@ -17,6 +17,9 @@ export const API_ENDPOINTS = {
     `${API_BASE_URL}/api/content-requests/${id}/`,
   GENERATED_CONTENT: (id: string) =>
     `${API_BASE_URL}/api/content-requests/${id}/content/`,
+  // Phase 5: Study Plan endpoints
+  STUDY_PLANS: `${API_BASE_URL}/api/study-plans/`,
+  STUDY_PLAN_ITEMS: `${API_BASE_URL}/api/study-plan-items/`,
 } as const;
 
 // Polling configuration

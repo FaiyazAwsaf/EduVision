@@ -16,6 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from apps.content_requests.api.views_study_plan import StudyPlanViewSet, StudyPlanItemViewSet
+
+# Router for study plans (Phase 5)
+router = DefaultRouter()
+router.register(r'study-plans', StudyPlanViewSet, basename='study-plan')
+router.register(r'study-plan-items', StudyPlanItemViewSet, basename='study-plan-item')
 
 urlpatterns = [
     # Admin interface
@@ -23,6 +30,9 @@ urlpatterns = [
     
     # API endpoints
     path('api/content-requests/', include('apps.content_requests.api.urls')),
+    
+    # Study plan endpoints (Phase 5)
+    path('api/', include(router.urls)),
     
     # Add other module APIs here as they are implemented
     # path('api/tutoring/', include('apps.tutoring.api.urls')),

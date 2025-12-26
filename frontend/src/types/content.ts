@@ -174,3 +174,99 @@ export interface LearningContext {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================================
+// Phase 5: Study Plan Types (Manual Mode Only)
+// ============================================================================
+// These types support manual study plan creation with hooks for future
+// Module 3 (Smart Analytics Dashboard) integration.
+//
+// IMPORTANT: Phase 5 is MANUAL MODE ONLY
+// - No analytics logic
+// - Fields marked with [MODULE 3 HOOK] are placeholders for future integration
+
+export enum StudyPlanMode {
+  MANUAL = "manual", // User creates and manages all topics manually (Phase 5)
+  AI = "ai", // [MODULE 3 HOOK] Module 3 automatically detects weaknesses (Future)
+}
+
+export enum StudyPlanItemSource {
+  MANUAL = "manual", // User manually added this topic
+  ANALYTICS = "analytics", // [MODULE 3 HOOK] Auto-detected by Module 3 (Future)
+  MIXED = "mixed", // [MODULE 3 HOOK] Module 3 suggested, user modified (Future)
+}
+
+export enum StudyPlanItemStatus {
+  PENDING = "pending",
+  IN_PROGRESS = "in_progress",
+  COMPLETED = "completed",
+}
+
+/**
+ * Study Plan - Container for multiple study topics
+ *
+ * Phase 5: Manual mode only
+ * Future: Module 3 will enable AI mode with automatic topic detection
+ */
+export interface StudyPlan {
+  id: string;
+  user_id?: string; // nullable until auth integration
+  name: string;
+  mode: StudyPlanMode;
+  auto_detect_weakness: boolean; // [MODULE 3 HOOK] default false in Phase 5
+  analytics_snapshot_id?: string; // [MODULE 3 HOOK] for future analytics linking
+  items: StudyPlanItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Study Plan Item - Individual topic within a study plan
+ *
+ * Phase 5: All items have source='manual' (user-created)
+ * Future: Module 3 will add items with source='analytics'
+ */
+export interface StudyPlanItem {
+  id: string;
+  topic: string;
+  priority: number; // 1 (highest) to 5 (lowest)
+  scheduled_date?: string; // ISO date string
+  status: StudyPlanItemStatus;
+  linked_request_id?: string; // optional link to content request
+  source: StudyPlanItemSource;
+  confidence_score?: number; // [MODULE 3 HOOK] 0.0-1.0, set by analytics (future)
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Payload for creating a new study plan
+ * Phase 5: mode and auto_detect_weakness are set automatically to manual/false
+ */
+export interface CreateStudyPlanPayload {
+  name: string;
+  user_id?: string; // nullable until auth integration
+}
+
+/**
+ * Payload for adding an item to a study plan
+ * Phase 5: source is automatically set to 'manual'
+ */
+export interface CreateStudyPlanItemPayload {
+  topic: string;
+  priority?: number; // default: 3
+  scheduled_date?: string; // ISO date string
+  status?: StudyPlanItemStatus; // default: pending
+  linked_request_id?: string; // optional link to content request
+}
+
+/**
+ * Payload for updating a study plan item
+ */
+export interface UpdateStudyPlanItemPayload {
+  topic?: string;
+  priority?: number;
+  scheduled_date?: string;
+  status?: StudyPlanItemStatus;
+  linked_request_id?: string;
+}

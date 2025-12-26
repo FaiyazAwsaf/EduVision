@@ -337,3 +337,304 @@ export async function getLearningContext(
 
   return response.json();
 }
+
+// ============================================================================
+// Phase 5: Study Plan API Functions (Manual Mode Only)
+// ============================================================================
+
+import type {
+  StudyPlan,
+  StudyPlanItem,
+  CreateStudyPlanPayload,
+  CreateStudyPlanItemPayload,
+  UpdateStudyPlanItemPayload,
+} from "@/types/content";
+
+/**
+ * Create a new study plan
+ *
+ * Phase 5: Always creates in manual mode with auto_detect_weakness=false
+ *
+ * @param payload - Study plan creation data
+ * @returns Created study plan with assigned ID
+ * @throws Error if request fails
+ */
+export async function createStudyPlan(
+  payload: CreateStudyPlanPayload
+): Promise<StudyPlan> {
+  const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to create study plan",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * List all study plans
+ *
+ * [FUTURE] When auth is implemented, will filter by current user
+ *
+ * @returns Array of study plans with their items
+ * @throws Error if request fails
+ */
+export async function listStudyPlans(): Promise<StudyPlan[]> {
+  const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch study plans");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific study plan with all its items
+ *
+ * @param planId - UUID of the study plan
+ * @returns Study plan with all items
+ * @throws Error if request fails or plan not found
+ */
+export async function getStudyPlan(planId: string): Promise<StudyPlan> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Study plan not found");
+    }
+    throw new Error("Failed to fetch study plan");
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a study plan and all its items
+ *
+ * @param planId - UUID of the study plan
+ * @throws Error if request fails
+ */
+export async function deleteStudyPlan(planId: string): Promise<void> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete study plan");
+  }
+}
+
+/**
+ * Add an item to a study plan
+ *
+ * Phase 5: All items created with source='manual'
+ *
+ * @param planId - UUID of the study plan
+ * @param payload - Item creation data
+ * @returns Created study plan item
+ * @throws Error if request fails
+ */
+export async function addStudyPlanItem(
+  planId: string,
+  payload: CreateStudyPlanItemPayload
+): Promise<StudyPlanItem> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/items/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to add study plan item",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * List study plan items
+ *
+ * @param studyPlanId - Optional: filter items by study plan
+ * @returns Array of study plan items
+ * @throws Error if request fails
+ */
+export async function listStudyPlanItems(
+  studyPlanId?: string
+): Promise<StudyPlanItem[]> {
+  const url = studyPlanId
+    ? `${API_ENDPOINTS.STUDY_PLAN_ITEMS}?study_plan_id=${studyPlanId}`
+    : API_ENDPOINTS.STUDY_PLAN_ITEMS;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch study plan items");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific study plan item
+ *
+ * @param itemId - UUID of the study plan item
+ * @returns Study plan item details
+ * @throws Error if request fails
+ */
+export async function getStudyPlanItem(itemId: string): Promise<StudyPlanItem> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Study plan item not found");
+    }
+    throw new Error("Failed to fetch study plan item");
+  }
+
+  return response.json();
+}
+
+/**
+ * Update a study plan item
+ *
+ * Commonly used to update status, priority, scheduled_date, or link content request
+ *
+ * @param itemId - UUID of the study plan item
+ * @param payload - Fields to update
+ * @returns Updated study plan item
+ * @throws Error if request fails
+ */
+export async function updateStudyPlanItem(
+  itemId: string,
+  payload: UpdateStudyPlanItemPayload
+): Promise<StudyPlanItem> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to update study plan item",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a study plan item
+ *
+ * @param itemId - UUID of the study plan item
+ * @throws Error if request fails
+ */
+export async function deleteStudyPlanItem(itemId: string): Promise<void> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete study plan item");
+  }
+}
+
+/**
+ * Mark a study plan item as completed
+ *
+ * Convenience function that calls the complete endpoint
+ *
+ * @param itemId - UUID of the study plan item
+ * @returns Updated study plan item
+ * @throws Error if request fails
+ */
+export async function markStudyPlanItemComplete(
+  itemId: string
+): Promise<StudyPlanItem> {
+  const response = await fetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/complete/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to mark item as complete");
+  }
+
+  return response.json();
+}
+
+/**
+ * Link a content request to a study plan item
+ *
+ * @param itemId - UUID of the study plan item
+ * @param requestId - UUID of the content request to link
+ * @returns Updated study plan item
+ * @throws Error if request fails
+ */
+export async function linkRequestToStudyPlanItem(
+  itemId: string,
+  requestId: string
+): Promise<StudyPlanItem> {
+  const response = await fetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/link-request/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ request_id: requestId }),
+    }
+  );
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to link content request",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}

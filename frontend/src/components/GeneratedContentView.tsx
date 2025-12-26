@@ -23,6 +23,7 @@ import {
 import ErrorMessage from "./ErrorMessage";
 import FeedbackForm from "./FeedbackForm";
 import FeedbackDisplay from "./FeedbackDisplay";
+import AddToStudyPlanModal from "./AddToStudyPlanModal";
 import type {
   GeneratedContent,
   OutputFormat,
@@ -46,6 +47,12 @@ export default function GeneratedContentView({
   );
   const [isFeedbackLoading, setIsFeedbackLoading] = useState<boolean>(true);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // Option B: Add to Study Plan modal state
+  const [showAddToStudyPlanModal, setShowAddToStudyPlanModal] = useState(false);
+  const [addToStudyPlanSuccess, setAddToStudyPlanSuccess] = useState<
+    string | null
+  >(null);
 
   // Check if feedback already exists
   useEffect(() => {
@@ -132,6 +139,50 @@ export default function GeneratedContentView({
         </dl>
       </div>
 
+      {/* Option B: Add to Study Plan CTA */}
+      {/* This provides an alternative entry point to link content to study plans
+          without requiring users to navigate to study plan view first.
+          Reuses existing study_plan_items API - NO new backend endpoints. */}
+      <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-purple-900 mb-1">
+              📚 Study Plan Integration
+            </h3>
+            <p className="text-sm text-purple-700">
+              Add this generated content to your study plan for better
+              organization and tracking.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddToStudyPlanModal(true)}
+            className="shrink-0 inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-700 transition-colors"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Add to Study Plan
+          </button>
+        </div>
+
+        {/* Success message */}
+        {addToStudyPlanSuccess && (
+          <div className="mt-3 bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded text-sm">
+            ✓ {addToStudyPlanSuccess}
+          </div>
+        )}
+      </div>
+
       {/* Content Display */}
       {/* Always show text content with download option */}
       <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-black">
@@ -142,7 +193,7 @@ export default function GeneratedContentView({
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isDownloading ? (
               <>
@@ -324,6 +375,25 @@ export default function GeneratedContentView({
           />
         )}
       </div>
+
+      {/* Option B: Add to Study Plan Modal */}
+      {/* Modal allows selecting existing plan or creating new one,
+          then adds current content as a study plan item with linked_request_id.
+          This is purely UX wiring - uses existing APIs, no schema changes. */}
+      <AddToStudyPlanModal
+        contentRequestId={content.request_id}
+        contentTopic={content.topic}
+        isOpen={showAddToStudyPlanModal}
+        onClose={() => setShowAddToStudyPlanModal(false)}
+        onSuccess={(item) => {
+          setAddToStudyPlanSuccess(
+            `Added "${item.topic}" to study plan successfully!`
+          );
+          setShowAddToStudyPlanModal(false);
+          // Clear success message after 5 seconds
+          setTimeout(() => setAddToStudyPlanSuccess(null), 5000);
+        }}
+      />
     </div>
   );
 }

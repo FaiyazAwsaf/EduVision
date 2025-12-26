@@ -37,13 +37,21 @@ export default function Home() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              AI Content Generator
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Generate educational content powered by AI
-            </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                AI Content Generator
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Generate educational content powered by AI
+              </p>
+            </div>
+            <a
+              href="/study-plans"
+              className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
+            >
+              📚 Study Plans
+            </a>
           </div>
         </div>
       </header>

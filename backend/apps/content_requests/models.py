@@ -460,7 +460,235 @@ class LearningContextModel(models.Model):
         return self.self_reported_weaknesses
 
 
-# Phase 5+ models will be added here
+# ============================================================================
+# Phase 5: Study Plan Models (Manual Mode Only)
+# ============================================================================
+# These models support manual study plan creation with hooks for future
+# Module 3 (Smart Analytics Dashboard) integration.
+#
+# IMPORTANT: Phase 5 is MANUAL MODE ONLY
+# - No analytics logic implemented
+# - No automatic weakness detection
+# - Fields marked [MODULE 3 HOOK] are placeholders for future integration
+
+
+class StudyPlanMode(models.TextChoices):
+    """
+    Study plan creation mode.
+    
+    MANUAL: User creates and manages all topics manually (Phase 5)
+    AI: Module 3 automatically detects weaknesses and suggests topics (Future)
+    """
+    MANUAL = 'manual', _('Manual')
+    AI = 'ai', _('AI-Driven')  # [MODULE 3 HOOK] Will be enabled when Module 3 is active
+
+
+class StudyPlanItemSource(models.TextChoices):
+    """
+    Tracks the origin of a study plan item for analytics attribution.
+    
+    MANUAL: User manually added this topic
+    ANALYTICS: Module 3 automatically detected and added (Future)
+    MIXED: Module 3 suggested, but user modified priority/date (Future)
+    """
+    MANUAL = 'manual', _('Manually Added')
+    ANALYTICS = 'analytics', _('Auto-detected by Analytics')  # [MODULE 3 HOOK]
+    MIXED = 'mixed', _('Analytics Suggested, User Modified')  # [MODULE 3 HOOK]
+
+
+class StudyPlanItemStatus(models.TextChoices):
+    """Status of a study plan item."""
+    PENDING = 'pending', _('Pending')
+    IN_PROGRESS = 'in_progress', _('In Progress')
+    COMPLETED = 'completed', _('Completed')
+
+
+class StudyPlan(models.Model):
+    """
+    A study plan containing multiple topics/items to study.
+    
+    Phase 5: Manual mode only - users create and manage plans
+    Future: Module 3 will enable AI mode with automatic topic detection
+    
+    Design Decisions:
+    - user_id is nullable now but will be required after auth integration
+    - mode defaults to 'manual' for Phase 5
+    - auto_detect_weakness defaults to False (no analytics yet)
+    - analytics_snapshot_id is a placeholder for future Module 3 linking
+    
+    [MODULE 3 INTEGRATION NOTES]
+    When Module 3 is integrated:
+    1. Set mode='ai' to enable automatic topic detection
+    2. Set auto_detect_weakness=True to inject weak topics automatically
+    3. Link analytics_snapshot_id to the analytics state that generated recommendations
+    4. Module 3 will populate study plan items with source='analytics'
+    """
+    
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text=_("Unique identifier for the study plan")
+    )
+    
+    # [FUTURE] Will be required after auth integration
+    user_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_("User who owns this study plan (nullable until auth is integrated)")
+    )
+    
+    name = models.CharField(
+        max_length=200,
+        help_text=_("Name of the study plan")
+    )
+    
+    mode = models.CharField(
+        max_length=20,
+        choices=StudyPlanMode.choices,
+        default=StudyPlanMode.MANUAL,
+        help_text=_("Plan creation mode: manual or AI-driven")
+    )
+    
+    # [MODULE 3 HOOK]
+    # When True, Module 3 will automatically inject topics based on weakness detection
+    auto_detect_weakness = models.BooleanField(
+        default=False,
+        help_text=_("Enable automatic weak topic detection (requires Module 3)")
+    )
+    
+    # [MODULE 3 HOOK]
+    # Links to the analytics snapshot that generated this plan's recommendations
+    analytics_snapshot_id = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text=_("Reference to Module 3 analytics snapshot (future)")
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'study_plans'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user_id', '-created_at']),
+            models.Index(fields=['mode']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_mode_display()})"
+
+
+class StudyPlanItem(models.Model):
+    """
+    Individual topic/item within a study plan.
+    
+    Phase 5: All items have source='manual' (user-created)
+    Future: Module 3 will add items with source='analytics'
+    
+    Design Decisions:
+    - linked_request_id allows associating content generation with study items
+    - source tracks whether user or analytics created this item
+    - confidence_score is reserved for Module 3's weakness detection confidence
+    - scheduled_date is manual now, will be auto-calculated by Module 3 later
+    
+    [MODULE 3 INTEGRATION NOTES]
+    When Module 3 detects a weak topic:
+    1. Create item with source='analytics'
+    2. Set confidence_score based on weakness detection algorithm
+    3. Calculate priority and scheduled_date based on:
+       - Topic importance
+       - Current mastery level
+       - Prerequisite dependencies
+       - User's study schedule
+    4. Link to analytics data for explanation/justification
+    """
+    
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text=_("Unique identifier for the study plan item")
+    )
+    
+    study_plan = models.ForeignKey(
+        StudyPlan,
+        on_delete=models.CASCADE,
+        related_name='items',
+        help_text=_("Study plan this item belongs to")
+    )
+    
+    topic = models.CharField(
+        max_length=500,
+        help_text=_("Topic or concept to study")
+    )
+    
+    priority = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        default=3,
+        help_text=_("Priority level (1=highest, 5=lowest)")
+    )
+    
+    scheduled_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text=_("Target date to study this topic")
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=StudyPlanItemStatus.choices,
+        default=StudyPlanItemStatus.PENDING,
+        help_text=_("Current status of this item")
+    )
+    
+    # Links to content generation system
+    linked_request = models.ForeignKey(
+        ContentRequestModel,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='study_plan_items',
+        help_text=_("Optional link to generated content request")
+    )
+    
+    source = models.CharField(
+        max_length=20,
+        choices=StudyPlanItemSource.choices,
+        default=StudyPlanItemSource.MANUAL,
+        help_text=_("How this item was added: manual, analytics, or mixed")
+    )
+    
+    # [MODULE 3 HOOK]
+    # Confidence score from weakness detection algorithm (0.0 to 1.0)
+    # Higher score = higher confidence that this is a weak topic
+    confidence_score = models.FloatField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+        help_text=_("Analytics confidence score for weakness detection (0.0-1.0, requires Module 3)")
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'study_plan_items'
+        ordering = ['priority', 'scheduled_date', '-created_at']
+        indexes = [
+            models.Index(fields=['study_plan', 'status']),
+            models.Index(fields=['study_plan', 'priority']),
+            models.Index(fields=['source']),
+        ]
+    
+    def __str__(self):
+        return f"{self.topic} - {self.get_status_display()}"
+
+
+# Future Phase models will be added here
 # Examples:
 # - ContentVersionModel: tracks content revisions
 # - PerformanceHistoryModel: for Module 3 analytics
