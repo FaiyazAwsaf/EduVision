@@ -85,9 +85,21 @@ def process_content_request(self, request_id: str):
             }
         
         # Get AI provider (from environment or config)
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            logger.error("[Task] GEMINI_API_KEY not configured")
+        # Support multiple API keys for rotation (GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.)
+        api_keys = []
+        for i in range(1, 10):  # Check for up to 10 keys
+            key = os.getenv(f'GEMINI_API_KEY_{i}')
+            if key:
+                api_keys.append(key)
+        
+        # Fallback to single GEMINI_API_KEY for backward compatibility
+        if not api_keys:
+            single_key = os.getenv('GEMINI_API_KEY')
+            if single_key:
+                api_keys.append(single_key)
+        
+        if not api_keys:
+            logger.error("[Task] No GEMINI_API_KEY configured (tried GEMINI_API_KEY_1, GEMINI_API_KEY_2, ..., GEMINI_API_KEY)")
             service.update_request_status(request_uuid, RequestStatus.FAILED)
             return {
                 'success': False,
@@ -95,9 +107,11 @@ def process_content_request(self, request_id: str):
                 'error': 'AI provider not configured'
             }
         
+        logger.info(f"[Task] Loaded {len(api_keys)} API key(s) for rotation")
+        
         try:
-            # Initialize AI provider
-            ai_provider = get_ai_provider('gemini', api_key=api_key)
+            # Initialize AI provider with multiple keys
+            ai_provider = get_ai_provider('gemini', api_key=api_keys)
             
             # Fetch learning context if available
             context_repo = LearningContextRepository()

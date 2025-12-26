@@ -170,7 +170,9 @@ export default function LearningContextForm({
             Understand Concepts
           </option>
           <option value={TargetGoalEnum.EXAM_PREP}>Exam Preparation</option>
-          <option value={TargetGoalEnum.PRACTICE}>Practice & Application</option>
+          <option value={TargetGoalEnum.PRACTICE}>
+            Practice & Application
+          </option>
         </select>
       </div>
 
@@ -193,9 +195,7 @@ export default function LearningContextForm({
             type="button"
             onClick={handleAddWeakness}
             disabled={
-              disabled ||
-              !currentWeakness.trim() ||
-              weaknesses.length >= 10
+              disabled || !currentWeakness.trim() || weaknesses.length >= 10
             }
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >

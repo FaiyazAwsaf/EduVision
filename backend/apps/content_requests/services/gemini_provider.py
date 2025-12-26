@@ -3,16 +3,23 @@ Google Gemini AI Provider Implementation
 
 This module implements the AIProvider interface using Google's Gemini AI API.
 It handles all Gemini-specific logic including API calls, response parsing,
-error handling, and retry logic.
+error handling, retry logic, and automatic API key rotation.
 
 Phase 4: Supports optional learning context for personalized generation.
 
+API Key Rotation:
+- Supports multiple API keys for automatic quota handling
+- When one key exceeds quota, automatically switches to next available key
+- Provides seamless experience without returning errors to users
+- Configure multiple keys via GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.
+
 Requirements:
 - google-generativeai package
-- GEMINI_API_KEY environment variable
+- GEMINI_API_KEY_1 (and optionally GEMINI_API_KEY_2, _3, _4...) environment variables
+- Or single GEMINI_API_KEY for backward compatibility
 
 Configuration:
-- model: Gemini model to use (default: gemini-1.5-flash)
+- model: Gemini model to use (default: gemini-2.5-flash)
 - temperature: Creativity level (0.0 to 1.0)
 - max_tokens: Maximum response length
 - retry_attempts: Number of retry attempts for transient failures
@@ -60,7 +67,7 @@ class GeminiProvider(AIProvider):
     
     def __init__(
         self,
-        api_key: str,
+        api_key: str | list[str],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -71,20 +78,29 @@ class GeminiProvider(AIProvider):
         Initialize Gemini provider with configuration.
         
         Args:
-            api_key: Google AI API key
+            api_key: Google AI API key or list of API keys for rotation
             model: Gemini model name (default: gemini-1.5-flash)
             temperature: Generation temperature 0.0-1.0 (default: 0.7)
             max_tokens: Maximum response length (default: 2048)
             retry_attempts: Number of retry attempts (default: 3)
             **config: Additional configuration options
         """
-        super().__init__(api_key, **config)
+        # Handle multiple API keys for rotation
+        if isinstance(api_key, list):
+            self.api_keys = api_key
+            primary_key = api_key[0]
+        else:
+            self.api_keys = [api_key]
+            primary_key = api_key
+        
+        super().__init__(primary_key, **config)
         
         # Configuration
         self.model_name = model or self.DEFAULT_MODEL
         self.temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
         self.max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
         self.retry_attempts = retry_attempts or self.DEFAULT_RETRY_ATTEMPTS
+        self.current_key_index = 0  # Track which API key is currently active
         
         # Configure Gemini API
         try:
@@ -103,7 +119,8 @@ class GeminiProvider(AIProvider):
             
             logger.info(
                 f"Initialized Gemini provider with model: {self.model_name}, "
-                f"temperature: {self.temperature}, max_tokens: {self.max_tokens}"
+                f"temperature: {self.temperature}, max_tokens: {self.max_tokens}, "
+                f"api_keys: {len(self.api_keys)}"
             )
             
         except Exception as e:
@@ -114,9 +131,37 @@ class GeminiProvider(AIProvider):
                 original_error=e
             )
     
+    def _reconfigure_with_key(self, api_key: str) -> bool:
+        """
+        Reconfigure Gemini API with a different API key.
+        
+        Args:
+            api_key: New API key to use
+            
+        Returns:
+            True if reconfiguration successful, False otherwise
+        """
+        try:
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel(
+                model_name=self.model_name,
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+                }
+            )
+            self.api_key = api_key
+            logger.info(f"Successfully switched to API key #{self.current_key_index + 1}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reconfigure with new API key: {str(e)}")
+            return False
+    
     def _call_api_with_retry(self, prompt: str) -> str:
         """
-        Call Gemini API with retry logic for transient failures.
+        Call Gemini API with retry logic for transient failures and automatic API key rotation.
         
         Args:
             prompt: Full prompt to send to API
@@ -125,13 +170,14 @@ class GeminiProvider(AIProvider):
             Generated text content
             
         Raises:
-            AIProviderError: If all retry attempts fail
+            AIProviderError: If all retry attempts fail with all available API keys
         """
         last_error = None
+        keys_tried = set()  # Track which keys we've tried to avoid infinite loops
         
         for attempt in range(1, self.retry_attempts + 1):
             try:
-                logger.debug(f"Gemini API call attempt {attempt}/{self.retry_attempts}")
+                logger.debug(f"Gemini API call attempt {attempt}/{self.retry_attempts} with key #{self.current_key_index + 1}")
                 
                 # Generate content
                 response = self.model.generate_content(
@@ -150,7 +196,7 @@ class GeminiProvider(AIProvider):
                     )
                 
                 logger.info(
-                    f"Gemini API call successful "
+                    f"Gemini API call successful with key #{self.current_key_index + 1} "
                     f"(attempt {attempt}, length: {len(response.text)})"
                 )
                 
@@ -160,28 +206,71 @@ class GeminiProvider(AIProvider):
                 last_error = e
                 error_str = str(e).lower()
                 
-                # Check for rate limit errors
-                if "quota" in error_str or "rate limit" in error_str:
-                    logger.warning(f"Rate limit hit on attempt {attempt}: {str(e)}")
+                # Check for quota/rate limit errors - try switching API keys
+                if "quota" in error_str or "rate limit" in error_str or "resource exhausted" in error_str:
+                    logger.warning(f"Quota/Rate limit hit with key #{self.current_key_index + 1}: {str(e)}")
+                    keys_tried.add(self.current_key_index)
+                    
+                    # Try switching to next API key if we have more keys available
+                    if len(keys_tried) < len(self.api_keys):
+                        # Find next untried key
+                        original_index = self.current_key_index
+                        for _ in range(len(self.api_keys)):
+                            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+                            if self.current_key_index not in keys_tried:
+                                break
+                        
+                        next_key = self.api_keys[self.current_key_index]
+                        logger.info(f"Switching from key #{original_index + 1} to key #{self.current_key_index + 1}...")
+                        
+                        if self._reconfigure_with_key(next_key):
+                            logger.info("API key switched successfully, retrying immediately...")
+                            # Reset attempt counter for new key, but keep trying
+                            continue
+                        else:
+                            logger.error("Failed to switch API key, marking as tried")
+                            keys_tried.add(self.current_key_index)
+                    
+                    # If all keys exhausted, fail with rate limit error
+                    if len(keys_tried) >= len(self.api_keys):
+                        logger.error(f"All {len(self.api_keys)} API keys have exceeded their quota")
+                        raise AIProviderRateLimitError(
+                            f"All {len(self.api_keys)} Gemini API keys have exceeded their quota",
+                            provider="gemini",
+                            original_error=e
+                        )
+                    
+                    # Wait before retry with same key
                     if attempt < self.retry_attempts:
-                        # Exponential backoff
                         wait_time = self.DEFAULT_RETRY_DELAY * (2 ** (attempt - 1))
                         logger.info(f"Waiting {wait_time}s before retry...")
                         time.sleep(wait_time)
                         continue
-                    raise AIProviderRateLimitError(
-                        "Gemini API rate limit exceeded",
-                        provider="gemini",
-                        original_error=e
-                    )
                 
                 # Check for authentication errors
-                if "api key" in error_str or "authentication" in error_str:
-                    raise AIProviderAuthenticationError(
-                        "Gemini API authentication failed",
-                        provider="gemini",
-                        original_error=e
-                    )
+                if "api key" in error_str or "authentication" in error_str or "invalid" in error_str:
+                    logger.error(f"Authentication failed with key #{self.current_key_index + 1}")
+                    keys_tried.add(self.current_key_index)
+                    
+                    # Try next key if available
+                    if len(keys_tried) < len(self.api_keys):
+                        original_index = self.current_key_index
+                        for _ in range(len(self.api_keys)):
+                            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+                            if self.current_key_index not in keys_tried:
+                                break
+                        
+                        next_key = self.api_keys[self.current_key_index]
+                        logger.info(f"Trying next key #{self.current_key_index + 1}...")
+                        
+                        if self._reconfigure_with_key(next_key):
+                            continue
+                    else:
+                        raise AIProviderAuthenticationError(
+                            f"All {len(self.api_keys)} API keys failed authentication",
+                            provider="gemini",
+                            original_error=e
+                        )
                 
                 # For other errors, retry with backoff
                 logger.warning(f"Gemini API error on attempt {attempt}: {str(e)}")
