@@ -131,3 +131,46 @@ export interface Feedback {
   freeform_comment?: string;
   submitted_at: string;
 }
+
+// ============================================================================
+// Phase 4: Learning Context Types
+// ============================================================================
+
+export enum TargetGoal {
+  REVISION = "REVISION",
+  CONCEPT_CLARITY = "CONCEPT_CLARITY",
+  EXAM_PREP = "EXAM_PREP",
+  PRACTICE = "PRACTICE",
+}
+
+export enum PreferredDepth {
+  SHALLOW = "SHALLOW",
+  NORMAL = "NORMAL",
+  DEEP = "DEEP",
+}
+
+export enum TimeConstraint {
+  QUICK = "QUICK",
+  NORMAL = "NORMAL",
+  EXTENSIVE = "EXTENSIVE",
+}
+
+export interface LearningContextPayload {
+  target_goal?: TargetGoal;
+  self_reported_weaknesses?: string[];
+  preferred_depth?: PreferredDepth;
+  time_constraint?: TimeConstraint;
+  notes?: string;
+}
+
+export interface LearningContext {
+  id: string;
+  content_request: string; // request_id
+  target_goal?: TargetGoal;
+  self_reported_weaknesses?: string[];
+  preferred_depth?: PreferredDepth;
+  time_constraint?: TimeConstraint;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}

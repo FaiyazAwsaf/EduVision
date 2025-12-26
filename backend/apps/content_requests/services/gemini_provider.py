@@ -5,6 +5,8 @@ This module implements the AIProvider interface using Google's Gemini AI API.
 It handles all Gemini-specific logic including API calls, response parsing,
 error handling, and retry logic.
 
+Phase 4: Supports optional learning context for personalized generation.
+
 Requirements:
 - google-generativeai package
 - GEMINI_API_KEY environment variable
@@ -28,6 +30,7 @@ from .ai_provider import (
     AIProviderRateLimitError,
     AIProviderAuthenticationError
 )
+from .prompt_builder import build_system_prompt, build_context_aware_prompt
 from ..domain.content_request import ContentRequest
 
 logger = logging.getLogger(__name__)
@@ -195,27 +198,27 @@ class GeminiProvider(AIProvider):
             original_error=last_error
         )
     
-    def generate_summary(self, request: ContentRequest) -> GeneratedContent:
+    def generate_summary(self, request: ContentRequest, learning_context: Optional[object] = None) -> GeneratedContent:
         """
-        Generate a summary using Gemini.
+        Generate a summary using Gemini with optional learning context (Phase 4).
         
         Args:
             request: Content request domain model
+            learning_context: Optional LearningContextModel for personalization
             
         Returns:
             GeneratedContent with summary and metadata
+            
+        Phase 4: Accepts manual learning context to personalize prompts.
+        Gracefully degrades if context is not provided.
         """
         logger.info(f"Generating summary for topic: {request.topic[:50]}...")
+        if learning_context:
+            logger.info("Using learning context for personalization")
         
-        # Build prompts
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(
-            topic=request.topic,
-            content_type=request.content_type,
-            style=request.style,
-            difficulty=request.difficulty,
-            notes=request.notes
-        )
+        # Build prompts with context awareness
+        system_prompt = build_system_prompt()
+        user_prompt = build_context_aware_prompt(request, learning_context)
         
         # Combine prompts
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
@@ -232,7 +235,8 @@ class GeminiProvider(AIProvider):
             "style": request.style.value,
             "difficulty": request.difficulty.value if request.difficulty else None,
             "prompt_length": len(full_prompt),
-            "response_length": len(content_text)
+            "response_length": len(content_text),
+            "has_learning_context": learning_context is not None  # Phase 4
         }
         
         return GeneratedContent(
@@ -240,37 +244,24 @@ class GeminiProvider(AIProvider):
             metadata=metadata
         )
     
-    def generate_worked_examples(self, request: ContentRequest) -> GeneratedContent:
+    def generate_worked_examples(self, request: ContentRequest, learning_context: Optional[object] = None) -> GeneratedContent:
         """
-        Generate worked examples using Gemini.
+        Generate worked examples using Gemini with optional learning context (Phase 4).
         
         Args:
             request: Content request domain model
+            learning_context: Optional LearningContextModel for personalization
             
         Returns:
             GeneratedContent with examples and metadata
         """
         logger.info(f"Generating worked examples for topic: {request.topic[:50]}...")
+        if learning_context:
+            logger.info("Using learning context for personalization")
         
-        # Build prompts
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(
-            topic=request.topic,
-            content_type=request.content_type,
-            style=request.style,
-            difficulty=request.difficulty,
-            notes=request.notes
-        )
-        
-        # Add specific instructions for worked examples
-        user_prompt += (
-            "\n\nFormat: Provide 2-3 complete worked examples. "
-            "For each example:\n"
-            "1. State the problem clearly\n"
-            "2. Show all steps with explanations\n"
-            "3. Highlight key insights or common mistakes\n"
-            "4. Provide the final answer"
-        )
+        # Build prompts with context awareness
+        system_prompt = build_system_prompt()
+        user_prompt = build_context_aware_prompt(request, learning_context)
         
         # Combine prompts
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
@@ -287,7 +278,8 @@ class GeminiProvider(AIProvider):
             "style": request.style.value,
             "difficulty": request.difficulty.value if request.difficulty else None,
             "prompt_length": len(full_prompt),
-            "response_length": len(content_text)
+            "response_length": len(content_text),
+            "has_learning_context": learning_context is not None
         }
         
         return GeneratedContent(
@@ -295,38 +287,24 @@ class GeminiProvider(AIProvider):
             metadata=metadata
         )
     
-    def generate_formula_sheet(self, request: ContentRequest) -> GeneratedContent:
+    def generate_formula_sheet(self, request: ContentRequest, learning_context: Optional[object] = None) -> GeneratedContent:
         """
-        Generate a formula sheet using Gemini.
+        Generate a formula sheet using Gemini with optional learning context (Phase 4).
         
         Args:
             request: Content request domain model
+            learning_context: Optional LearningContextModel for personalization
             
         Returns:
             GeneratedContent with formulas and metadata
         """
         logger.info(f"Generating formula sheet for topic: {request.topic[:50]}...")
+        if learning_context:
+            logger.info("Using learning context for personalization")
         
-        # Build prompts
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(
-            topic=request.topic,
-            content_type=request.content_type,
-            style=request.style,
-            difficulty=request.difficulty,
-            notes=request.notes
-        )
-        
-        # Add specific instructions for formula sheets
-        user_prompt += (
-            "\n\nFormat: Create a comprehensive formula sheet. "
-            "For each formula:\n"
-            "1. State the formula name\n"
-            "2. Write the formula clearly\n"
-            "3. Define all variables\n"
-            "4. Provide a brief description of when to use it\n"
-            "5. Include any important notes or constraints"
-        )
+        # Build prompts with context awareness
+        system_prompt = build_system_prompt()
+        user_prompt = build_context_aware_prompt(request, learning_context)
         
         # Combine prompts
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
@@ -343,7 +321,8 @@ class GeminiProvider(AIProvider):
             "style": request.style.value,
             "difficulty": request.difficulty.value if request.difficulty else None,
             "prompt_length": len(full_prompt),
-            "response_length": len(content_text)
+            "response_length": len(content_text),
+            "has_learning_context": learning_context is not None
         }
         
         return GeneratedContent(

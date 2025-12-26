@@ -145,7 +145,7 @@ class AIProvider(ABC):
         """
         pass
     
-    def generate_content(self, request: ContentRequest) -> GeneratedContent:
+    def generate_content(self, request: ContentRequest, learning_context=None) -> GeneratedContent:
         """
         Main entry point for content generation.
         
@@ -153,6 +153,7 @@ class AIProvider(ABC):
         
         Args:
             request: Content request domain model
+            learning_context: Optional learning context for personalization
             
         Returns:
             GeneratedContent with appropriate content and metadata
@@ -168,11 +169,11 @@ class AIProvider(ABC):
         
         # Route to appropriate method based on content type
         if request.content_type == ContentType.SUMMARY:
-            return self.generate_summary(request)
+            return self.generate_summary(request, learning_context=learning_context)
         elif request.content_type == ContentType.WORKED_EXAMPLES:
-            return self.generate_worked_examples(request)
+            return self.generate_worked_examples(request, learning_context=learning_context)
         elif request.content_type == ContentType.FORMULA_SHEET:
-            return self.generate_formula_sheet(request)
+            return self.generate_formula_sheet(request, learning_context=learning_context)
         else:
             raise ValueError(f"Unsupported content type: {request.content_type}")
     

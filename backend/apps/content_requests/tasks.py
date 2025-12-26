@@ -21,6 +21,7 @@ from .services.content_service import get_content_request_service
 from .services.ai_provider import get_ai_provider, AIProviderError, AIProviderRateLimitError
 from .services.content_formatter import get_content_formatter, ContentFormatterError
 from .persistence.repository import GeneratedContentRepository
+from .persistence.learning_context_repository import LearningContextRepository
 from .domain.enums import RequestStatus
 
 logger = logging.getLogger(__name__)
@@ -98,9 +99,18 @@ def process_content_request(self, request_id: str):
             # Initialize AI provider
             ai_provider = get_ai_provider('gemini', api_key=api_key)
             
+            # Fetch learning context if available
+            context_repo = LearningContextRepository()
+            learning_context = context_repo.get_by_request_id(request_uuid)
+            
+            if learning_context:
+                logger.info(f"[Task] Found learning context for request {request_id} - personalizing content")
+            else:
+                logger.info(f"[Task] No learning context found for request {request_id} - using default generation")
+            
             # Generate content
             logger.info(f"[Task] Generating content for request {request_id}")
-            generated = ai_provider.generate_content(request)
+            generated = ai_provider.generate_content(request, learning_context=learning_context)
             
             logger.info(
                 f"[Task] Content generated successfully "

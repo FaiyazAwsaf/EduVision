@@ -10,6 +10,8 @@ Endpoints:
 - GET    /api/content-requests/<id>/                  - Retrieve request details
 - GET    /api/content-requests/<id>/content/          - Retrieve generated content (Phase 2)
 - GET    /api/content-requests/<id>/content/download/ - Download as PDF
+- POST   /api/content-requests/<id>/context/          - Create/update learning context (Phase 4)
+- GET    /api/content-requests/<id>/context/          - Retrieve learning context (Phase 4)
 - POST   /api/generated-content/<id>/feedback/        - Submit feedback (Phase 3)
 - GET    /api/generated-content/<id>/feedback/        - Retrieve feedback (Phase 3)
 """
@@ -21,6 +23,7 @@ from .views import (
     download_generated_content_view
 )
 from .views_feedback import FeedbackView
+from .views_learning_context import LearningContextView
 
 
 app_name = 'content_requests'
@@ -52,6 +55,13 @@ urlpatterns = [
         '<str:request_id>/content/download/',
         download_generated_content_view,
         name='download-content'
+    ),
+    
+    # Learning context endpoints (Phase 4)
+    path(
+        '<str:request_id>/context/',
+        LearningContextView.as_view(),
+        name='learning-context'
     ),
 ]
 

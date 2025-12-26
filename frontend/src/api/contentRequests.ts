@@ -264,3 +264,76 @@ export async function getFeedback(contentId: string): Promise<Feedback | null> {
 
   return response.json();
 }
+
+// ============================================================================
+// Phase 4: Learning Context API Functions
+// ============================================================================
+
+import type { LearningContext, LearningContextPayload } from "@/types/content";
+
+/**
+ * Submit learning context for a content request
+ *
+ * Creates or updates learning context to personalize AI generation.
+ * Should be called AFTER creating the content request but BEFORE generation starts.
+ *
+ * @param requestId - UUID of the content request
+ * @param context - Learning context data
+ * @returns Created/updated learning context record
+ * @throws Error if submission fails or request not found
+ */
+export async function submitLearningContext(
+  requestId: string,
+  context: LearningContextPayload
+): Promise<LearningContext> {
+  const response = await fetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(context),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData: ApiError = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || errorData.detail || "Failed to submit learning context"
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Get learning context for a content request
+ *
+ * @param requestId - UUID of the content request
+ * @returns Learning context if it exists, null if not found
+ * @throws Error if request fails (other than 404)
+ */
+export async function getLearningContext(
+  requestId: string
+): Promise<LearningContext | null> {
+  const response = await fetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null; // No context exists yet
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to get learning context");
+  }
+
+  return response.json();
+}

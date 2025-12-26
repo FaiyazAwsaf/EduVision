@@ -3,19 +3,28 @@
  *
  * Allows users to submit new AI content generation requests.
  * Validates input and delegates API calls to service layer.
+ *
+ * Phase 4: Two-step submission:
+ * 1. Create content request
+ * 2. Optionally submit learning context
  */
 
 "use client";
 
 import { useState } from "react";
-import { createContentRequest } from "@/api/contentRequests";
+import {
+  createContentRequest,
+  submitLearningContext,
+} from "@/api/contentRequests";
 import ErrorMessage from "./ErrorMessage";
+import LearningContextForm from "./LearningContextForm";
 import {
   ContentType,
   Style,
   Difficulty,
   OutputFormat,
   type CreateContentRequestPayload,
+  type LearningContextPayload,
 } from "@/types/content";
 
 interface ContentRequestFormProps {
@@ -36,6 +45,8 @@ export default function ContentRequestForm({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [learningContext, setLearningContext] =
+    useState<LearningContextPayload | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +66,7 @@ export default function ContentRequestForm({
     setIsSubmitting(true);
 
     try {
-      // Remove empty optional fields
+      // Step 1: Create content request
       const payload: CreateContentRequestPayload = {
         ...formData,
         topic: formData.topic.trim(),
@@ -66,6 +77,22 @@ export default function ContentRequestForm({
       }
 
       const response = await createContentRequest(payload);
+
+      // Step 2: Submit learning context if provided
+      if (learningContext) {
+        try {
+          await submitLearningContext(response.id, learningContext);
+          console.log("[Phase 4] Learning context submitted for personalization");
+        } catch (contextError) {
+          console.warn(
+            "[Phase 4] Failed to submit learning context:",
+            contextError
+          );
+          // Don't fail the entire request if context submission fails
+          // The request will still be processed with default generation
+        }
+      }
+
       onSuccess(response.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create request");
@@ -212,6 +239,12 @@ export default function ContentRequestForm({
         />
         <p className="mt-1 text-sm text-gray-500">Maximum 2000 characters</p>
       </div>
+
+      {/* Phase 4: Learning Context */}
+      <LearningContextForm
+        onContextChange={setLearningContext}
+        disabled={isSubmitting}
+      />
 
       {/* Actions */}
       <div className="flex gap-3">

@@ -322,7 +322,146 @@ class FeedbackModel(models.Model):
         return self.usefulness_rating >= 4 and self.correctness_flag
 
 
-# Phase 4+ models will be added here
+# ============================================================================
+# Phase 4: Learning Context Models
+# ============================================================================
+
+class TargetGoal(models.TextChoices):
+    """Learning goal for content generation"""
+    REVISION = 'REVISION', 'Revision/Review'
+    CONCEPT_CLARITY = 'CONCEPT_CLARITY', 'Concept Clarity'
+    EXAM_PREP = 'EXAM_PREP', 'Exam Preparation'
+    PRACTICE = 'PRACTICE', 'Practice/Application'
+
+
+class PreferredDepth(models.TextChoices):
+    """Depth of explanation preference"""
+    SHALLOW = 'SHALLOW', 'Quick Overview'
+    NORMAL = 'NORMAL', 'Standard Detail'
+    DEEP = 'DEEP', 'In-Depth Explanation'
+
+
+class TimeConstraint(models.TextChoices):
+    """Time availability for studying"""
+    QUICK = 'QUICK', 'Quick (10-15 min)'
+    NORMAL = 'NORMAL', 'Normal (30-45 min)'
+    EXTENSIVE = 'EXTENSIVE', 'Extensive (60+ min)'
+
+
+class LearningContextModel(models.Model):
+    """
+    Manual learning context for personalized content generation (Phase 4).
+    
+    IMPORTANT: This is USER-PROVIDED data, not inferred or automated.
+    This phase captures manual inputs to prepare for Module 3 (analytics).
+    
+    Purpose:
+    - Enable context-aware AI generation
+    - Store structured personalization data
+    - Prepare for future analytics integration
+    
+    Design decisions:
+    - One context per content request (optional, one-to-one)
+    - All fields are optional (graceful degradation)
+    - Manual inputs only (no inference)
+    - No feedback integration (separate concern)
+    
+    Future extensions (Module 3):
+    - Auto-populate from performance history
+    - Infer weaknesses from past errors
+    - Suggest optimal depth/time settings
+    - Replace manual with analytics-driven context
+    """
+    
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    
+    content_request = models.OneToOneField(
+        'ContentRequestModel',
+        on_delete=models.CASCADE,
+        related_name='learning_context',
+        help_text='The content request this context applies to'
+    )
+    
+    target_goal = models.CharField(
+        max_length=20,
+        choices=TargetGoal.choices,
+        blank=True,
+        null=True,
+        help_text='Primary learning goal for this content'
+    )
+    
+    self_reported_weaknesses = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Topics/concepts the user wants to focus on (manual input)'
+    )
+    
+    preferred_depth = models.CharField(
+        max_length=10,
+        choices=PreferredDepth.choices,
+        default=PreferredDepth.NORMAL,
+        help_text='How detailed should explanations be?'
+    )
+    
+    time_constraint = models.CharField(
+        max_length=10,
+        choices=TimeConstraint.choices,
+        default=TimeConstraint.NORMAL,
+        help_text='Available time for studying this content'
+    )
+    
+    notes = models.TextField(
+        blank=True,
+        null=True,
+        max_length=1000,
+        help_text='Additional context or requirements (optional)'
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When context was provided'
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text='Last update to context'
+    )
+    
+    class Meta:
+        db_table = 'learning_context'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['content_request']),
+            models.Index(fields=['target_goal']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['content_request'],
+                name='unique_context_per_request'
+            )
+        ]
+    
+    def __str__(self):
+        goal = self.target_goal or 'No goal'
+        return f"Context for {self.content_request_id} - {goal}"
+    
+    def has_weaknesses(self):
+        """Check if user provided any specific weaknesses"""
+        return bool(self.self_reported_weaknesses)
+    
+    def get_weaknesses_list(self):
+        """Return weaknesses as a clean list (handles both list and None)"""
+        if not self.self_reported_weaknesses:
+            return []
+        return self.self_reported_weaknesses
+
+
+# Phase 5+ models will be added here
 # Examples:
 # - ContentVersionModel: tracks content revisions
+# - PerformanceHistoryModel: for Module 3 analytics
 
