@@ -79,3 +79,9 @@ typings/
 
 # Docker / Compose
 pgdata/
+
+# node modules
+node_modules/
+
+# md files
+*.md
