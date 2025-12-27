@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     # Project apps
     "apps.user.apps.UserConfig",
     "apps.content_requests.apps.ContentRequestsConfig",
+    "apps.intelligence.apps.IntelligenceConfig",  # Phase 6: Intelligence & Adaptive Optimization
 ]
 
 MIDDLEWARE = [

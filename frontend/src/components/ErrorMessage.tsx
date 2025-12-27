@@ -22,7 +22,7 @@ export default function ErrorMessage({
       <div className="flex items-start">
         <div className="flex-shrink-0">
           <svg
-            className="h-5 w-5 text-red-400"
+            className="h-5 w-5 text-red-500"
             viewBox="0 0 20 20"
             fill="currentColor"
           >
@@ -43,7 +43,7 @@ export default function ErrorMessage({
               <button
                 type="button"
                 onClick={onRetry}
-                className="rounded-md bg-red-100 px-3 py-2 text-sm font-semibold text-red-800 shadow-sm hover:bg-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                className="rounded-md bg-red-100 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 transition-colors"
               >
                 Try Again
               </button>

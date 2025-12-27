@@ -71,7 +71,7 @@ export default function AddStudyPlanItemForm({
       <div>
         <label
           htmlFor="topic"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#006A71] mb-1"
         >
           Topic <span className="text-red-500">*</span>
         </label>
@@ -81,7 +81,7 @@ export default function AddStudyPlanItemForm({
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="e.g., Quadratic Equations"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] text-[#006A71] placeholder:text-[#9ACBD0]"
           disabled={isSubmitting}
           maxLength={500}
         />
@@ -91,7 +91,7 @@ export default function AddStudyPlanItemForm({
         <div>
           <label
             htmlFor="priority"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#006A71] mb-1"
           >
             Priority
           </label>
@@ -99,7 +99,7 @@ export default function AddStudyPlanItemForm({
             id="priority"
             value={priority}
             onChange={(e) => setPriority(parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] text-[#006A71]"
             disabled={isSubmitting}
           >
             <option value={1}>1 - Highest</option>
@@ -113,7 +113,7 @@ export default function AddStudyPlanItemForm({
         <div>
           <label
             htmlFor="status"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-[#006A71] mb-1"
           >
             Status
           </label>
@@ -121,7 +121,7 @@ export default function AddStudyPlanItemForm({
             id="status"
             value={status}
             onChange={(e) => setStatus(e.target.value as StudyPlanItemStatus)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] text-[#006A71]"
             disabled={isSubmitting}
           >
             <option value={StudyPlanItemStatus.PENDING}>Pending</option>
@@ -134,17 +134,17 @@ export default function AddStudyPlanItemForm({
       <div>
         <label
           htmlFor="scheduledDate"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#006A71] mb-1"
         >
           Scheduled Date{" "}
-          <span className="text-gray-500 text-xs">(Optional)</span>
+          <span className="text-[#48A6A7] text-xs">(Optional)</span>
         </label>
         <input
           id="scheduledDate"
           type="date"
           value={scheduledDate}
           onChange={(e) => setScheduledDate(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] text-[#006A71]"
           disabled={isSubmitting}
         />
       </div>
@@ -152,10 +152,10 @@ export default function AddStudyPlanItemForm({
       <div>
         <label
           htmlFor="linkedRequestId"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-[#006A71] mb-1"
         >
           Linked Content Request ID{" "}
-          <span className="text-gray-500 text-xs">(Optional)</span>
+          <span className="text-[#48A6A7] text-xs">(Optional)</span>
         </label>
         <input
           id="linkedRequestId"
@@ -163,10 +163,10 @@ export default function AddStudyPlanItemForm({
           value={linkedRequestId}
           onChange={(e) => setLinkedRequestId(e.target.value)}
           placeholder="UUID of content request"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] text-[#006A71] placeholder:text-[#9ACBD0]"
           disabled={isSubmitting}
         />
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-[#48A6A7] mt-1">
           Link this study item to a generated content request
         </p>
       </div>
@@ -181,7 +181,7 @@ export default function AddStudyPlanItemForm({
         <button
           type="submit"
           disabled={isSubmitting || !topic.trim()}
-          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isSubmitting ? "Adding..." : "Add Item"}
         </button>
@@ -190,7 +190,7 @@ export default function AddStudyPlanItemForm({
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 border border-[#9ACBD0] text-[#006A71] rounded-md hover:bg-[#F2EFE7] disabled:opacity-50 transition-colors"
           >
             Cancel
           </button>

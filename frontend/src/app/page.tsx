@@ -33,22 +33,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F2EFE7]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white border-b border-[#9ACBD0]">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-[#006A71]">
                 AI Content Generator
               </h1>
-              <p className="mt-1 text-sm text-gray-600">
+              <p className="mt-1 text-sm text-[#48A6A7]">
                 Generate educational content powered by AI
               </p>
             </div>
             <a
               href="/study-plans"
-              className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
+              className="bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] transition-colors text-sm font-medium"
             >
               📚 Study Plans
             </a>
@@ -58,14 +58,14 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-[#9ACBD0] p-6">
           {viewState === "form" ? (
             <div>
               <div className="mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-[#006A71]">
                   Create Content Request
                 </h2>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-[#48A6A7]">
                   Fill in the details below to generate AI-powered educational
                   content.
                 </p>
@@ -84,9 +84,9 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-gray-200 bg-white">
+      <footer className="mt-auto border-t border-[#9ACBD0] bg-white">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-[#48A6A7]">
             EduVision Platform - AI-Assisted Content Request System
           </p>
         </div>

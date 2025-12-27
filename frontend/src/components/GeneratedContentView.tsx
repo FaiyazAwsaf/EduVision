@@ -105,36 +105,36 @@ export default function GeneratedContentView({
   return (
     <div className="space-y-6">
       {/* Metadata */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <h3 className="text-sm font-semibold text-blue-700 mb-3">
+      <div className="rounded-lg border border-[#9ACBD0] bg-[#F2EFE7] p-4">
+        <h3 className="text-sm font-semibold text-[#006A71] mb-3">
           Content Details
         </h3>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
-            <dt className="font-medium text-gray-500">Topic</dt>
-            <dd className="text-gray-900">{content.topic}</dd>
+            <dt className="font-medium text-[#48A6A7]">Topic</dt>
+            <dd className="text-[#006A71]">{content.topic}</dd>
           </div>
           <div>
-            <dt className="font-medium text-gray-500">Content Type</dt>
-            <dd className="text-gray-900">
+            <dt className="font-medium text-[#48A6A7]">Content Type</dt>
+            <dd className="text-[#006A71]">
               {content.content_type.replace("_", " ")}
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-gray-500">Style</dt>
-            <dd className="text-gray-900">{content.style.replace("_", " ")}</dd>
+            <dt className="font-medium text-[#48A6A7]">Style</dt>
+            <dd className="text-[#006A71]">{content.style.replace("_", " ")}</dd>
           </div>
           <div>
-            <dt className="font-medium text-gray-500">Format</dt>
-            <dd className="text-gray-900">{content.output_format}</dd>
+            <dt className="font-medium text-[#48A6A7]">Format</dt>
+            <dd className="text-[#006A71]">{content.output_format}</dd>
           </div>
           <div>
-            <dt className="font-medium text-gray-500">Generated</dt>
-            <dd className="text-gray-900">{formatDate(content.created_at)}</dd>
+            <dt className="font-medium text-[#48A6A7]">Generated</dt>
+            <dd className="text-[#006A71]">{formatDate(content.created_at)}</dd>
           </div>
           <div>
-            <dt className="font-medium text-gray-500">AI Model</dt>
-            <dd className="text-gray-900">{content.metadata.model}</dd>
+            <dt className="font-medium text-[#48A6A7]">AI Model</dt>
+            <dd className="text-[#006A71]">{content.metadata.model}</dd>
           </div>
         </dl>
       </div>
@@ -143,20 +143,20 @@ export default function GeneratedContentView({
       {/* This provides an alternative entry point to link content to study plans
           without requiring users to navigate to study plan view first.
           Reuses existing study_plan_items API - NO new backend endpoints. */}
-      <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+      <div className="rounded-lg border border-[#9ACBD0] bg-[#9ACBD0]/10 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-purple-900 mb-1">
+            <h3 className="text-sm font-semibold text-[#006A71] mb-1">
               📚 Study Plan Integration
             </h3>
-            <p className="text-sm text-purple-700">
+            <p className="text-sm text-[#48A6A7]">
               Add this generated content to your study plan for better
               organization and tracking.
             </p>
           </div>
           <button
             onClick={() => setShowAddToStudyPlanModal(true)}
-            className="shrink-0 inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-700 transition-colors"
+            className="shrink-0 inline-flex items-center gap-2 rounded-md bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors"
           >
             <svg
               className="w-4 h-4"
@@ -185,15 +185,15 @@ export default function GeneratedContentView({
 
       {/* Content Display */}
       {/* Always show text content with download option */}
-      <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-black">
-        <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
+      <div className="rounded-lg border border-[#9ACBD0] bg-white p-8 text-[#006A71]">
+        <div className="flex items-center justify-between mb-6 pb-2 border-b border-[#9ACBD0]">
+          <h3 className="text-lg font-semibold text-[#006A71]">
             Generated Content
           </h3>
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 rounded-md bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#48A6A7] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             {isDownloading ? (
               <>

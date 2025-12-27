@@ -120,7 +120,7 @@ export default function ContentRequestForm({
       <div>
         <label
           htmlFor="topic"
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-[#006A71]"
         >
           Topic <span className="text-red-500">*</span>
         </label>
@@ -131,10 +131,10 @@ export default function ContentRequestForm({
           onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
           placeholder="e.g., Pythagorean Theorem"
           disabled={isSubmitting}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 placeholder:text-gray-400"
+          className="mt-1 block w-full rounded-md border border-[#9ACBD0] px-3 py-2 focus:border-[#48A6A7] focus:outline-none focus:ring-1 focus:ring-[#48A6A7] disabled:bg-gray-100 disabled:text-gray-500 placeholder:text-[#9ACBD0]"
           required
         />
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-[#48A6A7]">
           The subject matter for content generation
         </p>
       </div>
@@ -143,7 +143,7 @@ export default function ContentRequestForm({
       <div>
         <label
           htmlFor="content_type"
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-[#006A71]"
         >
           Content Type <span className="text-red-500">*</span>
         </label>
@@ -157,7 +157,7 @@ export default function ContentRequestForm({
             })
           }
           disabled={isSubmitting}
-          className="mt-1 block w-full rounded-md border border-gray-400 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-400 text-gray-400"
+          className="mt-1 block w-full rounded-md border border-[#9ACBD0] px-3 py-2 focus:border-[#48A6A7] focus:outline-none focus:ring-1 focus:ring-[#48A6A7] disabled:bg-gray-100 text-[#006A71]"
           required
         >
           <option value={ContentType.SUMMARY}>Summary</option>
@@ -170,7 +170,7 @@ export default function ContentRequestForm({
       <div>
         <label
           htmlFor="style"
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-[#006A71]"
         >
           Style <span className="text-red-500">*</span>
         </label>
@@ -181,7 +181,7 @@ export default function ContentRequestForm({
             setFormData({ ...formData, style: e.target.value as Style })
           }
           disabled={isSubmitting}
-          className="mt-1 block w-full rounded-md text-gray-400 border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+          className="mt-1 block w-full rounded-md text-[#006A71] border border-[#9ACBD0] px-3 py-2 focus:border-[#48A6A7] focus:outline-none focus:ring-1 focus:ring-[#48A6A7] disabled:bg-gray-100"
           required
         >
           <option value={Style.BRIEF}>Brief</option>
@@ -194,7 +194,7 @@ export default function ContentRequestForm({
       <div>
         <label
           htmlFor="difficulty"
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-[#006A71]"
         >
           Difficulty
         </label>
@@ -210,7 +210,7 @@ export default function ContentRequestForm({
             })
           }
           disabled={isSubmitting}
-          className="mt-1 block w-full rounded-md border text-gray-400 border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+          className="mt-1 block w-full rounded-md border text-[#006A71] border-[#9ACBD0] px-3 py-2 focus:border-[#48A6A7] focus:outline-none focus:ring-1 focus:ring-[#48A6A7] disabled:bg-gray-100"
         >
           <option value={Difficulty.EASY}>Easy</option>
           <option value={Difficulty.MEDIUM}>Medium</option>
@@ -224,7 +224,7 @@ export default function ContentRequestForm({
       <div>
         <label
           htmlFor="notes"
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-[#006A71]"
         >
           Additional Notes
         </label>
@@ -235,9 +235,9 @@ export default function ContentRequestForm({
           placeholder="Optional: Add any specific instructions or context..."
           rows={3}
           disabled={isSubmitting}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 placeholder:text-gray-400"
+          className="mt-1 block w-full rounded-md border border-[#9ACBD0] px-3 py-2 focus:border-[#48A6A7] focus:outline-none focus:ring-1 focus:ring-[#48A6A7] disabled:bg-gray-100 disabled:text-gray-500 placeholder:text-[#9ACBD0]"
         />
-        <p className="mt-1 text-sm text-gray-500">Maximum 2000 characters</p>
+        <p className="mt-1 text-sm text-[#48A6A7]">Maximum 2000 characters</p>
       </div>
 
       {/* Phase 4: Learning Context */}
@@ -251,7 +251,7 @@ export default function ContentRequestForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="flex-1 rounded-md bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#48A6A7] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
@@ -286,7 +286,7 @@ export default function ContentRequestForm({
           type="button"
           onClick={handleReset}
           disabled={isSubmitting}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="rounded-md border border-[#9ACBD0] bg-white px-4 py-2 text-sm font-semibold text-[#006A71] hover:bg-[#F2EFE7] disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
         >
           Reset
         </button>

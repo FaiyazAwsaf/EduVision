@@ -148,7 +148,7 @@ export default function RequestStatusComponent({
       <div className="flex items-center justify-center py-12">
         <div className="flex items-center gap-3">
           <svg
-            className="h-6 w-6 animate-spin text-blue-600"
+            className="h-6 w-6 animate-spin text-[#48A6A7]"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -167,7 +167,7 @@ export default function RequestStatusComponent({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <span className="text-gray-600">Loading request details...</span>
+          <span className="text-[#48A6A7]">Loading request details...</span>
         </div>
       </div>
     );
@@ -189,13 +189,13 @@ export default function RequestStatusComponent({
 
       {/* Request Header */}
       {request && (
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <div className="rounded-lg border border-[#9ACBD0] bg-white p-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-[#006A71]">
                 {request.topic}
               </h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-[#48A6A7]">
                 Request ID: {requestId.slice(0, 8)}...
               </p>
             </div>
@@ -204,47 +204,47 @@ export default function RequestStatusComponent({
 
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="font-medium text-gray-500">Content Type</dt>
-              <dd className="text-gray-900">
+              <dt className="font-medium text-[#48A6A7]">Content Type</dt>
+              <dd className="text-[#006A71]">
                 {request.content_type.replace("_", " ")}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-gray-500">Style</dt>
-              <dd className="text-gray-900">
+              <dt className="font-medium text-[#48A6A7]">Style</dt>
+              <dd className="text-[#006A71]">
                 {request.style.replace("_", " ")}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-gray-500">Difficulty</dt>
-              <dd className="text-gray-900">
+              <dt className="font-medium text-[#48A6A7]">Difficulty</dt>
+              <dd className="text-[#006A71]">
                 {request.difficulty || "Not specified"}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-gray-500">Output Format</dt>
-              <dd className="text-gray-900">{request.output_format}</dd>
+              <dt className="font-medium text-[#48A6A7]">Output Format</dt>
+              <dd className="text-[#006A71]">{request.output_format}</dd>
             </div>
             <div>
-              <dt className="font-medium text-gray-500">Created</dt>
-              <dd className="text-gray-900">
+              <dt className="font-medium text-[#48A6A7]">Created</dt>
+              <dd className="text-[#006A71]">
                 {formatDate(request.created_at)}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-gray-500">Elapsed Time</dt>
-              <dd className="text-gray-900">
+              <dt className="font-medium text-[#48A6A7]">Elapsed Time</dt>
+              <dd className="text-[#006A71]">
                 {getElapsedTime() || "Calculating..."}
               </dd>
             </div>
           </dl>
 
           {request.notes && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <dt className="text-sm font-medium text-gray-500 mb-1">
+            <div className="mt-4 pt-4 border-t border-[#9ACBD0]">
+              <dt className="text-sm font-medium text-[#48A6A7] mb-1">
                 Additional Notes
               </dt>
-              <dd className="text-sm text-gray-700">{request.notes}</dd>
+              <dd className="text-sm text-[#006A71]">{request.notes}</dd>
             </div>
           )}
         </div>
@@ -259,7 +259,7 @@ export default function RequestStatusComponent({
       <div className="flex justify-center">
         <button
           onClick={onCreateNew}
-          className="rounded-md bg-white border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+          className="rounded-md bg-white border border-[#9ACBD0] px-4 py-2 text-sm font-semibold text-[#006A71] hover:bg-[#F2EFE7] transition-colors"
         >
           Create Another Request
         </button>

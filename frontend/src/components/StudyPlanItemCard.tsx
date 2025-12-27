@@ -34,17 +34,17 @@ export default function StudyPlanItemCard({
   const [error, setError] = useState<string | null>(null);
 
   const priorityColors: Record<number, string> = {
-    1: "bg-red-100 text-red-800 border-red-300",
-    2: "bg-orange-100 text-orange-800 border-orange-300",
-    3: "bg-yellow-100 text-yellow-800 border-yellow-300",
-    4: "bg-green-100 text-green-800 border-green-300",
-    5: "bg-blue-100 text-blue-800 border-blue-300",
+    1: "bg-red-50 text-red-800 border-red-200",
+    2: "bg-orange-50 text-orange-800 border-orange-200",
+    3: "bg-amber-50 text-amber-800 border-amber-200",
+    4: "bg-[#9ACBD0]/20 text-[#006A71] border-[#9ACBD0]",
+    5: "bg-[#F2EFE7] text-[#48A6A7] border-[#9ACBD0]",
   };
 
   const statusColors: Record<StudyPlanItemStatus, string> = {
-    [StudyPlanItemStatus.PENDING]: "bg-gray-100 text-gray-800",
-    [StudyPlanItemStatus.IN_PROGRESS]: "bg-blue-100 text-blue-800",
-    [StudyPlanItemStatus.COMPLETED]: "bg-green-100 text-green-800",
+    [StudyPlanItemStatus.PENDING]: "bg-[#F2EFE7] text-[#006A71]",
+    [StudyPlanItemStatus.IN_PROGRESS]: "bg-[#9ACBD0]/30 text-[#006A71]",
+    [StudyPlanItemStatus.COMPLETED]: "bg-green-50 text-green-800",
   };
 
   const statusLabels: Record<StudyPlanItemStatus, string> = {
@@ -100,7 +100,7 @@ export default function StudyPlanItemCard({
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="border border-[#9ACBD0] rounded-lg p-4 bg-white hover:border-[#48A6A7] transition-colors">
       {/* Header with status and priority */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex gap-2">
@@ -119,7 +119,7 @@ export default function StudyPlanItemCard({
             Priority {item.priority}
           </span>
           {item.source === "manual" && (
-            <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-800">
+            <span className="px-2 py-1 text-xs font-medium rounded bg-[#9ACBD0]/20 text-[#006A71]">
               Manual
             </span>
           )}
@@ -133,14 +133,14 @@ export default function StudyPlanItemCard({
             type="text"
             value={editedTopic}
             onChange={(e) => setEditedTopic(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md text-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
             disabled={isUpdating}
           />
           <div className="grid grid-cols-2 gap-3">
             <select
               value={editedPriority}
               onChange={(e) => setEditedPriority(parseInt(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-md"
+              className="px-3 py-2 border border-[#9ACBD0] rounded-md text-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
               disabled={isUpdating}
             >
               <option value={1}>Priority 1 (Highest)</option>
@@ -153,21 +153,21 @@ export default function StudyPlanItemCard({
               type="date"
               value={editedDate}
               onChange={(e) => setEditedDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
+              className="px-3 py-2 border border-[#9ACBD0] rounded-md text-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
               disabled={isUpdating}
             />
           </div>
         </div>
       ) : (
         <div className="mb-3">
-          <h3 className="font-medium text-gray-900 mb-1">{item.topic}</h3>
+          <h3 className="font-medium text-[#006A71] mb-1">{item.topic}</h3>
           {item.scheduled_date && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[#48A6A7]">
               📅 Scheduled: {new Date(item.scheduled_date).toLocaleDateString()}
             </p>
           )}
           {item.linked_request_id && (
-            <p className="text-sm text-blue-600 mt-1">
+            <p className="text-sm text-[#48A6A7] mt-1">
               🔗 Linked to content request
             </p>
           )}
@@ -187,7 +187,7 @@ export default function StudyPlanItemCard({
             <button
               onClick={handleSaveEdit}
               disabled={isUpdating || !editedTopic.trim()}
-              className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              className="px-3 py-1 text-sm bg-[#48A6A7] text-white rounded hover:bg-[#006A71] disabled:opacity-50 transition-colors"
             >
               Save
             </button>
@@ -200,7 +200,7 @@ export default function StudyPlanItemCard({
                 setError(null);
               }}
               disabled={isUpdating}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1 text-sm border border-[#9ACBD0] text-[#006A71] rounded hover:bg-[#F2EFE7] disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
@@ -213,7 +213,7 @@ export default function StudyPlanItemCard({
                   handleStatusChange(StudyPlanItemStatus.COMPLETED)
                 }
                 disabled={isUpdating}
-                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
               >
                 ✓ Complete
               </button>
@@ -224,7 +224,7 @@ export default function StudyPlanItemCard({
                   handleStatusChange(StudyPlanItemStatus.IN_PROGRESS)
                 }
                 disabled={isUpdating}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 py-1 text-sm bg-[#48A6A7] text-white rounded hover:bg-[#006A71] disabled:opacity-50 transition-colors"
               >
                 Start
               </button>
@@ -232,14 +232,14 @@ export default function StudyPlanItemCard({
             <button
               onClick={() => setIsEditing(true)}
               disabled={isUpdating}
-              className="px-3 py-1 text-sm border text-black border-black rounded hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1 text-sm border text-[#006A71] border-[#9ACBD0] rounded hover:bg-[#F2EFE7] disabled:opacity-50 transition-colors"
             >
               Edit
             </button>
             <button
               onClick={handleDelete}
               disabled={isUpdating}
-              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+              className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 transition-colors"
             >
               Delete
             </button>

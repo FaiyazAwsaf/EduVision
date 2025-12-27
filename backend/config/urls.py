@@ -34,6 +34,9 @@ urlpatterns = [
     # Study plan endpoints (Phase 5)
     path('api/', include(router.urls)),
     
+    # Intelligence & Adaptive Optimization endpoints (Phase 6)
+    path('api/intelligence/', include('apps.intelligence.api.urls', namespace='intelligence')),
+    
     # Add other module APIs here as they are implemented
     # path('api/tutoring/', include('apps.tutoring.api.urls')),
     # path('api/evaluation/', include('apps.evaluation.api.urls')),

@@ -15,19 +15,19 @@ interface StatusBadgeProps {
 const STATUS_CONFIG = {
   [RequestStatus.PENDING]: {
     label: "Queued",
-    className: "bg-gray-100 text-gray-800 border-gray-300",
+    className: "bg-[#F2EFE7] text-[#006A71] border-[#9ACBD0]",
   },
   [RequestStatus.PROCESSING]: {
     label: "Generating...",
-    className: "bg-blue-100 text-blue-800 border-blue-300",
+    className: "bg-[#9ACBD0]/20 text-[#006A71] border-[#48A6A7]",
   },
   [RequestStatus.COMPLETED]: {
     label: "Ready",
-    className: "bg-green-100 text-green-800 border-green-300",
+    className: "bg-green-50 text-green-800 border-green-300",
   },
   [RequestStatus.FAILED]: {
     label: "Failed",
-    className: "bg-red-100 text-red-800 border-red-300",
+    className: "bg-red-50 text-red-800 border-red-300",
   },
 } as const;
 
