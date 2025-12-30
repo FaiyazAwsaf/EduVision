@@ -139,3 +139,105 @@ def validate_livekit_config() -> dict:
     ])
     
     return config
+
+
+# ==================== WebSocket Broadcast Utilities ====================
+
+def broadcast_session_status_change(session_id: str, status: str, previous_status: str = None, metadata: dict = None):
+    """
+    Broadcast session status change to all connected WebSocket clients.
+    
+    This function should be called from HTTP views when session status changes.
+    Uses sync_to_async to work in Django's sync views.
+    
+    Args:
+        session_id: UUID of the tutoring session
+        status: New session status
+        previous_status: Previous session status (optional)
+        metadata: Additional metadata to include (optional)
+    """
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from datetime import datetime
+    
+    channel_layer = get_channel_layer()
+    room_group_name = f'tutoring_{session_id}'
+    
+    async_to_sync(channel_layer.group_send)(
+        room_group_name,
+        {
+            'type': 'session_status_changed',
+            'status': status,
+            'previous_status': previous_status,
+            'metadata': metadata or {},
+            'timestamp': datetime.now().isoformat()
+        }
+    )
+    
+    logger.info(f"Broadcast session status change: {session_id} -> {status}")
+
+
+def broadcast_session_ended(session_id: str, reason: str = "Session ended", ended_by: str = None):
+    """
+    Broadcast session ended event to all connected WebSocket clients.
+    
+    This function should be called from HTTP views when a session is ended.
+    
+    Args:
+        session_id: UUID of the tutoring session
+        reason: Reason for ending the session
+        ended_by: Role of user who ended the session ('teacher' or 'student')
+    """
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from datetime import datetime
+    
+    channel_layer = get_channel_layer()
+    room_group_name = f'tutoring_{session_id}'
+    
+    async_to_sync(channel_layer.group_send)(
+        room_group_name,
+        {
+            'type': 'session_ended',
+            'reason': reason,
+            'ended_by': ended_by,
+            'timestamp': datetime.now().isoformat()
+        }
+    )
+    
+    logger.info(f"Broadcast session ended: {session_id} - {reason}")
+
+
+def broadcast_participant_update(session_id: str, user_id: str, role: str, user_name: str, event_type: str):
+    """
+    Broadcast participant update (join/leave) to all connected WebSocket clients.
+    
+    Args:
+        session_id: UUID of the tutoring session
+        user_id: UUID of the participant
+        role: Role of the participant ('teacher' or 'student')
+        user_name: Display name of the participant
+        event_type: Either 'participant_joined' or 'participant_left'
+    """
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from datetime import datetime
+    
+    if event_type not in ['participant_joined', 'participant_left']:
+        raise ValueError(f"Invalid event_type: {event_type}")
+    
+    channel_layer = get_channel_layer()
+    room_group_name = f'tutoring_{session_id}'
+    
+    async_to_sync(channel_layer.group_send)(
+        room_group_name,
+        {
+            'type': event_type,
+            'user_id': str(user_id),
+            'role': role,
+            'user_name': user_name,
+            'timestamp': datetime.now().isoformat()
+        }
+    )
+    
+    logger.info(f"Broadcast {event_type}: {user_name} ({role}) in session {session_id}")

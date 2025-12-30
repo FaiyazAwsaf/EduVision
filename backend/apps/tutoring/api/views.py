@@ -34,7 +34,13 @@ from apps.tutoring.api.serializers import (
     SessionStatusSerializer,
     SessionListSerializer,
 )
-from apps.tutoring.utils import generate_livekit_token, get_livekit_ws_url
+from apps.tutoring.utils import (
+    generate_livekit_token, 
+    get_livekit_ws_url,
+    broadcast_session_status_change,
+    broadcast_session_ended,
+    broadcast_participant_update
+)
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +335,29 @@ class SessionJoinView(APIView):
             f"Student {user.id} joined session {session.id}"
         )
         
+        # Broadcast WebSocket event for student join
+        try:
+            broadcast_session_status_change(
+                session_id=str(session.id),
+                status=session.status,
+                previous_status=SessionStatus.WAITING,
+                metadata={
+                    'student_id': str(user.id),
+                    'student_name': user.full_name,
+                    'event': 'student_joined'
+                }
+            )
+            broadcast_participant_update(
+                session_id=str(session.id),
+                user_id=str(user.id),
+                role='student',
+                user_name=user.full_name,
+                event_type='participant_joined'
+            )
+        except Exception as e:
+            # Don't fail the join if WebSocket broadcast fails
+            logger.warning(f"Failed to broadcast join event: {str(e)}")
+        
         return Response(
             {
                 'session_id': str(session.id),
@@ -471,11 +500,23 @@ class SessionEndView(APIView):
             )
         
         # End the session
+        previous_status = session.status
         session.end()
         
         logger.info(
             f"Session {session.id} ended by teacher {user.id}"
         )
+        
+        # Broadcast WebSocket event for session end
+        try:
+            broadcast_session_ended(
+                session_id=str(session.id),
+                reason="Session ended by teacher",
+                ended_by="teacher"
+            )
+        except Exception as e:
+            # Don't fail the end if WebSocket broadcast fails
+            logger.warning(f"Failed to broadcast session end event: {str(e)}")
         
         serializer = SessionStatusSerializer(session)
         return Response(serializer.data, status=status.HTTP_200_OK)
