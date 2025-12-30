@@ -37,7 +37,9 @@ urlpatterns = [
     # Intelligence & Adaptive Optimization endpoints (Phase 6)
     path('api/intelligence/', include('apps.intelligence.api.urls', namespace='intelligence')),
     
+    # Module 5: Tutoring endpoints
+    path('api/tutoring/', include('apps.tutoring.api.urls', namespace='tutoring')),
+    
     # Add other module APIs here as they are implemented
-    # path('api/tutoring/', include('apps.tutoring.api.urls')),
     # path('api/evaluation/', include('apps.evaluation.api.urls')),
 ]

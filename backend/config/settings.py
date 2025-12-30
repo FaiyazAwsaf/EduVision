@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "apps.user.apps.UserConfig",
     "apps.content_requests.apps.ContentRequestsConfig",
     "apps.intelligence.apps.IntelligenceConfig",  # Phase 6: Intelligence & Adaptive Optimization
+    "apps.tutoring.apps.TutoringConfig",  # Module 5: One-on-One Live Tutoring
 ]
 
 MIDDLEWARE = [
@@ -53,6 +54,9 @@ MIDDLEWARE = [
     # Custom middleware for content requests
     "apps.content_requests.middleware.RequestLoggingMiddleware",
     "apps.content_requests.middleware.ContentRequestErrorHandlingMiddleware",
+    
+    # Temporary authentication for tutoring (development only)
+    "apps.tutoring.middleware.TempAuthMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -187,6 +191,19 @@ CORS_ALLOW_METHODS = [
     'PATCH',
     'POST',
     'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-user-id',  # Temporary auth header for tutoring module
 ]
 
 
