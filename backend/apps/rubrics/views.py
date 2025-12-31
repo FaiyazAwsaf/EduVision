@@ -8,6 +8,7 @@ from .serializers import (
     RubricSerializer, RubricListSerializer,
     RubricVersionSerializer, RubricPublishSerializer
 )
+from .services import apply_rubric
 
 
 class RubricViewSet(viewsets.ModelViewSet):
@@ -204,3 +205,53 @@ class RubricViewSet(viewsets.ModelViewSet):
         versions = instance.versions.all()
         serializer = RubricVersionSerializer(versions, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], permission_classes=[])
+    def test(self, request):
+        """
+        Test a rubric against a sample answer without saving.
+        
+        This endpoint allows testing evaluation rules before creating/publishing a rubric.
+        No authentication required for testing.
+        
+        Request body:
+        {
+            "rubric": {
+                "evaluation_rules": [...],
+                "total_marks": 10.0
+            },
+            "answer_text": "Student's answer text"
+        }
+        
+        Response:
+        {
+            "total_score": 7.5,
+            "max_score": 10.0,
+            "rule_results": [...],
+            "feedback": "Combined feedback summary"
+        }
+        """
+        rubric_data = request.data.get('rubric')
+        answer_text = request.data.get('answer_text')
+        
+        if not rubric_data or not answer_text:
+            return Response(
+                {"detail": "Both 'rubric' and 'answer_text' are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not rubric_data.get('evaluation_rules'):
+            return Response(
+                {"detail": "Rubric must contain 'evaluation_rules'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Apply the rubric to the answer text
+            result = apply_rubric(rubric_data, answer_text)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error evaluating answer: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

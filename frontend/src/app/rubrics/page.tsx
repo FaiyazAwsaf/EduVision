@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { RuleEditor, SampleAnswerTester } from "@/components/rubrics";
 import type { EvaluationRule } from "@/components/rubrics";
+import { createRubric, updateRubric, publishRubric } from "@/lib/api/rubrics";
 
 interface RubricFormData {
   title: string;
@@ -22,6 +23,9 @@ export default function RubricBuilderPage() {
     total_marks: 10,
     evaluation_rules: [],
   });
+  const [rubricId, setRubricId] = useState<string | null>(null);
+  const [rubricVersion, setRubricVersion] = useState<number>(1);
+  const [isPublished, setIsPublished] = useState<boolean>(false);
   const [activeRuleIndex, setActiveRuleIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +40,7 @@ export default function RubricBuilderPage() {
   // Add new evaluation rule
   const addRule = () => {
     const newRule: EvaluationRule = {
-      id: `rule-${Date.now()}`,
+      id: crypto.randomUUID(),
       type: "keyword",
       marks: 0,
       config: {
@@ -133,9 +137,21 @@ export default function RubricBuilderPage() {
 
     setIsSubmitting(true);
     try {
-      // TODO: Implement API call to save draft
-      console.log("Saving draft:", formData);
-      setSuccess("Draft saved successfully!");
+      let result;
+      
+      if (rubricId) {
+        // Update existing rubric
+        result = await updateRubric(rubricId, formData);
+        setSuccess(`Draft updated successfully! (Version ${result.version})`);
+      } else {
+        // Create new rubric
+        result = await createRubric(formData);
+        setRubricId(result.id);
+        setSuccess("Draft saved successfully!");
+      }
+      
+      // Update version from response
+      setRubricVersion(result.version);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save draft");
     } finally {
@@ -162,12 +178,23 @@ export default function RubricBuilderPage() {
   // Publish rubric after confirmation
   const confirmPublish = async () => {
     setShowPublishModal(false);
+    
+    // Check if rubric has been saved first
+    if (!rubricId) {
+      setError("Please save the rubric as a draft before publishing");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      // TODO: Implement API call to publish
-      console.log("Publishing rubric:", formData);
-      setSuccess("Rubric published successfully!");
+      const result = await publishRubric(rubricId);
+      
+      // Update local state with published rubric data
+      setRubricVersion(result.version);
+      setIsPublished(true);
+      
+      setSuccess(`Rubric published successfully! (Version ${result.version})`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to publish rubric");
     } finally {
@@ -180,12 +207,23 @@ export default function RubricBuilderPage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Rubric Builder
-          </h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Create evaluation rubrics for automated grading
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Rubric Builder
+              </h1>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">
+                Create evaluation rubrics for automated grading
+              </p>
+            </div>
+            {isPublished && (
+              <div className="px-4 py-2 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
+                <span className="text-sm font-medium text-green-800 dark:text-green-300">
+                  ✓ Published (Read-Only)
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -238,7 +276,8 @@ export default function RubricBuilderPage() {
                     id="title"
                     value={formData.title}
                     onChange={(e) => updateField("title", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    disabled={isPublished}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     placeholder="e.g., Physics Newton's Laws - Question 5"
                     required
                   />
@@ -256,7 +295,8 @@ export default function RubricBuilderPage() {
                     id="subject"
                     value={formData.subject}
                     onChange={(e) => updateField("subject", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    disabled={isPublished}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     placeholder="e.g., Physics"
                     required
                   />
@@ -274,7 +314,8 @@ export default function RubricBuilderPage() {
                     id="total_marks"
                     value={formData.total_marks}
                     onChange={(e) => updateField("total_marks", parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    disabled={isPublished}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     min="0"
                     step="0.5"
                     required
@@ -304,7 +345,8 @@ export default function RubricBuilderPage() {
                     id="question_text"
                     value={formData.question_text}
                     onChange={(e) => updateField("question_text", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    disabled={isPublished}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     rows={4}
                     placeholder="Enter the question text here..."
                     required
@@ -322,7 +364,8 @@ export default function RubricBuilderPage() {
                     id="reference_answer"
                     value={formData.reference_answer}
                     onChange={(e) => updateField("reference_answer", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    disabled={isPublished}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     rows={6}
                     placeholder="Enter the model/reference answer here..."
                     required
@@ -340,7 +383,8 @@ export default function RubricBuilderPage() {
                 <button
                   type="button"
                   onClick={addRule}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  disabled={isPublished}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -373,7 +417,8 @@ export default function RubricBuilderPage() {
                   <button
                     type="button"
                     onClick={addRule}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={isPublished}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Add First Rule
                   </button>
@@ -387,6 +432,7 @@ export default function RubricBuilderPage() {
                       ruleNumber={index + 1}
                       onChange={(updatedRule) => updateRule(index, updatedRule)}
                       onDelete={() => removeRule(index)}
+                      disabled={isPublished}
                     />
                   ))}
                 </div>
@@ -400,6 +446,7 @@ export default function RubricBuilderPage() {
                   Test Your Rubric
                 </h2>
                 <SampleAnswerTester
+                  rubricId={rubricId || undefined}
                   evaluationRules={formData.evaluation_rules}
                   totalMarks={formData.total_marks}
                 />
@@ -412,7 +459,7 @@ export default function RubricBuilderPage() {
                 <button
                   type="button"
                   onClick={handleSaveDraft}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPublished}
                   className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? "Saving..." : "Save Draft"}
@@ -420,7 +467,7 @@ export default function RubricBuilderPage() {
                 <button
                   type="button"
                   onClick={handlePublishClick}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPublished}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? "Publishing..." : "Publish"}

@@ -40,6 +40,7 @@ interface RuleEditorProps {
   ruleNumber: number;
   onChange: (updatedRule: EvaluationRule) => void;
   onDelete: () => void;
+  disabled?: boolean;
 }
 
 export default function RuleEditor({
@@ -47,6 +48,7 @@ export default function RuleEditor({
   ruleNumber,
   onChange,
   onDelete,
+  disabled = false,
 }: RuleEditorProps) {
   const [newKeyword, setNewKeyword] = useState("");
   const [newPattern, setNewPattern] = useState("");
@@ -166,7 +168,8 @@ export default function RuleEditor({
         <button
           type="button"
           onClick={onDelete}
-          className="text-red-600 dark:text-red-400 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors p-2"
+          disabled={disabled}
+          className="text-red-600 dark:text-red-400 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors p-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -190,7 +193,8 @@ export default function RuleEditor({
             <select
               value={rule.type}
               onChange={(e) => handleTypeChange(e.target.value as RuleType)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              disabled={disabled}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="keyword">Keyword Matching</option>
               <option value="numeric">Numeric Value</option>
@@ -206,9 +210,10 @@ export default function RuleEditor({
               type="number"
               value={rule.marks}
               onChange={(e) => updateField("marks", parseFloat(e.target.value) || 0)}
+              disabled={disabled}
               min={0}
               step={0.5}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -223,7 +228,8 @@ export default function RuleEditor({
               <select
                 value={(rule.config as KeywordConfig).scoring_mode}
                 onChange={(e) => updateConfig("scoring_mode", e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                disabled={disabled}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <option value="proportional">Proportional (partial credit)</option>
                 <option value="all_or_nothing">All or Nothing</option>
@@ -240,13 +246,15 @@ export default function RuleEditor({
                   value={newKeyword}
                   onChange={(e) => setNewKeyword(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addKeyword())}
+                  disabled={disabled}
                   placeholder="Add a keyword..."
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
                   onClick={addKeyword}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={disabled}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add
                 </button>
@@ -262,7 +270,8 @@ export default function RuleEditor({
                       <button
                         type="button"
                         onClick={() => removeKeyword(index)}
-                        className="hover:text-blue-900 dark:hover:text-blue-200"
+                        disabled={disabled}
+                        className="hover:text-blue-900 dark:hover:text-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -287,8 +296,9 @@ export default function RuleEditor({
                 type="number"
                 value={(rule.config as NumericConfig).expected_value}
                 onChange={(e) => updateConfig("expected_value", parseFloat(e.target.value) || 0)}
+                disabled={disabled}
                 step="any"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -299,9 +309,10 @@ export default function RuleEditor({
                 type="number"
                 value={(rule.config as NumericConfig).tolerance}
                 onChange={(e) => updateConfig("tolerance", parseFloat(e.target.value) || 0)}
+                disabled={disabled}
                 step="any"
                 min={0}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -318,8 +329,9 @@ export default function RuleEditor({
                 type="text"
                 value={(rule.config as StepwiseConfig).step_description}
                 onChange={(e) => updateConfig("step_description", e.target.value)}
+                disabled={disabled}
                 placeholder="e.g., Formula shown correctly"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -329,7 +341,8 @@ export default function RuleEditor({
                   type="checkbox"
                   checked={(rule.config as StepwiseConfig).allow_partial_credit}
                   onChange={(e) => updateConfig("allow_partial_credit", e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  disabled={disabled}
+                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">Allow Partial Credit</span>
               </label>
@@ -345,13 +358,15 @@ export default function RuleEditor({
                   value={newPattern}
                   onChange={(e) => setNewPattern(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addPattern())}
+                  disabled={disabled}
                   placeholder="e.g., F\s*=\s*ma"
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
                   onClick={addPattern}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={disabled}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add
                 </button>
@@ -367,7 +382,8 @@ export default function RuleEditor({
                       <button
                         type="button"
                         onClick={() => removePattern(index)}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        disabled={disabled}
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -395,8 +411,9 @@ export default function RuleEditor({
               type="text"
               value={rule.feedback.on_success}
               onChange={(e) => updateFeedback("on_success", e.target.value)}
+              disabled={disabled}
               placeholder="Message when rule is fully satisfied"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -409,8 +426,9 @@ export default function RuleEditor({
                 type="text"
                 value={rule.feedback.on_partial || ""}
                 onChange={(e) => updateFeedback("on_partial", e.target.value)}
+                disabled={disabled}
                 placeholder="Message for partial matches"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           )}
@@ -423,8 +441,9 @@ export default function RuleEditor({
               type="text"
               value={rule.feedback.on_failure}
               onChange={(e) => updateFeedback("on_failure", e.target.value)}
+              disabled={disabled}
               placeholder="Message when rule is not satisfied"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>

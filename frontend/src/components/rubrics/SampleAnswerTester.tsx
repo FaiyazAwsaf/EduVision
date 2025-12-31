@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { EvaluationRule } from "./RuleEditor";
+import { testRubric } from "@/lib/api/rubrics";
 
 interface RuleResult {
   rule_id: string;
@@ -60,26 +61,15 @@ export default function SampleAnswerTester({
     setTestResult(null);
 
     try {
-      // TODO: Replace with actual API call
-      // For now, simulate the response
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const result = await testRubric(
+        {
+          evaluation_rules: evaluationRules,
+          total_marks: totalMarks,
+        },
+        sampleAnswer
+      );
 
-      // Mock result - replace with actual API call
-      const mockResult: TestResult = {
-        total_score: 7.5,
-        max_score: totalMarks,
-        rule_results: evaluationRules.map((rule, index) => ({
-          rule_id: rule.id,
-          rule_type: rule.type,
-          score_awarded: rule.marks * 0.75, // Mock: 75% score
-          max_marks: rule.marks,
-          matched: index % 2 === 0,
-          feedback_message: rule.feedback.on_success || "Evaluation completed",
-        })),
-        feedback: "Overall performance analysis...",
-      };
-
-      setTestResult(mockResult);
+      setTestResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to test answer");
     } finally {
@@ -311,7 +301,9 @@ export default function SampleAnswerTester({
                 Overall Feedback
               </h2>
               <div className="prose dark:prose-invert max-w-none">
-                <p className="text-gray-600 dark:text-gray-400">{testResult.feedback}</p>
+                <pre className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-sans">
+                  {testResult.feedback}
+                </pre>
               </div>
             </div>
           )}
