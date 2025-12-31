@@ -30,6 +30,7 @@ import {
   StatusChangeEvent,
   SessionEndedEvent,
   ErrorEvent,
+  WebRTCSignalEvent,
 } from "@/lib/websocket";
 
 // Session state interface
@@ -56,6 +57,9 @@ export interface SessionContextValue {
   isReconnecting: boolean;
   isSessionActive: boolean;
   isSessionEnded: boolean;
+
+  // WebSocket manager (for WebRTC signaling)
+  wsManager: TutoringWebSocketManager | null;
 
   // Actions
   connect: () => void;
@@ -263,6 +267,7 @@ export function SessionProvider({
       isReconnecting,
       isSessionActive,
       isSessionEnded,
+      wsManager,
       connect,
       disconnect,
       clearError,
@@ -275,6 +280,7 @@ export function SessionProvider({
       isReconnecting,
       isSessionActive,
       isSessionEnded,
+      wsManager,
       connect,
       disconnect,
       clearError,

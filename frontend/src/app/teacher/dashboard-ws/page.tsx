@@ -5,6 +5,7 @@
  *
  * Allows teachers to create and manage tutoring sessions.
  * Uses WebSocket for real-time updates instead of polling.
+ * Phase 3: Audio-only WebRTC integration.
  */
 
 import React, { useState, useCallback, useEffect } from "react";
@@ -15,6 +16,7 @@ import {
   ParticipantStatus,
 } from "@/components/ConnectionStatus";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
+import { AudioSession } from "@/components/AudioSession";
 import {
   TutoringUser,
   SessionCreateResponse,
@@ -235,13 +237,14 @@ function SessionView({
           </div>
         </div>
 
-        {/* Video Placeholder */}
-        <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center">
-          <div className="text-center text-gray-400">
-            <div className="text-5xl mb-4">📹</div>
-            <p>Video will appear here in Phase 3</p>
-          </div>
-        </div>
+        {/* Audio Controls - Phase 3 */}
+        {!isEnded && (
+          <AudioSession
+            sessionId={sessionData.session_id}
+            roomId={sessionData.room_id}
+            role="teacher"
+          />
+        )}
       </div>
 
       {/* Session Actions */}
