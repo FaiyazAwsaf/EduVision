@@ -7,7 +7,7 @@
  * Uses WebSocket for real-time updates instead of polling.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import UserSelector from "@/components/tutoring/UserSelector";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
@@ -29,9 +29,11 @@ import { SessionEndedEvent } from "@/lib/websocket";
 function SessionView({
   joinData,
   user,
+  onLeaveSession,
 }: {
   joinData: SessionJoinResponse;
   user: TutoringUser;
+  onLeaveSession: () => void;
 }) {
   const router = useRouter();
   const {
@@ -149,20 +151,76 @@ function SessionView({
       </div>
 
       {/* Actions */}
-      {isEnded && (
-        <div className="p-6 border-t border-gray-200 bg-gray-50">
-          <div className="text-center">
+      <div className="p-6 border-t border-gray-200 bg-gray-50">
+        <div className="text-center space-y-3">
+          {!isEnded && (
+            <button
+              onClick={onLeaveSession}
+              className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Leave Session
+            </button>
+          )}
+          {isEnded && (
             <button
               onClick={() => router.push("/")}
               className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               Return Home
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
+}
+
+// Storage keys for session persistence
+const STORAGE_KEY_STUDENT_SESSION = "tutoring_student_session";
+const STORAGE_KEY_STUDENT_USER = "tutoring_student_user";
+const STORAGE_KEY_STUDENT_ROOM = "tutoring_student_room";
+
+// Helper functions for session persistence
+function saveStudentSession(joinData: SessionJoinResponse, user: TutoringUser, roomId: string) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY_STUDENT_SESSION, JSON.stringify(joinData));
+    localStorage.setItem(STORAGE_KEY_STUDENT_USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEY_STUDENT_ROOM, roomId);
+  }
+}
+
+function loadStudentSession(currentRoomId: string): { joinData: SessionJoinResponse | null; user: TutoringUser | null } {
+  if (typeof window === "undefined") {
+    return { joinData: null, user: null };
+  }
+  try {
+    const savedRoom = localStorage.getItem(STORAGE_KEY_STUDENT_ROOM);
+    console.log("[Session Restore] Current room:", currentRoomId, "Saved room:", savedRoom);
+    // Only restore if it's the same room
+    if (savedRoom !== currentRoomId) {
+      console.log("[Session Restore] Room mismatch, not restoring");
+      return { joinData: null, user: null };
+    }
+    const sessionStr = localStorage.getItem(STORAGE_KEY_STUDENT_SESSION);
+    const userStr = localStorage.getItem(STORAGE_KEY_STUDENT_USER);
+    const result = {
+      joinData: sessionStr ? JSON.parse(sessionStr) : null,
+      user: userStr ? JSON.parse(userStr) : null,
+    };
+    console.log("[Session Restore] Restored:", result.joinData ? "yes" : "no");
+    return result;
+  } catch (e) {
+    console.error("[Session Restore] Error:", e);
+    return { joinData: null, user: null };
+  }
+}
+
+function clearStudentSession() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEY_STUDENT_SESSION);
+    localStorage.removeItem(STORAGE_KEY_STUDENT_USER);
+    localStorage.removeItem(STORAGE_KEY_STUDENT_ROOM);
+  }
 }
 
 // Main page component
@@ -174,6 +232,24 @@ export default function StudentJoinPage() {
   const [joinData, setJoinData] = useState<SessionJoinResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    const { joinData: savedSession, user: savedUser } = loadStudentSession(roomId);
+    if (savedSession && savedUser) {
+      setJoinData(savedSession);
+      setUser(savedUser);
+    }
+    setIsRestoring(false);
+  }, [roomId]);
+
+  // Save session to localStorage when it changes
+  useEffect(() => {
+    if (joinData && user && roomId) {
+      saveStudentSession(joinData, user, roomId);
+    }
+  }, [joinData, user, roomId]);
 
   const handleUserChange = useCallback((selectedUser: TutoringUser | null) => {
     setUser(selectedUser);
@@ -214,7 +290,20 @@ export default function StudentJoinPage() {
   // Event handlers for WebSocket events
   const handleSessionEnded = useCallback((event: SessionEndedEvent) => {
     console.log("Session ended:", event);
+    // Clear session storage when session ends
+    clearStudentSession();
     // Could add toast notification here
+  }, []);
+
+  // Handle student leaving the session
+  const handleLeaveSession = useCallback(() => {
+    console.log("Student leaving session");
+    // Clear session storage
+    clearStudentSession();
+    // Reset state to show user selection again
+    setJoinData(null);
+    setUser(null);
+    // WebSocket will automatically disconnect when SessionProvider unmounts
   }, []);
 
   return (
@@ -259,8 +348,14 @@ export default function StudentJoinPage() {
           </div>
         )}
 
-        {/* Main Content */}
-        {!user ? (
+        {/* Loading while restoring session */}
+        {isRestoring ? (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading session...</p>
+          </div>
+        ) : /* Main Content */
+        !user ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <div className="text-gray-400 text-5xl mb-4">👤</div>
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
@@ -317,7 +412,7 @@ export default function StudentJoinPage() {
             userId={user.id}
             onSessionEnded={handleSessionEnded}
           >
-            <SessionView joinData={joinData} user={user} />
+            <SessionView joinData={joinData} user={user} onLeaveSession={handleLeaveSession} />
           </SessionProvider>
         )}
 

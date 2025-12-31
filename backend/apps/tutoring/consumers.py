@@ -21,8 +21,15 @@ from datetime import datetime
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from asgiref.sync import sync_to_async
+from collections import defaultdict
+import threading
 
 logger = logging.getLogger(__name__)
+
+# Track connected users per session (in-memory)
+# Structure: {session_id: {user_id: {'role': 'teacher'|'student', 'channel_name': '...'}}}
+_connected_users = defaultdict(dict)
+_connected_users_lock = threading.Lock()
 
 
 class TutoringConsumer(AsyncWebsocketConsumer):
@@ -51,8 +58,8 @@ class TutoringConsumer(AsyncWebsocketConsumer):
         self.user = self.scope.get('user')
         self.role = None
         
-        # Check authentication
-        if not self.user or self.user.is_anonymous:
+        # Check authentication - TutoringUser has full_name, AnonymousUser doesn't
+        if not self.user or not hasattr(self.user, 'full_name'):
             logger.warning(
                 f"WebSocket connection rejected: No authenticated user for session {self.session_id}"
             )
@@ -95,6 +102,14 @@ class TutoringConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         
+        # Track this connection
+        with _connected_users_lock:
+            _connected_users[self.session_id][str(self.user.id)] = {
+                'role': self.role,
+                'channel_name': self.channel_name,
+                'user_name': self.user.full_name
+            }
+        
         # Accept the connection
         await self.accept()
         
@@ -103,7 +118,7 @@ class TutoringConsumer(AsyncWebsocketConsumer):
             f"joined session {self.session_id}"
         )
         
-        # Send initial state to the connecting user
+        # Send initial state to the connecting user (includes who's connected)
         await self.send_initial_state(session)
         
         # Broadcast join event to all participants
@@ -127,6 +142,14 @@ class TutoringConsumer(AsyncWebsocketConsumer):
         3. Clean up connection tracking
         """
         if hasattr(self, 'room_group_name') and self.role:
+            # Remove from connection tracking
+            with _connected_users_lock:
+                if self.session_id in _connected_users:
+                    _connected_users[self.session_id].pop(str(self.user.id), None)
+                    # Clean up empty sessions
+                    if not _connected_users[self.session_id]:
+                        del _connected_users[self.session_id]
+            
             # Broadcast leave event before leaving the group
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -350,20 +373,27 @@ class TutoringConsumer(AsyncWebsocketConsumer):
         - Session status
         - Participant information
         - User's role
+        - Who is currently connected
         """
-        # Build participant info
+        # Get currently connected users for this session
+        with _connected_users_lock:
+            connected = _connected_users.get(self.session_id, {})
+        
+        # Build participant info with actual connection status
+        teacher_connected = str(session.teacher_id) in connected
         teacher_info = {
             'id': str(session.teacher_id),
             'name': session.teacher.full_name,
-            'connected': False  # Will be updated by presence events
+            'connected': teacher_connected
         }
         
         student_info = None
         if session.student:
+            student_connected = str(session.student_id) in connected
             student_info = {
                 'id': str(session.student_id),
                 'name': session.student.full_name,
-                'connected': False  # Will be updated by presence events
+                'connected': student_connected
             }
         
         await self.send(text_data=json.dumps({

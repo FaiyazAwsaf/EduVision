@@ -46,7 +46,8 @@ class TokenAuthMiddleware(BaseMiddleware):
         if user_id:
             # Fetch user from database
             scope['user'] = await self.get_user(user_id)
-            if not scope['user'].is_anonymous:
+            # Check if we got a real user (TutoringUser has full_name, AnonymousUser doesn't)
+            if hasattr(scope['user'], 'full_name'):
                 logger.debug(
                     f"WebSocket authenticated: {scope['user'].full_name} ({scope['user'].id})"
                 )

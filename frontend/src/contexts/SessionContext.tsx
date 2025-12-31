@@ -124,8 +124,9 @@ export function SessionProvider({
         yourRole: state.your_role,
         teacher: state.teacher,
         student: state.student,
-        isTeacherConnected: false, // Will be updated by presence events
-        isStudentConnected: false,
+        // Use the connected status from the server
+        isTeacherConnected: state.teacher?.connected || false,
+        isStudentConnected: state.student?.connected || false,
       });
       setError(null);
     });

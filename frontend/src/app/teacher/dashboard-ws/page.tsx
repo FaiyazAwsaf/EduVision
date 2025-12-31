@@ -269,6 +269,41 @@ function SessionView({
   );
 }
 
+// Storage keys for session persistence
+const STORAGE_KEY_TEACHER_SESSION = "tutoring_teacher_session";
+const STORAGE_KEY_TEACHER_USER = "tutoring_teacher_user";
+
+// Helper functions for session persistence
+function saveTeacherSession(sessionData: SessionCreateResponse, user: TutoringUser) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(STORAGE_KEY_TEACHER_SESSION, JSON.stringify(sessionData));
+    localStorage.setItem(STORAGE_KEY_TEACHER_USER, JSON.stringify(user));
+  }
+}
+
+function loadTeacherSession(): { sessionData: SessionCreateResponse | null; user: TutoringUser | null } {
+  if (typeof window === "undefined") {
+    return { sessionData: null, user: null };
+  }
+  try {
+    const sessionStr = localStorage.getItem(STORAGE_KEY_TEACHER_SESSION);
+    const userStr = localStorage.getItem(STORAGE_KEY_TEACHER_USER);
+    return {
+      sessionData: sessionStr ? JSON.parse(sessionStr) : null,
+      user: userStr ? JSON.parse(userStr) : null,
+    };
+  } catch {
+    return { sessionData: null, user: null };
+  }
+}
+
+function clearTeacherSession() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEY_TEACHER_SESSION);
+    localStorage.removeItem(STORAGE_KEY_TEACHER_USER);
+  }
+}
+
 // Main page component
 export default function TeacherDashboardPage() {
   const [user, setUser] = useState<TutoringUser | null>(null);
@@ -277,10 +312,28 @@ export default function TeacherDashboardPage() {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    const { sessionData: savedSession, user: savedUser } = loadTeacherSession();
+    if (savedSession && savedUser) {
+      setSessionData(savedSession);
+      setUser(savedUser);
+    }
+    setIsRestoring(false);
+  }, []);
+
+  // Save session to localStorage when it changes
+  useEffect(() => {
+    if (sessionData && user) {
+      saveTeacherSession(sessionData, user);
+    }
+  }, [sessionData, user]);
 
   const handleUserChange = useCallback((selectedUser: TutoringUser | null) => {
     setUser(selectedUser);
-    // Reset session state when user changes
+    // Reset session state when user changes (but don't clear storage yet)
     setSessionData(null);
     setError(null);
   }, []);
@@ -317,7 +370,8 @@ export default function TeacherDashboardPage() {
     setError(null);
 
     try {
-      await endSession(sessionData.session_id);
+      // Pass the teacher_id from session creation to ensure authorization
+      await endSession(sessionData.session_id, sessionData.teacher_id);
       // Session ended - WebSocket will receive the event
     } catch (err) {
       const apiError = err as ApiError;
@@ -328,6 +382,7 @@ export default function TeacherDashboardPage() {
   };
 
   const handleNewSession = () => {
+    clearTeacherSession();
     setSessionData(null);
     setError(null);
   };
@@ -350,6 +405,8 @@ export default function TeacherDashboardPage() {
 
   const handleSessionEnded = useCallback((event: SessionEndedEvent) => {
     console.log("Session ended:", event);
+    // Clear session storage when session ends
+    clearTeacherSession();
     // Could add toast notification here
   }, []);
 
@@ -384,8 +441,14 @@ export default function TeacherDashboardPage() {
           </div>
         )}
 
-        {/* Main Content */}
-        {!user ? (
+        {/* Loading while restoring session */}
+        {isRestoring ? (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading session...</p>
+          </div>
+        ) : /* Main Content */
+        !user ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <div className="text-gray-400 text-5xl mb-4">👤</div>
             <h2 className="text-xl font-semibold text-gray-700 mb-2">

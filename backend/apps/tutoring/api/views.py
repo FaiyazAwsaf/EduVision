@@ -153,9 +153,9 @@ class SessionCreateView(APIView):
             f"Session created: {session.id} by teacher {user.id}"
         )
         
-        # Build join URL
+        # Build join URL - use WebSocket version
         base_url = get_base_url(request)
-        join_url = f"{base_url}/student/join/{room_id}"
+        join_url = f"{base_url}/student/join-ws/{room_id}"
         
         return Response(
             {
@@ -165,6 +165,7 @@ class SessionCreateView(APIView):
                 'status': session.status,
                 'join_url': join_url,
                 'livekit_ws_url': get_livekit_ws_url(),
+                'teacher_id': str(user.id),
             },
             status=status.HTTP_201_CREATED
         )

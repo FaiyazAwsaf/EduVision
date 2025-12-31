@@ -23,6 +23,7 @@ export interface SessionCreateResponse {
   status: string;
   join_url: string;
   livekit_ws_url: string | null;
+  teacher_id: string;
 }
 
 export interface SessionJoinResponse {
@@ -178,13 +179,25 @@ export async function getSessionStatus(
 
 /**
  * End a tutoring session (Teacher only)
+ * @param sessionId - The session ID to end
+ * @param teacherId - Optional teacher ID to use (overrides localStorage)
  */
-export async function endSession(sessionId: string): Promise<SessionStatus> {
+export async function endSession(sessionId: string, teacherId?: string): Promise<SessionStatus> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  
+  // Use provided teacherId or fall back to localStorage
+  const userId = teacherId || getCurrentUserId();
+  if (userId) {
+    headers["X-User-Id"] = userId;
+  }
+
   const response = await fetch(
     `${TUTORING_API_URL}/sessions/${sessionId}/end/`,
     {
       method: "POST",
-      headers: getHeaders(),
+      headers,
     }
   );
   return handleResponse<SessionStatus>(response);
