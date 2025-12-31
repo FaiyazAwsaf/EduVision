@@ -56,7 +56,8 @@ export function useWebRTC({
   wsManager,
   peerConnected,
 }: UseWebRTCOptions): UseWebRTCReturn {
-  const [connectionState, setConnectionState] = useState<WebRTCConnectionState>("new");
+  const [connectionState, setConnectionState] =
+    useState<WebRTCConnectionState>("new");
   const [hasLocalAudio, setHasLocalAudio] = useState(false);
   const [hasRemoteAudio, setHasRemoteAudio] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -70,22 +71,19 @@ export function useWebRTC({
   /**
    * Handle WebRTC signal from WebSocket
    */
-  const handleWebRTCSignal = useCallback(
-    async (event: WebRTCSignalEvent) => {
-      const manager = webrtcManagerRef.current;
-      if (!manager) {
-        console.log("[useWebRTC] Received signal but no manager - ignoring");
-        return;
-      }
+  const handleWebRTCSignal = useCallback(async (event: WebRTCSignalEvent) => {
+    const manager = webrtcManagerRef.current;
+    if (!manager) {
+      console.log("[useWebRTC] Received signal but no manager - ignoring");
+      return;
+    }
 
-      await manager.handleSignal(
-        event.signal_type,
-        event.signal_data,
-        event.sender_role
-      );
-    },
-    []
-  );
+    await manager.handleSignal(
+      event.signal_type,
+      event.signal_data,
+      event.sender_role
+    );
+  }, []);
 
   /**
    * Initialize WebRTC manager
@@ -131,7 +129,8 @@ export function useWebRTC({
       await webrtcManagerRef.current.initialize();
       wasInitializedRef.current = true;
     } catch (err) {
-      const errMessage = err instanceof Error ? err.message : "Failed to initialize WebRTC";
+      const errMessage =
+        err instanceof Error ? err.message : "Failed to initialize WebRTC";
       setError(errMessage);
     }
   }, [wsManager, roomId, role]);
@@ -200,8 +199,8 @@ export function useWebRTC({
         // then send offer
         const sendOfferWithDelay = async () => {
           // Small delay to allow student to initialize
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
           if (hadPeerConnectionRef.current) {
             // This is a rejoin - peer disconnected and reconnected
             console.log("[useWebRTC] Teacher handling peer rejoin");

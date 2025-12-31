@@ -136,7 +136,9 @@ export function AudioStatus({
       {isConnected && hasRemoteAudio && (
         <div className="flex items-center gap-2 text-green-400 text-sm">
           <span className="animate-pulse">🔊</span>
-          <span>Receiving audio from {role === "teacher" ? "student" : "teacher"}</span>
+          <span>
+            Receiving audio from {role === "teacher" ? "student" : "teacher"}
+          </span>
         </div>
       )}
     </div>

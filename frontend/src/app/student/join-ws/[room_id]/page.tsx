@@ -17,7 +17,7 @@ import {
   ParticipantStatus,
 } from "@/components/ConnectionStatus";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
-import { AudioSession } from "@/components/AudioSession";
+import { MediaSession } from "@/components/MediaSession";
 import {
   TutoringUser,
   SessionJoinResponse,
@@ -143,12 +143,13 @@ function SessionView({
           </div>
         </div>
 
-        {/* Audio Controls - Phase 3 */}
+        {/* Video + Audio Session - Phase 4 */}
         {!isEnded && (
-          <AudioSession
-            sessionId={joinData.session_id}
-            roomId={joinData.room_id}
+          <MediaSession
+            wsUrl={joinData.livekit_ws_url}
+            token={joinData.token}
             role="student"
+            sessionId={joinData.session_id}
           />
         )}
       </div>
@@ -184,7 +185,11 @@ const STORAGE_KEY_STUDENT_USER = "tutoring_student_user";
 const STORAGE_KEY_STUDENT_ROOM = "tutoring_student_room";
 
 // Helper functions for session persistence
-function saveStudentSession(joinData: SessionJoinResponse, user: TutoringUser, roomId: string) {
+function saveStudentSession(
+  joinData: SessionJoinResponse,
+  user: TutoringUser,
+  roomId: string
+) {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY_STUDENT_SESSION, JSON.stringify(joinData));
     localStorage.setItem(STORAGE_KEY_STUDENT_USER, JSON.stringify(user));
@@ -192,13 +197,21 @@ function saveStudentSession(joinData: SessionJoinResponse, user: TutoringUser, r
   }
 }
 
-function loadStudentSession(currentRoomId: string): { joinData: SessionJoinResponse | null; user: TutoringUser | null } {
+function loadStudentSession(currentRoomId: string): {
+  joinData: SessionJoinResponse | null;
+  user: TutoringUser | null;
+} {
   if (typeof window === "undefined") {
     return { joinData: null, user: null };
   }
   try {
     const savedRoom = localStorage.getItem(STORAGE_KEY_STUDENT_ROOM);
-    console.log("[Session Restore] Current room:", currentRoomId, "Saved room:", savedRoom);
+    console.log(
+      "[Session Restore] Current room:",
+      currentRoomId,
+      "Saved room:",
+      savedRoom
+    );
     // Only restore if it's the same room
     if (savedRoom !== currentRoomId) {
       console.log("[Session Restore] Room mismatch, not restoring");
@@ -239,7 +252,8 @@ export default function StudentJoinPage() {
 
   // Restore session from localStorage on mount
   useEffect(() => {
-    const { joinData: savedSession, user: savedUser } = loadStudentSession(roomId);
+    const { joinData: savedSession, user: savedUser } =
+      loadStudentSession(roomId);
     if (savedSession && savedUser) {
       setJoinData(savedSession);
       setUser(savedUser);
@@ -415,7 +429,11 @@ export default function StudentJoinPage() {
             userId={user.id}
             onSessionEnded={handleSessionEnded}
           >
-            <SessionView joinData={joinData} user={user} onLeaveSession={handleLeaveSession} />
+            <SessionView
+              joinData={joinData}
+              user={user}
+              onLeaveSession={handleLeaveSession}
+            />
           </SessionProvider>
         )}
 

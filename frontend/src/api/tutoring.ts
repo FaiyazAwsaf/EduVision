@@ -182,11 +182,14 @@ export async function getSessionStatus(
  * @param sessionId - The session ID to end
  * @param teacherId - Optional teacher ID to use (overrides localStorage)
  */
-export async function endSession(sessionId: string, teacherId?: string): Promise<SessionStatus> {
+export async function endSession(
+  sessionId: string,
+  teacherId?: string
+): Promise<SessionStatus> {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
-  
+
   // Use provided teacherId or fall back to localStorage
   const userId = teacherId || getCurrentUserId();
   if (userId) {

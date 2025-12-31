@@ -104,14 +104,19 @@ export class WebRTCManager {
    * Check if local audio is active
    */
   hasLocalAudio(): boolean {
-    return this.localStream !== null && this.localStream.getAudioTracks().length > 0;
+    return (
+      this.localStream !== null && this.localStream.getAudioTracks().length > 0
+    );
   }
 
   /**
    * Check if remote audio is active
    */
   hasRemoteAudio(): boolean {
-    return this.remoteStream !== null && this.remoteStream.getAudioTracks().length > 0;
+    return (
+      this.remoteStream !== null &&
+      this.remoteStream.getAudioTracks().length > 0
+    );
   }
 
   /**
@@ -119,7 +124,7 @@ export class WebRTCManager {
    *
    * For teacher: Acquires audio and prepares peer connection
    * For student: Acquires audio and prepares peer connection, waits for offer
-   * 
+   *
    * NOTE: Teacher does NOT send offer here. Offer is sent when student connects
    * (via handlePeerRejoined or sendOffer method)
    */
@@ -160,10 +165,16 @@ export class WebRTCManager {
 
     switch (signalType) {
       case "offer":
-        await this.handleOffer(signalData as RTCSessionDescriptionInit, senderRole);
+        await this.handleOffer(
+          signalData as RTCSessionDescriptionInit,
+          senderRole
+        );
         break;
       case "answer":
-        await this.handleAnswer(signalData as RTCSessionDescriptionInit, senderRole);
+        await this.handleAnswer(
+          signalData as RTCSessionDescriptionInit,
+          senderRole
+        );
         break;
       case "ice_candidate":
         await this.handleIceCandidate(signalData as RTCIceCandidateInit);
@@ -296,7 +307,7 @@ export class WebRTCManager {
     if (typeof window !== "undefined" && !window.isSecureContext) {
       throw new Error(
         "Microphone access requires a secure context (HTTPS or localhost). " +
-        "Please access this page via HTTPS."
+          "Please access this page via HTTPS."
       );
     }
 
@@ -323,9 +334,7 @@ export class WebRTCManager {
           "Microphone permission denied. Please allow microphone access."
         );
       } else if (err.name === "NotFoundError") {
-        throw new Error(
-          "No microphone found. Please connect a microphone."
-        );
+        throw new Error("No microphone found. Please connect a microphone.");
       } else {
         throw new Error(`Failed to access microphone: ${err.message}`);
       }
@@ -355,7 +364,10 @@ export class WebRTCManager {
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         console.log("[WebRTC] Sending ICE candidate");
-        this.wsManager.sendWebRTCSignal("ice_candidate", event.candidate.toJSON());
+        this.wsManager.sendWebRTCSignal(
+          "ice_candidate",
+          event.candidate.toJSON()
+        );
       }
     };
 
@@ -564,7 +576,9 @@ export class WebRTCManager {
   /**
    * Handle incoming ICE candidate
    */
-  private async handleIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+  private async handleIceCandidate(
+    candidate: RTCIceCandidateInit
+  ): Promise<void> {
     if (!this.peerConnection) {
       console.log("[WebRTC] Queuing ICE candidate - no peer connection yet");
       this.pendingIceCandidates.push(new RTCIceCandidate(candidate));
@@ -576,7 +590,9 @@ export class WebRTCManager {
       this.isSettingRemoteDescription ||
       !this.peerConnection.remoteDescription
     ) {
-      console.log("[WebRTC] Queuing ICE candidate - remote description not set");
+      console.log(
+        "[WebRTC] Queuing ICE candidate - remote description not set"
+      );
       this.pendingIceCandidates.push(new RTCIceCandidate(candidate));
       return;
     }

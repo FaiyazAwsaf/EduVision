@@ -16,7 +16,7 @@ import {
   ParticipantStatus,
 } from "@/components/ConnectionStatus";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
-import { AudioSession } from "@/components/AudioSession";
+import { MediaSession } from "@/components/MediaSession";
 import {
   TutoringUser,
   SessionCreateResponse,
@@ -237,12 +237,13 @@ function SessionView({
           </div>
         </div>
 
-        {/* Audio Controls - Phase 3 */}
+        {/* Video + Audio Session - Phase 4 */}
         {!isEnded && (
-          <AudioSession
-            sessionId={sessionData.session_id}
-            roomId={sessionData.room_id}
+          <MediaSession
+            wsUrl={sessionData.livekit_ws_url}
+            token={sessionData.token}
             role="teacher"
+            sessionId={sessionData.session_id}
           />
         )}
       </div>
@@ -277,14 +278,23 @@ const STORAGE_KEY_TEACHER_SESSION = "tutoring_teacher_session";
 const STORAGE_KEY_TEACHER_USER = "tutoring_teacher_user";
 
 // Helper functions for session persistence
-function saveTeacherSession(sessionData: SessionCreateResponse, user: TutoringUser) {
+function saveTeacherSession(
+  sessionData: SessionCreateResponse,
+  user: TutoringUser
+) {
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY_TEACHER_SESSION, JSON.stringify(sessionData));
+    localStorage.setItem(
+      STORAGE_KEY_TEACHER_SESSION,
+      JSON.stringify(sessionData)
+    );
     localStorage.setItem(STORAGE_KEY_TEACHER_USER, JSON.stringify(user));
   }
 }
 
-function loadTeacherSession(): { sessionData: SessionCreateResponse | null; user: TutoringUser | null } {
+function loadTeacherSession(): {
+  sessionData: SessionCreateResponse | null;
+  user: TutoringUser | null;
+} {
   if (typeof window === "undefined") {
     return { sessionData: null, user: null };
   }
