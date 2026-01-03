@@ -8,6 +8,7 @@
  */
 
 import React from "react";
+import { Clock, Circle, AlertTriangle, Square, HelpCircle } from "lucide-react";
 
 interface SessionStatusProps {
   status: "WAITING" | "ACTIVE" | "GRACE" | "ENDED";
@@ -26,7 +27,7 @@ export default function SessionStatus({
           text: "text-yellow-800",
           border: "border-yellow-200",
           label: "Waiting for student",
-          icon: "⏳",
+          icon: Clock,
         };
       case "ACTIVE":
         return {
@@ -34,7 +35,7 @@ export default function SessionStatus({
           text: "text-green-800",
           border: "border-green-200",
           label: "Session active",
-          icon: "🟢",
+          icon: Circle,
         };
       case "GRACE":
         return {
@@ -42,7 +43,7 @@ export default function SessionStatus({
           text: "text-orange-800",
           border: "border-orange-200",
           label: "Grace period",
-          icon: "⚠️",
+          icon: AlertTriangle,
         };
       case "ENDED":
         return {
@@ -50,7 +51,7 @@ export default function SessionStatus({
           text: "text-gray-800",
           border: "border-gray-200",
           label: "Session ended",
-          icon: "⏹️",
+          icon: Square,
         };
       default:
         return {
@@ -58,18 +59,19 @@ export default function SessionStatus({
           text: "text-gray-800",
           border: "border-gray-200",
           label: "Unknown",
-          icon: "❓",
+          icon: HelpCircle,
         };
     }
   };
 
   const styles = getStatusStyles();
+  const IconComponent = styles.icon;
 
   return (
     <div
       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${styles.bg} ${styles.text} ${styles.border} ${className}`}
     >
-      <span>{styles.icon}</span>
+      <IconComponent className="w-4 h-4" />
       <span className="text-sm font-medium">{styles.label}</span>
     </div>
   );

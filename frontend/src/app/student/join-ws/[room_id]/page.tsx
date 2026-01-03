@@ -9,6 +9,13 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
+import {
+  AlertTriangle,
+  User,
+  GraduationCap,
+  Link as LinkIcon,
+  Circle,
+} from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import UserSelector from "@/components/tutoring/UserSelector";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
@@ -75,7 +82,7 @@ function SessionView({
         {wsError && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center gap-2">
-              <span className="text-red-500">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
               <p className="text-red-700">{wsError}</p>
             </div>
           </div>
@@ -85,7 +92,7 @@ function SessionView({
         {!isEnded && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🟢</span>
+              <Circle className="w-6 h-6 text-green-600 fill-green-600" />
               <div>
                 <p className="font-medium text-green-800">
                   Connected! Initializing video...
@@ -347,7 +354,7 @@ export default function StudentJoinPage() {
         {/* Room ID Display */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-blue-500">🔗</span>
+            <LinkIcon className="w-5 h-5 text-blue-500" />
             <p className="text-blue-700">
               <span className="font-medium">Room ID:</span>{" "}
               <span className="font-mono">{roomId}</span>
@@ -359,7 +366,7 @@ export default function StudentJoinPage() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-red-500">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
               <p className="text-red-700">{error}</p>
             </div>
           </div>
@@ -374,7 +381,7 @@ export default function StudentJoinPage() {
         ) : /* Main Content */
         !user ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">👤</div>
+            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Select a Student Account
             </h2>
@@ -385,7 +392,7 @@ export default function StudentJoinPage() {
         ) : !joinData ? (
           /* Join View */
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">🎓</div>
+            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Ready to Join?
             </h2>
@@ -435,35 +442,6 @@ export default function StudentJoinPage() {
               onLeaveSession={handleLeaveSession}
             />
           </SessionProvider>
-        )}
-
-        {/* Debug Info (Development) */}
-        {joinData?.token && (
-          <div className="mt-6 bg-gray-800 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-400 mb-2">
-              Debug Info (Development Only)
-            </h3>
-            <div className="space-y-2 text-xs font-mono text-gray-500">
-              <p>
-                <span className="text-gray-400">Session ID:</span>{" "}
-                {joinData.session_id}
-              </p>
-              <p>
-                <span className="text-gray-400">Token:</span>{" "}
-                {joinData.token.substring(0, 50)}...
-              </p>
-              {joinData.livekit_ws_url && (
-                <p>
-                  <span className="text-gray-400">LiveKit URL:</span>{" "}
-                  {joinData.livekit_ws_url}
-                </p>
-              )}
-              <p>
-                <span className="text-gray-400">WebSocket:</span>{" "}
-                ws://localhost:8000/ws/tutoring/{joinData.session_id}/
-              </p>
-            </div>
-          </div>
         )}
       </div>
     </div>

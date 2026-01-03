@@ -8,6 +8,7 @@
 "use client";
 
 import { useState } from "react";
+import { Calendar, Link as LinkIcon, Check } from "lucide-react";
 import {
   updateStudyPlanItem,
   deleteStudyPlanItem,
@@ -162,13 +163,13 @@ export default function StudyPlanItemCard({
         <div className="mb-3">
           <h3 className="font-medium text-[#006A71] mb-1">{item.topic}</h3>
           {item.scheduled_date && (
-            <p className="text-sm text-[#48A6A7]">
-              📅 Scheduled: {new Date(item.scheduled_date).toLocaleDateString()}
+            <p className="text-sm text-[#48A6A7] flex items-center gap-1">
+              <Calendar className="w-4 h-4" /> Scheduled: {new Date(item.scheduled_date).toLocaleDateString()}
             </p>
           )}
           {item.linked_request_id && (
-            <p className="text-sm text-[#48A6A7] mt-1">
-              🔗 Linked to content request
+            <p className="text-sm text-[#48A6A7] mt-1 flex items-center gap-1">
+              <LinkIcon className="w-4 h-4" /> Linked to content request
             </p>
           )}
         </div>
@@ -213,9 +214,9 @@ export default function StudyPlanItemCard({
                   handleStatusChange(StudyPlanItemStatus.COMPLETED)
                 }
                 disabled={isUpdating}
-                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-1"
               >
-                ✓ Complete
+                <Check className="w-4 h-4" /> Complete
               </button>
             )}
             {item.status === StudyPlanItemStatus.PENDING && (

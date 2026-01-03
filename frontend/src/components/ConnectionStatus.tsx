@@ -9,6 +9,7 @@
 import React from "react";
 import { ConnectionState } from "@/lib/websocket";
 import { useConnectionState } from "@/contexts/SessionContext";
+import { GraduationCap, User } from "lucide-react";
 
 interface ConnectionStatusProps {
   /** Show text label alongside indicator */
@@ -133,7 +134,7 @@ export function ParticipantStatus({
   connected: boolean;
   className?: string;
 }) {
-  const roleLabel = role === "teacher" ? "👨‍🏫" : "👨‍🎓";
+  const RoleIcon = role === "teacher" ? User : GraduationCap;
   const statusColor = connected ? "bg-green-500" : "bg-gray-400";
   const bgColor = connected ? "bg-green-50" : "bg-gray-50";
   const borderColor = connected ? "border-green-200" : "border-gray-200";
@@ -142,7 +143,7 @@ export function ParticipantStatus({
     <div
       className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${bgColor} ${borderColor} ${className}`}
     >
-      <span className="text-lg">{roleLabel}</span>
+      <RoleIcon className="w-6 h-6" style={{ color: "#48A6A7" }} />
       <div className="flex-1">
         <p className="font-medium text-gray-900">{name}</p>
         <p className="text-xs text-gray-500 capitalize">{role}</p>

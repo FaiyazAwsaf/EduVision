@@ -13,6 +13,7 @@
 "use client";
 
 import { useState } from "react";
+import { BookOpen } from "lucide-react";
 import ContentRequestForm from "@/components/ContentRequestForm";
 import RequestStatusComponent from "@/components/RequestStatus";
 
@@ -48,9 +49,9 @@ export default function Home() {
             </div>
             <a
               href="/study-plans"
-              className="bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] transition-colors text-sm font-medium"
+              className="bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] transition-colors text-sm font-medium flex items-center gap-2"
             >
-              📚 Study Plans
+              <BookOpen className="w-4 h-4" /> Study Plans
             </a>
           </div>
         </div>

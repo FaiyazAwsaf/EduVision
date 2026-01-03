@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
+import { GraduationCap, User, Link as LinkIcon, Video, AlertTriangle, Circle } from "lucide-react";
 import { useParams } from "next/navigation";
 import UserSelector from "@/components/tutoring/UserSelector";
 import SessionStatus from "@/components/tutoring/SessionStatus";
@@ -148,7 +149,7 @@ export default function StudentJoinPage() {
         {/* Room ID Display */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-blue-500">🔗</span>
+            <LinkIcon className="w-5 h-5 text-blue-500" />
             <p className="text-blue-700">
               <span className="font-medium">Room ID:</span>{" "}
               <span className="font-mono">{roomId}</span>
@@ -160,7 +161,7 @@ export default function StudentJoinPage() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-red-500">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
               <p className="text-red-700">{error}</p>
             </div>
           </div>
@@ -169,7 +170,7 @@ export default function StudentJoinPage() {
         {/* Main Content */}
         {!user ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">👤</div>
+            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Select a Student Account
             </h2>
@@ -180,7 +181,7 @@ export default function StudentJoinPage() {
         ) : joinState.status === "idle" || joinState.status === "error" ? (
           /* Join View */
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">🎓</div>
+            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Ready to Join?
             </h2>
@@ -249,7 +250,7 @@ export default function StudentJoinPage() {
               {joinState.session_status === "ACTIVE" && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">🟢</span>
+                    <Circle className="w-6 h-6 text-green-600 fill-green-600" />
                     <div>
                       <p className="font-medium text-green-800">
                         Connected! Initializing video...
@@ -297,7 +298,7 @@ export default function StudentJoinPage() {
               {/* Video Placeholder */}
               <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center">
                 <div className="text-center text-gray-400">
-                  <div className="text-5xl mb-4">📹</div>
+                  <Video className="w-16 h-16 mx-auto mb-4" />
                   <p>Video will appear here in Phase 3</p>
                 </div>
               </div>

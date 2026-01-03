@@ -13,6 +13,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Lightbulb } from "lucide-react";
 import type {
   LearningContextPayload,
   TargetGoal,
@@ -316,8 +317,8 @@ export default function LearningContextForm({
       </div>
 
       <div className="pt-2 border-t border-[#9ACBD0]">
-        <p className="text-xs text-[#48A6A7]">
-          💡 This information helps the AI adapt content to your specific needs,
+        <p className="text-xs text-[#48A6A7] flex items-center gap-1">
+          <Lightbulb className="w-4 h-4" /> This information helps the AI adapt content to your specific needs,
           but all fields are optional.
         </p>
       </div>

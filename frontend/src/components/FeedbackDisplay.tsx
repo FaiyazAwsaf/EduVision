@@ -7,6 +7,7 @@
 
 "use client";
 
+import { CheckCircle, Check, X } from "lucide-react";
 import { DifficultyRating, type Feedback } from "@/types/content";
 
 interface FeedbackDisplayProps {
@@ -35,8 +36,8 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
   return (
     <div className="rounded-lg border border-green-200 bg-green-50 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-[#006A71]">
-          ✅ Feedback Submitted
+        <h3 className="text-lg font-semibold text-[#006A71] flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" /> Feedback Submitted
         </h3>
         <span className="text-xs text-[#48A6A7]">
           {formatDate(feedback.submitted_at)}
@@ -79,10 +80,14 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
           <span className="font-medium text-[#006A71]">Correctness:</span>
           <span
             className={
-              feedback.correctness_flag ? "text-green-700" : "text-red-700"
+              feedback.correctness_flag ? "text-green-700 flex items-center gap-1" : "text-red-700 flex items-center gap-1"
             }
           >
-            {feedback.correctness_flag ? "✓ Correct" : "✗ Incorrect"}
+            {feedback.correctness_flag ? (
+              <><Check className="w-4 h-4" /> Correct</>
+            ) : (
+              <><X className="w-4 h-4" /> Incorrect</>
+            )}
           </span>
         </div>
 

@@ -23,6 +23,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { RefreshCw, CheckCircle, ClipboardList } from "lucide-react";
 import {
   listStudyPlans,
   getStudyPlan,
@@ -305,8 +306,8 @@ export default function StudyPlansPage() {
                       {/* Pending Items */}
                       {pendingItems.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-[#006A71] mb-3">
-                            📋 Pending ({pendingItems.length})
+                          <h3 className="text-lg font-semibold text-[#006A71] mb-3 flex items-center gap-2">
+                            <ClipboardList className="w-5 h-5" /> Pending ({pendingItems.length})
                           </h3>
                           <div className="space-y-3">
                             {pendingItems.map((item) => (
@@ -324,8 +325,8 @@ export default function StudyPlansPage() {
                       {/* In Progress Items */}
                       {inProgressItems.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-[#006A71] mb-3">
-                            🔄 In Progress ({inProgressItems.length})
+                          <h3 className="text-lg font-semibold text-[#006A71] mb-3 flex items-center gap-2">
+                            <RefreshCw className="w-5 h-5" /> In Progress ({inProgressItems.length})
                           </h3>
                           <div className="space-y-3">
                             {inProgressItems.map((item) => (
@@ -343,8 +344,8 @@ export default function StudyPlansPage() {
                       {/* Completed Items */}
                       {completedItems.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-[#006A71] mb-3">
-                            ✅ Completed ({completedItems.length})
+                          <h3 className="text-lg font-semibold text-[#006A71] mb-3 flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-600" /> Completed ({completedItems.length})
                           </h3>
                           <div className="space-y-3">
                             {completedItems.map((item) => (

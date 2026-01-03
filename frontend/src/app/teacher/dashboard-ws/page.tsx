@@ -9,6 +9,13 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
+import {
+  AlertTriangle,
+  User,
+  GraduationCap,
+  Check,
+  Circle,
+} from "lucide-react";
 import UserSelector from "@/components/tutoring/UserSelector";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
 import {
@@ -99,7 +106,7 @@ function SessionView({
         {wsError && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center gap-2">
-              <span className="text-red-500">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
               <p className="text-red-700">{wsError}</p>
             </div>
           </div>
@@ -126,7 +133,7 @@ function SessionView({
         {isActive && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🟢</span>
+              <Circle className="w-6 h-6 text-green-600 fill-green-600" />
               <div>
                 <p className="font-medium text-green-800">
                   {sessionState?.student?.name
@@ -174,7 +181,7 @@ function SessionView({
               />
             ) : (
               <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-dashed border-gray-300 bg-gray-50">
-                <span className="text-lg">👨‍🎓</span>
+                <GraduationCap className="w-6 h-6 text-gray-400" />
                 <div className="flex-1">
                   <p className="font-medium text-gray-400">
                     Waiting for student...
@@ -205,12 +212,10 @@ function SessionView({
               >
                 {copied ? (
                   <>
-                    <span>✓</span> Copied!
+                    <Check className="w-4 h-4" /> Copied!
                   </>
                 ) : (
-                  <>
-                    <span>📋</span> Copy Link
-                  </>
+                  "Copy Link"
                 )}
               </button>
             </div>
@@ -448,7 +453,7 @@ export default function TeacherDashboardPage() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-red-500">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
               <p className="text-red-700">{error}</p>
             </div>
           </div>
@@ -463,7 +468,7 @@ export default function TeacherDashboardPage() {
         ) : /* Main Content */
         !user ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">👤</div>
+            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Select a Teacher
             </h2>
@@ -474,7 +479,7 @@ export default function TeacherDashboardPage() {
         ) : !sessionData ? (
           /* Create Session View */
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">🎓</div>
+            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Start a New Tutoring Session
             </h2>
@@ -529,31 +534,6 @@ export default function TeacherDashboardPage() {
               isLoading={isLoading}
             />
           </SessionProvider>
-        )}
-
-        {/* Debug Info (Development) */}
-        {sessionData?.token && (
-          <div className="mt-6 bg-gray-800 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-400 mb-2">
-              Debug Info (Development Only)
-            </h3>
-            <div className="space-y-2 text-xs font-mono text-gray-500">
-              <p>
-                <span className="text-gray-400">Token:</span>{" "}
-                {sessionData.token.substring(0, 50)}...
-              </p>
-              {sessionData.livekit_ws_url && (
-                <p>
-                  <span className="text-gray-400">LiveKit URL:</span>{" "}
-                  {sessionData.livekit_ws_url}
-                </p>
-              )}
-              <p>
-                <span className="text-gray-400">WebSocket:</span>{" "}
-                ws://localhost:8000/ws/tutoring/{sessionData.session_id}/
-              </p>
-            </div>
-          </div>
         )}
       </div>
     </div>

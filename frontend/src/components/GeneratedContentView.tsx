@@ -15,6 +15,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
+import { BookOpen, CheckCircle } from "lucide-react";
 import {
   downloadGeneratedContent,
   submitFeedback,
@@ -146,8 +147,9 @@ export default function GeneratedContentView({
       <div className="rounded-lg border border-[#9ACBD0] bg-[#9ACBD0]/10 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-[#006A71] mb-1">
-              📚 Study Plan Integration
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-[#006A71] mb-1">
+              <BookOpen className="w-4 h-4" />
+              <span>Study Plan Integration</span>
             </h3>
             <p className="text-sm text-[#48A6A7]">
               Add this generated content to your study plan for better
@@ -177,8 +179,9 @@ export default function GeneratedContentView({
 
         {/* Success message */}
         {addToStudyPlanSuccess && (
-          <div className="mt-3 bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded text-sm">
-            ✓ {addToStudyPlanSuccess}
+          <div className="mt-3 bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            <span>{addToStudyPlanSuccess}</span>
           </div>
         )}
       </div>

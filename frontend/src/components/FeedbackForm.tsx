@@ -15,6 +15,7 @@
 "use client";
 
 import { useState } from "react";
+import { MessageSquare } from "lucide-react";
 import { DifficultyRating, type FeedbackPayload } from "@/types/content";
 
 interface FeedbackFormProps {
@@ -72,8 +73,8 @@ export default function FeedbackForm({
 
   return (
     <div className="rounded-lg border border-[#9ACBD0] bg-[#F2EFE7] p-6">
-      <h3 className="text-lg font-semibold text-[#006A71] mb-4">
-        📝 Share Your Feedback
+      <h3 className="text-lg font-semibold text-[#006A71] mb-4 flex items-center gap-2">
+        <MessageSquare className="w-5 h-5" /> Share Your Feedback
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-5">

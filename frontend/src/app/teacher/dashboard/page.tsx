@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useCallback } from "react";
+import { AlertTriangle, User, GraduationCap, Video, Check, Circle } from "lucide-react";
 import UserSelector from "@/components/tutoring/UserSelector";
 import SessionStatus from "@/components/tutoring/SessionStatus";
 import {
@@ -216,7 +217,7 @@ export default function TeacherDashboardPage() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-red-500">⚠️</span>
+              <AlertTriangle className="w-5 h-5 text-red-500" />
               <p className="text-red-700">{error}</p>
             </div>
           </div>
@@ -225,7 +226,7 @@ export default function TeacherDashboardPage() {
         {/* Main Content */}
         {!user ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">👤</div>
+            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Select a Teacher
             </h2>
@@ -236,7 +237,7 @@ export default function TeacherDashboardPage() {
         ) : sessionState.status === "idle" ? (
           /* Create Session View */
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="text-gray-400 text-5xl mb-4">🎓</div>
+            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Start a New Tutoring Session
             </h2>
@@ -316,7 +317,7 @@ export default function TeacherDashboardPage() {
               {sessionState.status === "active" && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">🟢</span>
+                    <Circle className="w-6 h-6 text-green-600 fill-green-600" />
                     <div>
                       <p className="font-medium text-green-800">
                         Student has joined!
@@ -364,12 +365,10 @@ export default function TeacherDashboardPage() {
                     >
                       {copied ? (
                         <>
-                          <span>✓</span> Copied!
+                          <Check className="w-4 h-4" /> Copied!
                         </>
                       ) : (
-                        <>
-                          <span>📋</span> Copy Link
-                        </>
+                        "Copy Link"
                       )}
                     </button>
                   </div>
@@ -399,7 +398,7 @@ export default function TeacherDashboardPage() {
               {/* Video Placeholder */}
               <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center">
                 <div className="text-center text-gray-400">
-                  <div className="text-5xl mb-4">📹</div>
+                  <Video className="w-16 h-16 mx-auto mb-4" />
                   <p>Video will appear here in Phase 3</p>
                 </div>
               </div>

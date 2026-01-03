@@ -166,6 +166,13 @@ export function useLiveKit({
         },
         onError: (err, context) => {
           console.error(`[useLiveKit] Error in ${context}:`, err);
+          
+          // Ignore "Client initiated disconnect" - this is expected when user disconnects
+          if (err.message?.includes("Client initiated disconnect")) {
+            console.log("[useLiveKit] Ignoring expected disconnect error");
+            return;
+          }
+          
           // Only set error for critical failures (audio, connection)
           if (context === "audio" || context === "connection") {
             setError(err.message);

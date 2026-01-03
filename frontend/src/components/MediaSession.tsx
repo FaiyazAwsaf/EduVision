@@ -7,7 +7,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import { VideoRenderer } from "@/components/VideoRenderer";
 import { ScreenShareRenderer } from "@/components/ScreenShareRenderer";
@@ -20,6 +20,8 @@ import {
   Monitor,
   MonitorOff,
   AlertCircle,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 
 interface MediaSessionProps {
@@ -57,6 +59,9 @@ export function MediaSession({
   role,
   sessionId,
 }: MediaSessionProps) {
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   const {
     connectionState,
     localTracks,
@@ -93,6 +98,36 @@ export function MediaSession({
 
   // Check if any screen is being shared
   const isAnyScreenSharing = hasLocalScreenShare || hasRemoteScreenShare;
+
+  // Filter out expected disconnect errors
+  const shouldShowError = error && !error.includes("Client initiated disconnect");
+
+  // Handle fullscreen state changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  // Toggle fullscreen mode
+  const toggleFullscreen = async () => {
+    if (!videoContainerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await videoContainerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error("Error toggling fullscreen:", error);
+    }
+  };
 
   // Show waiting message if not connected yet
   if (!wsUrl || !token) {
@@ -133,7 +168,7 @@ export function MediaSession({
       </div>
 
       {/* Error Display */}
-      {error && (
+      {shouldShowError && (
         <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: "#fee", borderLeft: "4px solid #dc2626" }}>
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div>
@@ -144,7 +179,7 @@ export function MediaSession({
       )}
 
       {/* Video/Screen Share error (non-critical) */}
-      {(localTracks.videoError || localTracks.screenShareError) && !error && (
+      {(localTracks.videoError || localTracks.screenShareError) && !shouldShowError && (
         <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: "#fffbeb", borderLeft: "4px solid #f59e0b" }}>
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
@@ -159,7 +194,11 @@ export function MediaSession({
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 relative overflow-hidden">
+      <div 
+        ref={videoContainerRef}
+        className="flex-1 relative overflow-hidden"
+        style={isFullscreen ? { backgroundColor: "#F2EFE7" } : undefined}
+      >
         {isAnyScreenSharing ? (
           /* Screen Share Layout: Full screen with minimized videos at top */
           <div className="h-full flex flex-col">
@@ -347,6 +386,23 @@ export function MediaSession({
                 <MonitorOff className="w-5 h-5" />
               ) : (
                 <Monitor className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Fullscreen Toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-4 rounded-full transition-all duration-200 hover:bg-gray-100"
+              style={{
+                backgroundColor: "#48A6A7",
+                color: "#fff",
+              }}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-5 h-5" />
+              ) : (
+                <Maximize className="w-5 h-5" />
               )}
             </button>
           </div>
