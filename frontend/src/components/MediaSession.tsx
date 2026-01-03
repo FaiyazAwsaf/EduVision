@@ -1,16 +1,8 @@
 /**
- * Media Session Component - Phase 4
+ * Media Session Component - Professional UI
  *
- * Integrates LiveKit media (audio + video) with session context.
- * Replaces AudioSession to support both audio and video.
- *
- * Features:
- * - LiveKit room connection management
- * - Audio and video track display
- * - Mute/unmute controls
- * - Video on/off controls
- * - Connection status display
- * - Graceful video failure handling (audio continues)
+ * Google Meet-inspired interface for live tutoring sessions
+ * Features video, audio, and screen sharing capabilities
  */
 
 "use client";
@@ -18,7 +10,17 @@
 import React from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import { VideoRenderer } from "@/components/VideoRenderer";
+import { ScreenShareRenderer } from "@/components/ScreenShareRenderer";
 import { LiveKitConnectionState } from "@/lib/livekit";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Monitor,
+  MonitorOff,
+  AlertCircle,
+} from "lucide-react";
 
 interface MediaSessionProps {
   /** LiveKit WebSocket URL */
@@ -49,23 +51,6 @@ function getConnectionStatusText(state: LiveKitConnectionState): string {
   }
 }
 
-/**
- * Get connection status color
- */
-function getConnectionStatusColor(state: LiveKitConnectionState): string {
-  switch (state) {
-    case "connected":
-      return "text-green-500";
-    case "connecting":
-    case "reconnecting":
-      return "text-yellow-500";
-    case "disconnected":
-      return "text-red-500";
-    default:
-      return "text-gray-500";
-  }
-}
-
 export function MediaSession({
   wsUrl,
   token,
@@ -81,10 +66,15 @@ export function MediaSession({
     error,
     toggleAudio,
     toggleVideo,
+    toggleScreenShare,
     attachLocalVideo,
     detachLocalVideo,
     attachRemoteVideo,
     detachRemoteVideo,
+    attachLocalScreenShare,
+    detachLocalScreenShare,
+    attachRemoteScreenShare,
+    detachRemoteScreenShare,
   } = useLiveKit({
     wsUrl,
     token,
@@ -95,169 +85,275 @@ export function MediaSession({
   // Derived states
   const isAudioMuted = !localTracks.isAudioEnabled;
   const isVideoOff = !localTracks.isVideoEnabled;
-  const hasLocalAudio = !!localTracks.audioTrack;
+  const isScreenSharing = localTracks.isScreenSharing;
   const hasLocalVideo = !!localTracks.videoTrack;
-  const hasRemoteAudio = !!remoteTracks.audioTrack;
   const hasRemoteVideo = !!remoteTracks.videoTrack;
+  const hasLocalScreenShare = !!localTracks.screenShareTrack;
+  const hasRemoteScreenShare = !!remoteTracks.screenShareTrack;
+
+  // Check if any screen is being shared
+  const isAnyScreenSharing = hasLocalScreenShare || hasRemoteScreenShare;
 
   // Show waiting message if not connected yet
   if (!wsUrl || !token) {
     return (
-      <div className="bg-gray-800 rounded-lg p-6">
-        <div className="text-center text-gray-400">
-          <p>Waiting for session...</p>
+      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: "#F2EFE7" }}>
+        <div className="text-center" style={{ color: "#006A71" }}>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "#48A6A7" }}></div>
+          <p className="text-lg font-medium">Waiting for session...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 space-y-4">
-      {/* Header with connection status */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-white font-medium">
-          Video Session
+    <div className="h-screen flex flex-col" style={{ backgroundColor: "#F2EFE7" }}>
+      {/* Header Bar */}
+      <div className="flex items-center justify-between px-6 py-3 border-b" style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold" style={{ color: "#006A71" }}>
+            EduVision Tutoring
+          </h1>
           {sessionId && (
-            <span className="text-gray-400 text-sm ml-2">({role})</span>
+            <span className="text-sm px-3 py-1 rounded-full" style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}>
+              {role === "teacher" ? "Teacher" : "Student"}
+            </span>
           )}
-        </h3>
+        </div>
         <div className="flex items-center gap-2">
-          <span
+          <div
             className={`w-2 h-2 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-gray-500"
+              isConnected ? "bg-green-500" : "bg-gray-400"
             }`}
           />
-          <span
-            className={`text-sm ${getConnectionStatusColor(connectionState)}`}
-          >
+          <span className="text-sm" style={{ color: "#006A71" }}>
             {getConnectionStatusText(connectionState)}
           </span>
         </div>
       </div>
 
-      {/* Error display */}
+      {/* Error Display */}
       {error && (
-        <div className="bg-red-900/50 border border-red-500 rounded-lg p-3">
-          <p className="text-red-200 text-sm">{error}</p>
+        <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: "#fee", borderLeft: "4px solid #dc2626" }}>
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-900">Connection Error</p>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+          </div>
         </div>
       )}
 
-      {/* Video-only error (info level, not critical) */}
-      {localTracks.videoError && !error && (
-        <div className="bg-yellow-900/50 border border-yellow-500 rounded-lg p-3">
-          <p className="text-yellow-200 text-sm">
-            📹 {localTracks.videoError}
-          </p>
-          <p className="text-yellow-300 text-xs mt-1">
-            Session continues with audio only.
-          </p>
+      {/* Video/Screen Share error (non-critical) */}
+      {(localTracks.videoError || localTracks.screenShareError) && !error && (
+        <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: "#fffbeb", borderLeft: "4px solid #f59e0b" }}>
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            {localTracks.videoError && (
+              <p className="text-sm text-amber-900">{localTracks.videoError}</p>
+            )}
+            {localTracks.screenShareError && (
+              <p className="text-sm text-amber-900">{localTracks.screenShareError}</p>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Video feeds */}
-      <VideoRenderer
-        localTracks={localTracks}
-        remoteTracks={remoteTracks}
-        role={role}
-        attachLocalVideo={attachLocalVideo}
-        detachLocalVideo={detachLocalVideo}
-        attachRemoteVideo={attachRemoteVideo}
-        detachRemoteVideo={detachRemoteVideo}
-        isPeerConnected={isPeerConnected}
-      />
+      {/* Main Content Area */}
+      <div className="flex-1 relative overflow-hidden">
+        {isAnyScreenSharing ? (
+          /* Screen Share Layout: Full screen with minimized videos at top */
+          <div className="h-full flex flex-col">
+            {/* Minimized Videos at Top */}
+            <div className="absolute top-4 left-4 right-4 z-20 flex gap-3">
+              {hasRemoteVideo && (
+                <div className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2" style={{ borderColor: "#48A6A7" }}>
+                  <VideoRenderer
+                    localTracks={localTracks}
+                    remoteTracks={remoteTracks}
+                    role={role}
+                    attachLocalVideo={attachLocalVideo}
+                    detachLocalVideo={detachLocalVideo}
+                    attachRemoteVideo={attachRemoteVideo}
+                    detachRemoteVideo={detachRemoteVideo}
+                    isPeerConnected={isPeerConnected}
+                    layout="remote-only"
+                  />
+                </div>
+              )}
+              {hasLocalVideo && (
+                <div className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2" style={{ borderColor: "#9ACBD0" }}>
+                  <VideoRenderer
+                    localTracks={localTracks}
+                    remoteTracks={remoteTracks}
+                    role={role}
+                    attachLocalVideo={attachLocalVideo}
+                    detachLocalVideo={detachLocalVideo}
+                    attachRemoteVideo={attachRemoteVideo}
+                    detachRemoteVideo={detachRemoteVideo}
+                    isPeerConnected={isPeerConnected}
+                    layout="local-only"
+                  />
+                </div>
+              )}
+            </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-center gap-4">
-        {/* Audio toggle */}
-        <button
-          onClick={toggleAudio}
-          disabled={!hasLocalAudio}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            !hasLocalAudio
-              ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-              : isAudioMuted
-              ? "bg-red-600 hover:bg-red-700 text-white"
-              : "bg-green-600 hover:bg-green-700 text-white"
-          }`}
-          title={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
-        >
-          <span className="text-lg">{isAudioMuted ? "🔇" : "🎤"}</span>
-          <span>{isAudioMuted ? "Unmute" : "Mute"}</span>
-        </button>
-
-        {/* Video toggle */}
-        <button
-          onClick={toggleVideo}
-          disabled={!hasLocalVideo}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            !hasLocalVideo
-              ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-              : isVideoOff
-              ? "bg-red-600 hover:bg-red-700 text-white"
-              : "bg-blue-600 hover:bg-blue-700 text-white"
-          }`}
-          title={isVideoOff ? "Turn on camera" : "Turn off camera"}
-        >
-          <span className="text-lg">{isVideoOff ? "📷" : "📹"}</span>
-          <span>{isVideoOff ? "Start Video" : "Stop Video"}</span>
-        </button>
-      </div>
-
-      {/* Status indicators */}
-      <div className="grid grid-cols-2 gap-2 text-sm border-t border-gray-700 pt-3">
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              hasLocalAudio && !isAudioMuted ? "bg-green-500" : "bg-gray-500"
-            }`}
-          />
-          <span className="text-gray-300">
-            Your mic: {hasLocalAudio ? (isAudioMuted ? "Muted" : "Active") : "Off"}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              hasLocalVideo && !isVideoOff ? "bg-green-500" : "bg-gray-500"
-            }`}
-          />
-          <span className="text-gray-300">
-            Your camera: {hasLocalVideo ? (isVideoOff ? "Off" : "On") : "Unavailable"}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              hasRemoteAudio ? "bg-green-500" : "bg-gray-500"
-            }`}
-          />
-          <span className="text-gray-300">
-            Remote audio: {hasRemoteAudio ? "Active" : "Waiting"}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              hasRemoteVideo ? "bg-green-500" : "bg-gray-500"
-            }`}
-          />
-          <span className="text-gray-300">
-            Remote video: {hasRemoteVideo ? "Active" : "Waiting"}
-          </span>
-        </div>
-      </div>
-
-      {/* Peer status */}
-      <div className="text-center text-sm">
-        {isPeerConnected ? (
-          <span className="text-green-400">
-            ✓ {role === "teacher" ? "Student" : "Teacher"} connected
-          </span>
+            {/* Screen Share Display */}
+            <div className="flex-1 flex items-center justify-center p-6">
+              {hasRemoteScreenShare && (
+                <div className="w-full h-full max-w-7xl max-h-full">
+                  <ScreenShareRenderer
+                    track={remoteTracks.screenShareTrack}
+                    isLocal={false}
+                    participantName={remoteTracks.participantName || undefined}
+                    attachScreenShare={attachRemoteScreenShare}
+                    detachScreenShare={detachRemoteScreenShare}
+                  />
+                </div>
+              )}
+              {hasLocalScreenShare && !hasRemoteScreenShare && (
+                <div className="w-full h-full max-w-7xl max-h-full">
+                  <ScreenShareRenderer
+                    track={localTracks.screenShareTrack}
+                    isLocal={true}
+                    attachScreenShare={attachLocalScreenShare}
+                    detachScreenShare={detachLocalScreenShare}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
-          <span className="text-gray-400">
-            Waiting for {role === "teacher" ? "student" : "teacher"} to join...
-          </span>
+          /* Normal Video Layout: Large remote + Small local */
+          <div className="h-full relative">
+            {/* Large Remote Video (main view) */}
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <VideoRenderer
+                localTracks={localTracks}
+                remoteTracks={remoteTracks}
+                role={role}
+                attachLocalVideo={attachLocalVideo}
+                detachLocalVideo={detachLocalVideo}
+                attachRemoteVideo={attachRemoteVideo}
+                detachRemoteVideo={detachRemoteVideo}
+                isPeerConnected={isPeerConnected}
+                layout="remote-only"
+              />
+            </div>
+
+            {/* Small Local Video (bottom-right corner) */}
+            <div className="absolute bottom-6 right-6 w-64 h-48 rounded-lg overflow-hidden shadow-2xl border-3 z-10" style={{ borderColor: "#48A6A7" }}>
+              <VideoRenderer
+                localTracks={localTracks}
+                remoteTracks={remoteTracks}
+                role={role}
+                attachLocalVideo={attachLocalVideo}
+                detachLocalVideo={detachLocalVideo}
+                attachRemoteVideo={attachRemoteVideo}
+                detachRemoteVideo={detachRemoteVideo}
+                isPeerConnected={isPeerConnected}
+                layout="local-only"
+              />
+            </div>
+          </div>
         )}
+      </div>
+
+      {/* Bottom Control Bar */}
+      <div className="px-6 py-4 border-t" style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}>
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          {/* Peer Status */}
+          <div className="text-sm" style={{ color: "#006A71" }}>
+            {isPeerConnected ? (
+              <span className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                {role === "teacher" ? "Student" : "Teacher"} joined
+              </span>
+            ) : (
+              <span className="flex items-center gap-2" style={{ color: "#9ACBD0" }}>
+                <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                Waiting for {role === "teacher" ? "student" : "teacher"}...
+              </span>
+            )}
+          </div>
+
+          {/* Control Buttons */}
+          <div className="flex items-center gap-3">
+            {/* Microphone Toggle */}
+            <button
+              onClick={toggleAudio}
+              disabled={!isConnected}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                !isConnected
+                  ? "bg-gray-200 cursor-not-allowed"
+                  : isAudioMuted
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "hover:bg-gray-100"
+              }`}
+              style={{
+                backgroundColor: !isConnected ? "#e5e7eb" : isAudioMuted ? "#ef4444" : "#48A6A7",
+                color: isAudioMuted || !isConnected ? "#fff" : "#fff",
+              }}
+              title={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
+            >
+              {isAudioMuted ? (
+                <MicOff className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Camera Toggle */}
+            <button
+              onClick={toggleVideo}
+              disabled={!isConnected || !hasLocalVideo}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                !isConnected || !hasLocalVideo
+                  ? "bg-gray-200 cursor-not-allowed"
+                  : isVideoOff
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "hover:bg-gray-100"
+              }`}
+              style={{
+                backgroundColor: !isConnected || !hasLocalVideo ? "#e5e7eb" : isVideoOff ? "#ef4444" : "#48A6A7",
+                color: isVideoOff || !isConnected || !hasLocalVideo ? "#fff" : "#fff",
+              }}
+              title={isVideoOff ? "Turn on camera" : "Turn off camera"}
+            >
+              {isVideoOff ? (
+                <VideoOff className="w-5 h-5" />
+              ) : (
+                <Video className="w-5 h-5" />
+              )}
+            </button>
+
+            {/* Screen Share Toggle */}
+            <button
+              onClick={toggleScreenShare}
+              disabled={!isConnected}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                !isConnected
+                  ? "bg-gray-200 cursor-not-allowed"
+                  : isScreenSharing
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "hover:bg-gray-100"
+              }`}
+              style={{
+                backgroundColor: !isConnected ? "#e5e7eb" : isScreenSharing ? "#ef4444" : "#48A6A7",
+                color: isScreenSharing || !isConnected ? "#fff" : "#fff",
+              }}
+              title={isScreenSharing ? "Stop sharing" : "Share screen"}
+            >
+              {isScreenSharing ? (
+                <MonitorOff className="w-5 h-5" />
+              ) : (
+                <Monitor className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+          {/* Spacer for symmetry */}
+          <div className="w-32"></div>
+        </div>
       </div>
     </div>
   );

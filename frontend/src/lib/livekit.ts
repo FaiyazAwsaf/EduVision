@@ -47,15 +47,19 @@ export type LiveKitConnectionState =
 export interface LocalTrackState {
   audioTrack: LocalAudioTrack | null;
   videoTrack: LocalVideoTrack | null;
+  screenShareTrack: LocalVideoTrack | null;
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
+  isScreenSharing: boolean;
   audioError: string | null;
   videoError: string | null;
+  screenShareError: string | null;
 }
 
 export interface RemoteTrackState {
   audioTrack: RemoteAudioTrack | null;
   videoTrack: RemoteVideoTrack | null;
+  screenShareTrack: RemoteVideoTrack | null;
   participantIdentity: string | null;
   participantName: string | null;
   participantRole: "teacher" | "student" | null;
@@ -82,8 +86,10 @@ export class LiveKitManager {
   private room: Room | null = null;
   private localAudioTrack: LocalAudioTrack | null = null;
   private localVideoTrack: LocalVideoTrack | null = null;
+  private localScreenShareTrack: LocalVideoTrack | null = null;
   private remoteAudioTrack: RemoteAudioTrack | null = null;
   private remoteVideoTrack: RemoteVideoTrack | null = null;
+  private remoteScreenShareTrack: RemoteVideoTrack | null = null;
   private remoteParticipant: RemoteParticipant | null = null;
 
   private connectionState: LiveKitConnectionState = "disconnected";
@@ -92,6 +98,7 @@ export class LiveKitManager {
   // Error tracking (video fail should not affect audio)
   private audioError: string | null = null;
   private videoError: string | null = null;
+  private screenShareError: string | null = null;
 
   // Role from metadata
   private role: "teacher" | "student" | null = null;
@@ -126,10 +133,13 @@ export class LiveKitManager {
     return {
       audioTrack: this.localAudioTrack,
       videoTrack: this.localVideoTrack,
+      screenShareTrack: this.localScreenShareTrack,
       isAudioEnabled: this.localAudioTrack?.isMuted === false,
       isVideoEnabled: this.localVideoTrack?.isMuted === false,
+      isScreenSharing: !!this.localScreenShareTrack && this.localScreenShareTrack.isMuted === false,
       audioError: this.audioError,
       videoError: this.videoError,
+      screenShareError: this.screenShareError,
     };
   }
 
@@ -140,6 +150,7 @@ export class LiveKitManager {
     return {
       audioTrack: this.remoteAudioTrack,
       videoTrack: this.remoteVideoTrack,
+      screenShareTrack: this.remoteScreenShareTrack,
       participantIdentity: this.remoteParticipant?.identity || null,
       participantName: this.remoteParticipant?.name || null,
       participantRole: this.getParticipantRole(this.remoteParticipant),
@@ -200,7 +211,6 @@ export class LiveKitManager {
 
       // Check for existing remote participants
       this.handleExistingParticipants();
-
     } catch (error) {
       console.error("[LiveKit] Connection failed:", error);
       this.setConnectionState("disconnected");
@@ -220,13 +230,23 @@ export class LiveKitManager {
 
     // Disconnect from room
     if (this.room) {
-      this.room.disconnect();
+      try {
+        await this.room.disconnect();
+      } catch (error) {
+        // Ignore "Client initiated disconnect" error - this is expected
+        // LiveKit throws this error when disconnect() is called intentionally
+        const err = error as Error;
+        if (!err.message?.includes("Client initiated disconnect")) {
+          console.error("[LiveKit] Unexpected disconnect error:", err);
+        }
+      }
       this.room = null;
     }
 
     // Clean up remote track references
     this.remoteAudioTrack = null;
     this.remoteVideoTrack = null;
+    this.remoteScreenShareTrack = null;
     this.remoteParticipant = null;
 
     // Clean up audio element
@@ -285,6 +305,131 @@ export class LiveKitManager {
   }
 
   /**
+   * Check if screen sharing
+   */
+  isScreenSharing(): boolean {
+    return !!this.localScreenShareTrack && this.localScreenShareTrack.isMuted === false;
+  }
+
+  /**
+   * Start screen sharing
+   */
+  async startScreenShare(): Promise<void> {
+    if (!this.room) {
+      console.warn("[LiveKit] Cannot start screen share - not connected");
+      return;
+    }
+
+    if (this.localScreenShareTrack) {
+      console.log("[LiveKit] Screen share already active");
+      return;
+    }
+
+    try {
+      console.log("[LiveKit] Starting screen share...");
+      this.screenShareError = null;
+
+      // Import screen share functions from livekit-client
+      const { createLocalScreenTracks } = await import("livekit-client");
+
+      // Create screen share tracks (includes audio if user shares tab audio)
+      const tracks = await createLocalScreenTracks({
+        audio: true, // Capture system audio if available
+        resolution: {
+          width: 1920,
+          height: 1080,
+          frameRate: 15,
+        },
+      });
+
+      // Find the video track (screen)
+      const screenTrack = tracks.find(
+        (track) => track.kind === Track.Kind.Video
+      ) as LocalVideoTrack | undefined;
+
+      if (!screenTrack) {
+        throw new Error("No screen track created");
+      }
+
+      this.localScreenShareTrack = screenTrack;
+
+      // Set up track ended handler (user clicks "Stop sharing" in browser)
+      screenTrack.mediaStreamTrack.addEventListener("ended", () => {
+        console.log("[LiveKit] Screen share ended by user");
+        this.stopScreenShare();
+      });
+
+      // Publish screen share track
+      await this.room.localParticipant.publishTrack(screenTrack, {
+        name: "screen",
+        source: Track.Source.ScreenShare,
+      });
+
+      console.log("[LiveKit] Screen share started and published");
+      this.notifyLocalTracksChanged();
+    } catch (error) {
+      const err = error as Error;
+      console.error("[LiveKit] Failed to start screen share:", err);
+      this.screenShareError = this.getScreenShareErrorMessage(err);
+      this.handlers.onError?.(err, "screen-share");
+
+      // Clean up on failure
+      if (this.localScreenShareTrack) {
+        this.localScreenShareTrack.stop();
+        this.localScreenShareTrack = null;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Stop screen sharing
+   */
+  async stopScreenShare(): Promise<void> {
+    if (!this.localScreenShareTrack) {
+      console.log("[LiveKit] No active screen share to stop");
+      return;
+    }
+
+    try {
+      console.log("[LiveKit] Stopping screen share...");
+
+      // Unpublish track
+      if (this.room) {
+        await this.room.localParticipant.unpublishTrack(this.localScreenShareTrack);
+      }
+
+      // Stop track
+      this.localScreenShareTrack.stop();
+      this.localScreenShareTrack = null;
+      this.screenShareError = null;
+
+      console.log("[LiveKit] Screen share stopped");
+      this.notifyLocalTracksChanged();
+    } catch (error) {
+      console.error("[LiveKit] Error stopping screen share:", error);
+      // Clean up anyway
+      if (this.localScreenShareTrack) {
+        this.localScreenShareTrack.stop();
+        this.localScreenShareTrack = null;
+      }
+      this.notifyLocalTracksChanged();
+    }
+  }
+
+  /**
+   * Toggle screen sharing
+   */
+  async toggleScreenShare(): Promise<void> {
+    if (this.isScreenSharing()) {
+      await this.stopScreenShare();
+    } else {
+      await this.startScreenShare();
+    }
+  }
+
+  /**
    * Attach local video to element
    */
   attachLocalVideo(element: HTMLVideoElement): void {
@@ -321,6 +466,46 @@ export class LiveKitManager {
     if (this.remoteVideoTrack) {
       this.remoteVideoTrack.detach(element);
       console.log("[LiveKit] Remote video detached from element");
+    }
+  }
+
+  /**
+   * Attach local screen share to element
+   */
+  attachLocalScreenShare(element: HTMLVideoElement): void {
+    if (this.localScreenShareTrack) {
+      this.localScreenShareTrack.attach(element);
+      console.log("[LiveKit] Local screen share attached to element");
+    }
+  }
+
+  /**
+   * Detach local screen share from element
+   */
+  detachLocalScreenShare(element: HTMLVideoElement): void {
+    if (this.localScreenShareTrack) {
+      this.localScreenShareTrack.detach(element);
+      console.log("[LiveKit] Local screen share detached from element");
+    }
+  }
+
+  /**
+   * Attach remote screen share to element
+   */
+  attachRemoteScreenShare(element: HTMLVideoElement): void {
+    if (this.remoteScreenShareTrack) {
+      this.remoteScreenShareTrack.attach(element);
+      console.log("[LiveKit] Remote screen share attached to element");
+    }
+  }
+
+  /**
+   * Detach remote screen share from element
+   */
+  detachRemoteScreenShare(element: HTMLVideoElement): void {
+    if (this.remoteScreenShareTrack) {
+      this.remoteScreenShareTrack.detach(element);
+      console.log("[LiveKit] Remote screen share detached from element");
     }
   }
 
@@ -366,7 +551,10 @@ export class LiveKitManager {
     this.room.on(
       RoomEvent.ParticipantDisconnected,
       (participant: RemoteParticipant) => {
-        console.log("[LiveKit] Participant disconnected:", participant.identity);
+        console.log(
+          "[LiveKit] Participant disconnected:",
+          participant.identity
+        );
 
         if (this.remoteParticipant?.identity === participant.identity) {
           this.remoteParticipant = null;
@@ -388,9 +576,9 @@ export class LiveKitManager {
         participant: RemoteParticipant
       ) => {
         console.log(
-          `[LiveKit] Track subscribed: ${track.kind} from ${participant.identity}`
+          `[LiveKit] Track subscribed: ${track.kind} (source: ${publication.source}) from ${participant.identity}`
         );
-        this.handleRemoteTrack(track, participant);
+        this.handleRemoteTrack(track, publication, participant);
       }
     );
 
@@ -403,7 +591,7 @@ export class LiveKitManager {
         participant: RemoteParticipant
       ) => {
         console.log(
-          `[LiveKit] Track unsubscribed: ${track.kind} from ${participant.identity}`
+          `[LiveKit] Track unsubscribed: ${track.kind} (source: ${publication.source}) from ${participant.identity}`
         );
 
         if (track.kind === Track.Kind.Audio) {
@@ -411,8 +599,14 @@ export class LiveKitManager {
             this.remoteAudioTrack = null;
           }
         } else if (track.kind === Track.Kind.Video) {
-          if (this.remoteVideoTrack === track) {
-            this.remoteVideoTrack = null;
+          if (publication.source === Track.Source.ScreenShare) {
+            if (this.remoteScreenShareTrack === track) {
+              this.remoteScreenShareTrack = null;
+            }
+          } else {
+            if (this.remoteVideoTrack === track) {
+              this.remoteVideoTrack = null;
+            }
           }
         }
 
@@ -544,6 +738,7 @@ export class LiveKitManager {
       if (publication.track && publication.isSubscribed) {
         this.handleRemoteTrack(
           publication.track as RemoteTrack,
+          publication as RemoteTrackPublication,
           participant
         );
       }
@@ -557,13 +752,21 @@ export class LiveKitManager {
    */
   private handleRemoteTrack(
     track: RemoteTrack,
+    publication: RemoteTrackPublication,
     participant: RemoteParticipant
   ): void {
     if (track.kind === Track.Kind.Audio) {
       this.remoteAudioTrack = track as RemoteAudioTrack;
       this.attachRemoteAudio(track as RemoteAudioTrack);
     } else if (track.kind === Track.Kind.Video) {
-      this.remoteVideoTrack = track as RemoteVideoTrack;
+      // Differentiate between camera and screen share
+      if (publication.source === Track.Source.ScreenShare) {
+        console.log("[LiveKit] Received screen share track");
+        this.remoteScreenShareTrack = track as RemoteVideoTrack;
+      } else {
+        console.log("[LiveKit] Received camera track");
+        this.remoteVideoTrack = track as RemoteVideoTrack;
+      }
     }
 
     this.remoteParticipant = participant;
@@ -618,6 +821,17 @@ export class LiveKitManager {
       this.localVideoTrack = null;
     }
 
+    // Stop and unpublish screen share track
+    if (this.localScreenShareTrack) {
+      try {
+        await this.room?.localParticipant.unpublishTrack(this.localScreenShareTrack);
+      } catch (e) {
+        // Ignore unpublish errors during cleanup
+      }
+      this.localScreenShareTrack.stop();
+      this.localScreenShareTrack = null;
+    }
+
     console.log("[LiveKit] Local tracks cleaned up");
   }
 
@@ -631,16 +845,41 @@ export class LiveKitManager {
     const name = error.name;
 
     if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      return `${device === "microphone" ? "Microphone" : "Camera"} permission denied. Please allow access.`;
+      return `${
+        device === "microphone" ? "Microphone" : "Camera"
+      } permission denied. Please allow access.`;
     } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
       return `No ${device} found. Please connect a ${device}.`;
     } else if (name === "NotReadableError" || name === "TrackStartError") {
-      return `${device === "microphone" ? "Microphone" : "Camera"} is in use by another application.`;
+      return `${
+        device === "microphone" ? "Microphone" : "Camera"
+      } is in use by another application.`;
     } else if (name === "OverconstrainedError") {
-      return `${device === "microphone" ? "Microphone" : "Camera"} doesn't support required settings.`;
+      return `${
+        device === "microphone" ? "Microphone" : "Camera"
+      } doesn't support required settings.`;
     }
 
     return `Failed to access ${device}: ${error.message}`;
+  }
+
+  /**
+   * Get user-friendly screen share error message
+   */
+  private getScreenShareErrorMessage(error: Error): string {
+    const name = error.name;
+
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+      return "Screen sharing permission denied or cancelled.";
+    } else if (name === "NotFoundError") {
+      return "No screen available to share.";
+    } else if (name === "NotReadableError") {
+      return "Cannot access screen. It may be in use.";
+    } else if (name === "AbortError") {
+      return "Screen sharing was cancelled.";
+    }
+
+    return `Failed to share screen: ${error.message}`;
   }
 
   /**

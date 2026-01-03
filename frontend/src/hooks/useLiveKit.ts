@@ -57,10 +57,16 @@ export interface UseLiveKitReturn {
   toggleAudio: () => Promise<void>;
   /** Toggle video */
   toggleVideo: () => Promise<void>;
+  /** Toggle screen share */
+  toggleScreenShare: () => Promise<void>;
   /** Set audio enabled state */
   setAudioEnabled: (enabled: boolean) => Promise<void>;
   /** Set video enabled state */
   setVideoEnabled: (enabled: boolean) => Promise<void>;
+  /** Start screen sharing */
+  startScreenShare: () => Promise<void>;
+  /** Stop screen sharing */
+  stopScreenShare: () => Promise<void>;
   /** Attach local video to element */
   attachLocalVideo: (element: HTMLVideoElement) => void;
   /** Detach local video from element */
@@ -69,20 +75,32 @@ export interface UseLiveKitReturn {
   attachRemoteVideo: (element: HTMLVideoElement) => void;
   /** Detach remote video from element */
   detachRemoteVideo: (element: HTMLVideoElement) => void;
+  /** Attach local screen share to element */
+  attachLocalScreenShare: (element: HTMLVideoElement) => void;
+  /** Detach local screen share from element */
+  detachLocalScreenShare: (element: HTMLVideoElement) => void;
+  /** Attach remote screen share to element */
+  attachRemoteScreenShare: (element: HTMLVideoElement) => void;
+  /** Detach remote screen share from element */
+  detachRemoteScreenShare: (element: HTMLVideoElement) => void;
 }
 
 const initialLocalTracks: LocalTrackState = {
   audioTrack: null,
   videoTrack: null,
+  screenShareTrack: null,
   isAudioEnabled: false,
   isVideoEnabled: false,
+  isScreenSharing: false,
   audioError: null,
   videoError: null,
+  screenShareError: null,
 };
 
 const initialRemoteTracks: RemoteTrackState = {
   audioTrack: null,
   videoTrack: null,
+  screenShareTrack: null,
   participantIdentity: null,
   participantName: null,
   participantRole: null,
@@ -124,8 +142,10 @@ export function useLiveKit({
           console.log("[useLiveKit] Local tracks updated:", {
             hasAudio: !!state.audioTrack,
             hasVideo: !!state.videoTrack,
+            hasScreenShare: !!state.screenShareTrack,
             audioEnabled: state.isAudioEnabled,
             videoEnabled: state.isVideoEnabled,
+            screenSharing: state.isScreenSharing,
           });
           setLocalTracks(state);
 
@@ -138,6 +158,7 @@ export function useLiveKit({
           console.log("[useLiveKit] Remote tracks updated:", {
             hasAudio: !!state.audioTrack,
             hasVideo: !!state.videoTrack,
+            hasScreenShare: !!state.screenShareTrack,
             participant: state.participantName,
           });
           setRemoteTracks(state);
@@ -280,6 +301,81 @@ export function useLiveKit({
   }, []);
 
   /**
+   * Start screen sharing
+   */
+  const startScreenShare = useCallback(async () => {
+    const manager = managerRef.current;
+    if (manager) {
+      try {
+        await manager.startScreenShare();
+      } catch (error) {
+        console.error("[useLiveKit] Failed to start screen share:", error);
+        // Error is already handled in manager
+      }
+    }
+  }, []);
+
+  /**
+   * Stop screen sharing
+   */
+  const stopScreenShare = useCallback(async () => {
+    const manager = managerRef.current;
+    if (manager) {
+      await manager.stopScreenShare();
+    }
+  }, []);
+
+  /**
+   * Toggle screen sharing
+   */
+  const toggleScreenShare = useCallback(async () => {
+    const manager = managerRef.current;
+    if (manager) {
+      await manager.toggleScreenShare();
+    }
+  }, []);
+
+  /**
+   * Attach local screen share to element
+   */
+  const attachLocalScreenShare = useCallback((element: HTMLVideoElement) => {
+    const manager = managerRef.current;
+    if (manager) {
+      manager.attachLocalScreenShare(element);
+    }
+  }, []);
+
+  /**
+   * Detach local screen share from element
+   */
+  const detachLocalScreenShare = useCallback((element: HTMLVideoElement) => {
+    const manager = managerRef.current;
+    if (manager) {
+      manager.detachLocalScreenShare(element);
+    }
+  }, []);
+
+  /**
+   * Attach remote screen share to element
+   */
+  const attachRemoteScreenShare = useCallback((element: HTMLVideoElement) => {
+    const manager = managerRef.current;
+    if (manager) {
+      manager.attachRemoteScreenShare(element);
+    }
+  }, []);
+
+  /**
+   * Detach remote screen share from element
+   */
+  const detachRemoteScreenShare = useCallback((element: HTMLVideoElement) => {
+    const manager = managerRef.current;
+    if (manager) {
+      manager.detachRemoteScreenShare(element);
+    }
+  }, []);
+
+  /**
    * Auto-connect when token becomes available
    */
   useEffect(() => {
@@ -314,11 +410,18 @@ export function useLiveKit({
     disconnect,
     toggleAudio,
     toggleVideo,
+    toggleScreenShare,
     setAudioEnabled,
     setVideoEnabled,
+    startScreenShare,
+    stopScreenShare,
     attachLocalVideo,
     detachLocalVideo,
     attachRemoteVideo,
     detachRemoteVideo,
+    attachLocalScreenShare,
+    detachLocalScreenShare,
+    attachRemoteScreenShare,
+    detachRemoteScreenShare,
   };
 }

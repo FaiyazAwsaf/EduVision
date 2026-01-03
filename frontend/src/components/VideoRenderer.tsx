@@ -1,20 +1,15 @@
 /**
- * Video Renderer Component - Phase 4
+ * Video Renderer Component - Professional UI
  *
- * Renders local and remote video tracks with role-aware layout.
- * Handles video element attachment/detachment lifecycle.
- *
- * Features:
- * - Role-based visual emphasis (teacher highlighted)
- * - Graceful handling when video is unavailable
- * - Audio-only fallback display
- * - Responsive layout
+ * Google Meet-inspired video display for tutoring sessions
+ * Supports flexible layouts: remote-only, local-only, or both
  */
 
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
 import { LocalTrackState, RemoteTrackState } from "@/lib/livekit";
+import { Mic, MicOff, User } from "lucide-react";
 
 interface VideoRendererProps {
   /** Local track state */
@@ -33,20 +28,8 @@ interface VideoRendererProps {
   detachRemoteVideo: (element: HTMLVideoElement) => void;
   /** Whether peer is connected */
   isPeerConnected: boolean;
-}
-
-/**
- * Get role display name
- */
-function getRoleDisplayName(role: "teacher" | "student" | null): string {
-  switch (role) {
-    case "teacher":
-      return "Teacher";
-    case "student":
-      return "Student";
-    default:
-      return "Participant";
-  }
+  /** Layout mode */
+  layout?: "both" | "remote-only" | "local-only";
 }
 
 /**
@@ -74,7 +57,7 @@ function VideoTile({
   isLocal,
   videoRef,
   isTeacher,
-  error,
+  isPeerConnected,
 }: {
   label: string;
   name: string | null;
@@ -84,22 +67,18 @@ function VideoTile({
   isLocal: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   isTeacher: boolean;
-  error?: string | null;
+  isPeerConnected?: boolean;
 }) {
   const displayName = name || (isLocal ? "You" : "Waiting...");
 
   return (
-    <div
-      className={`relative rounded-lg overflow-hidden bg-gray-900 ${
-        isTeacher ? "ring-2 ring-blue-500" : ""
-      }`}
-    >
+    <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg" style={{ backgroundColor: "#F2EFE7" }}>
       {/* Video element */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        muted={isLocal} // Local video should be muted to prevent echo
+        muted={isLocal}
         className={`w-full h-full object-cover ${
           hasVideo ? "block" : "hidden"
         }`}
@@ -107,60 +86,57 @@ function VideoTile({
 
       {/* Placeholder when no video */}
       {!hasVideo && (
-        <div className="w-full h-full flex items-center justify-center bg-gray-800">
-          <div className="flex flex-col items-center gap-2">
-            {/* Avatar */}
+        <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: "#006A71" }}>
+          <div className="flex flex-col items-center gap-3">
+            {/* Avatar Circle */}
             <div
-              className={`w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-white ${
-                isTeacher ? "bg-blue-600" : "bg-gray-600"
-              }`}
+              className="w-24 h-24 rounded-full flex items-center justify-center shadow-lg"
+              style={{ backgroundColor: "#48A6A7" }}
             >
-              {getInitials(name)}
+              {isPeerConnected !== false ? (
+                <span className="text-3xl font-bold text-white">
+                  {getInitials(name)}
+                </span>
+              ) : (
+                <User className="w-12 h-12 text-white" />
+              )}
             </div>
             {/* Name */}
-            <span className="text-gray-300 text-sm">{displayName}</span>
-            {/* Error message */}
-            {error && (
-              <span className="text-red-400 text-xs max-w-[200px] text-center">
-                {error}
+            <span className="text-white text-lg font-medium">{displayName}</span>
+            {!isLocal && !isPeerConnected && (
+              <span className="text-sm px-3 py-1 rounded-full" style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}>
+                Waiting to join...
               </span>
             )}
           </div>
         </div>
       )}
 
-      {/* Label overlay */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Role badge */}
-            {isTeacher && (
-              <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
-                Teacher
-              </span>
-            )}
-            <span className="text-white text-sm font-medium truncate">
-              {label}
+      {/* Bottom Overlay with Name and Audio Status */}
+      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 flex items-center justify-between" style={{ background: "linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent)" }}>
+        <div className="flex items-center gap-2">
+          {isTeacher && (
+            <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: "#48A6A7", color: "#FFFFFF" }}>
+              {isLocal ? "You" : "Teacher"}
             </span>
-          </div>
+          )}
+          {!isTeacher && !isLocal && (
+            <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}>
+              Student
+            </span>
+          )}
+          <span className="text-white text-sm font-medium truncate max-w-[150px]">
+            {label}
+          </span>
+        </div>
 
-          {/* Media indicators */}
-          <div className="flex items-center gap-1">
-            {/* Audio indicator */}
-            <span
-              className={`text-sm ${hasAudio ? "text-green-400" : "text-red-400"}`}
-              title={hasAudio ? "Audio active" : "Audio off"}
-            >
-              {hasAudio ? "🎤" : "🔇"}
-            </span>
-            {/* Video indicator */}
-            <span
-              className={`text-sm ${hasVideo ? "text-green-400" : "text-gray-400"}`}
-              title={hasVideo ? "Video active" : "Video off"}
-            >
-              {hasVideo ? "📹" : "📷"}
-            </span>
-          </div>
+        {/* Audio indicator */}
+        <div className={`p-1.5 rounded-full ${hasAudio ? "bg-white/20" : "bg-red-500"}`}>
+          {hasAudio ? (
+            <Mic className="w-4 h-4 text-white" />
+          ) : (
+            <MicOff className="w-4 h-4 text-white" />
+          )}
         </div>
       </div>
     </div>
@@ -176,6 +152,7 @@ export function VideoRenderer({
   attachRemoteVideo,
   detachRemoteVideo,
   isPeerConnected,
+  layout = "both",
 }: VideoRendererProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -248,26 +225,60 @@ export function VideoRenderer({
   const isRemoteTeacher = remoteTracks.participantRole === "teacher";
 
   // Determine local participant info
-  const localLabel = isLocalTeacher ? "You (Teacher)" : "You (Student)";
+  const localLabel = isLocalTeacher ? "You (Teacher)" : "You";
   const localName = isLocalTeacher ? "Teacher" : "Student";
 
   // Determine remote participant info
   const remoteName =
     remoteTracks.participantName ||
-    (isPeerConnected
-      ? isRemoteTeacher
-        ? "Teacher"
-        : "Student"
-      : null);
+    (isPeerConnected ? (isRemoteTeacher ? "Teacher" : "Student") : null);
   const remoteLabel = isPeerConnected
     ? isRemoteTeacher
-      ? `${remoteName} (Teacher)`
-      : `${remoteName} (Student)`
-    : "Waiting for participant...";
+      ? "Teacher"
+      : remoteTracks.participantName || "Student"
+    : "Waiting...";
 
+  // Render based on layout mode
+  if (layout === "remote-only") {
+    return (
+      <div className="w-full h-full">
+        <VideoTile
+          label={remoteLabel}
+          name={remoteName}
+          role={remoteTracks.participantRole}
+          hasVideo={!!remoteTracks.videoTrack}
+          hasAudio={!!remoteTracks.audioTrack}
+          isLocal={false}
+          videoRef={remoteVideoRef}
+          isTeacher={isRemoteTeacher}
+          isPeerConnected={isPeerConnected}
+        />
+      </div>
+    );
+  }
+
+  if (layout === "local-only") {
+    return (
+      <div className="w-full h-full">
+        <VideoTile
+          label={localLabel}
+          name={localName}
+          role={role}
+          hasVideo={!!localTracks.videoTrack && localTracks.isVideoEnabled}
+          hasAudio={!!localTracks.audioTrack && localTracks.isAudioEnabled}
+          isLocal={true}
+          videoRef={localVideoRef}
+          isTeacher={isLocalTeacher}
+          isPeerConnected={true}
+        />
+      </div>
+    );
+  }
+
+  // Default: both videos side by side
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Remote video (main/larger) */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full h-full">
+      {/* Remote video */}
       <div className="aspect-video">
         <VideoTile
           label={remoteLabel}
@@ -278,10 +289,11 @@ export function VideoRenderer({
           isLocal={false}
           videoRef={remoteVideoRef}
           isTeacher={isRemoteTeacher}
+          isPeerConnected={isPeerConnected}
         />
       </div>
 
-      {/* Local video (self-view) */}
+      {/* Local video */}
       <div className="aspect-video">
         <VideoTile
           label={localLabel}
@@ -292,7 +304,7 @@ export function VideoRenderer({
           isLocal={true}
           videoRef={localVideoRef}
           isTeacher={isLocalTeacher}
-          error={localTracks.videoError}
+          isPeerConnected={true}
         />
       </div>
     </div>
