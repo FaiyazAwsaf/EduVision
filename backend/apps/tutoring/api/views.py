@@ -153,9 +153,9 @@ class SessionCreateView(APIView):
             f"Session created: {session.id} by teacher {user.id}"
         )
         
-        # Build join URL - use WebSocket version
+        # Build join URL (frontend route)
         base_url = get_base_url(request)
-        join_url = f"{base_url}/student/join-ws/{room_id}"
+        join_url = f"{base_url}/student/join/{room_id}"
         
         return Response(
             {

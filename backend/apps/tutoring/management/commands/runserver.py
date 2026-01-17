@@ -38,7 +38,7 @@ class Command(BaseCommand):
             port = addrport
 
         self.stdout.write(self.style.SUCCESS(
-            f'\n🚀 Starting Daphne ASGI server with WebSocket support...\n'
+            f'\nStarting Daphne ASGI server with WebSocket support...\n'
         ))
         self.stdout.write(
             f'   Listening on: http://{addr}:{port}\n'
@@ -51,7 +51,7 @@ class Command(BaseCommand):
             from daphne.cli import CommandLineInterface
         except ImportError:
             self.stdout.write(self.style.ERROR(
-                '\n❌ Daphne is not installed!\n'
+                '\nDaphne is not installed.\n'
                 'Install it with: pip install daphne\n'
             ))
             sys.exit(1)
@@ -74,5 +74,5 @@ class Command(BaseCommand):
         try:
             CommandLineInterface().run(daphne_args[1:])
         except KeyboardInterrupt:
-            self.stdout.write(self.style.SUCCESS('\n\n✅ Server stopped.\n'))
+            self.stdout.write(self.style.SUCCESS('\n\nServer stopped.\n'))
             sys.exit(0)

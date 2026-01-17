@@ -11,6 +11,8 @@
 import React, { useState, useCallback, useEffect } from "react";
 import {
   AlertTriangle,
+  Clock,
+  Square,
   User,
   GraduationCap,
   Check,
@@ -116,7 +118,7 @@ function SessionView({
         {isWaiting && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">⏳</span>
+              <Clock className="w-6 h-6 text-yellow-600" />
               <div>
                 <p className="font-medium text-yellow-800">
                   Waiting for student to join...
@@ -151,7 +153,7 @@ function SessionView({
         {isEnded && (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">⏹️</span>
+              <Square className="w-6 h-6 text-gray-600 fill-gray-600" />
               <div>
                 <p className="font-medium text-gray-800">Session has ended</p>
                 <p className="text-sm text-gray-600">

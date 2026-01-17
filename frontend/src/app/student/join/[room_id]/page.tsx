@@ -14,6 +14,7 @@ import {
   User,
   GraduationCap,
   Link as LinkIcon,
+  Square,
   Circle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -109,7 +110,7 @@ function SessionView({
         {isEnded && (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">⏹️</span>
+              <Square className="w-6 h-6 text-gray-600 fill-gray-600" />
               <div>
                 <p className="font-medium text-gray-800">Session has ended</p>
                 <p className="text-sm text-gray-600">
