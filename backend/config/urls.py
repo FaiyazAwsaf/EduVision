@@ -18,11 +18,14 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from apps.content_requests.api.views_study_plan import StudyPlanViewSet, StudyPlanItemViewSet
+from django.conf import settings
+from django.conf.urls.static import static
 
 # Router for study plans (Phase 5)
 router = DefaultRouter()
 router.register(r'study-plans', StudyPlanViewSet, basename='study-plan')
 router.register(r'study-plan-items', StudyPlanItemViewSet, basename='study-plan-item')
+
 
 urlpatterns = [
     # Admin interface
@@ -42,4 +45,10 @@ urlpatterns = [
     
     # Add other module APIs here as they are implemented
     # path('api/evaluation/', include('apps.evaluation.api.urls')),
+    path('api/evaluation/', include('apps.evaluation.urls')),
+    path('api/', include('apps.rubrics.urls')),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

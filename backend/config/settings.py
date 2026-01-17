@@ -40,13 +40,16 @@ INSTALLED_APPS = [
     "apps.user.apps.UserConfig",
     "apps.content_requests.apps.ContentRequestsConfig",
     "apps.intelligence.apps.IntelligenceConfig",  # Phase 6: Intelligence & Adaptive Optimization
-    "apps.tutoring.apps.TutoringConfig",  # Module 5: One-on-One Live Tutoring
+    "apps.tutoring.apps.TutoringConfig", 
+    "apps.evaluation.apps.EvaluationConfig",
+    "apps.rubrics.apps.RubricsConfig",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS - should be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -316,3 +319,28 @@ LOGGING = {
     },
 }
 
+# Media files (uploaded files)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",
+        "rest_framework.parsers.FormParser",
+    ],
+}
+
+# Gemini API Key (for script evaluation)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
