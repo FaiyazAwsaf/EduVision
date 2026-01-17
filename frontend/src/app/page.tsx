@@ -6,7 +6,14 @@
  */
 
 import Link from "next/link";
-import { Sparkles, Video, BookOpen, Brain } from "lucide-react";
+import {
+  Sparkles,
+  Video,
+  BookOpen,
+  Brain,
+  FileText,
+  ClipboardCheck,
+} from "lucide-react";
 
 export default function Home() {
   return (
@@ -89,6 +96,46 @@ export default function Home() {
                 </span>
               </div>
             </Link>
+
+            {/* Script Evaluation Card */}
+            <Link href="/evaluation" className="group">
+              <div className="bg-white rounded-xl border border-[#9ACBD0] p-8 h-full transition-all duration-200 hover:border-[#48A6A7] hover:shadow-lg group-hover:-translate-y-1">
+                <div className="w-14 h-14 bg-[#F2EFE7] rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#9ACBD0]/20 transition-colors">
+                  <ClipboardCheck className="w-7 h-7 text-[#006A71]" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#006A71] mb-3">
+                  Script Evaluation
+                </h3>
+                <p className="text-[#48A6A7] text-sm leading-relaxed mb-4">
+                  Upload and evaluate handwritten answer scripts using
+                  AI-powered grading. Supports question papers, marking schemes,
+                  and detailed evaluation reports.
+                </p>
+                <span className="inline-flex items-center text-sm font-medium text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
+                  Start evaluating →
+                </span>
+              </div>
+            </Link>
+
+            {/* Rubric Builder Card */}
+            <Link href="/rubrics" className="group">
+              <div className="bg-white rounded-xl border border-[#9ACBD0] p-8 h-full transition-all duration-200 hover:border-[#48A6A7] hover:shadow-lg group-hover:-translate-y-1">
+                <div className="w-14 h-14 bg-[#F2EFE7] rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#9ACBD0]/20 transition-colors">
+                  <FileText className="w-7 h-7 text-[#006A71]" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#006A71] mb-3">
+                  Rubric Builder
+                </h3>
+                <p className="text-[#48A6A7] text-sm leading-relaxed mb-4">
+                  Create detailed evaluation rubrics with multiple rule types,
+                  keyword matching, and configurable scoring modes for
+                  consistent automated grading.
+                </p>
+                <span className="inline-flex items-center text-sm font-medium text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
+                  Build rubrics →
+                </span>
+              </div>
+            </Link>
           </div>
 
           {/* Additional Quick Links */}
@@ -101,6 +148,20 @@ export default function Home() {
               >
                 <BookOpen className="w-4 h-4" />
                 Study Plans
+              </Link>
+              <Link
+                href="/evaluation"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm text-[#48A6A7] hover:border-[#48A6A7] hover:text-[#006A71] transition-colors"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                Evaluation
+              </Link>
+              <Link
+                href="/rubrics"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm text-[#48A6A7] hover:border-[#48A6A7] hover:text-[#006A71] transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Rubrics
               </Link>
             </div>
           </div>

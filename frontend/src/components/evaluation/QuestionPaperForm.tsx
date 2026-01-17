@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import evaluationAPI, { QuestionPaper, Question, Rubric } from "@/lib/api/evaluation";
+import evaluationAPI, {
+  QuestionPaper,
+  Question,
+  Rubric,
+} from "@/lib/api/evaluation";
 
 interface QuestionPaperFormProps {
   onSuccess: (paper: QuestionPaper) => void;
@@ -48,7 +52,9 @@ export default function QuestionPaperForm({
   const [subject, setSubject] = useState("Mathematics");
   const [classLevel, setClassLevel] = useState("9");
   const [description, setDescription] = useState("");
-  const [questions, setQuestions] = useState<QuestionFormData[]>([{ ...defaultQuestion }]);
+  const [questions, setQuestions] = useState<QuestionFormData[]>([
+    { ...defaultQuestion },
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -71,7 +77,11 @@ export default function QuestionPaperForm({
     }
   };
 
-  const updateQuestion = (index: number, field: keyof QuestionFormData, value: unknown) => {
+  const updateQuestion = (
+    index: number,
+    field: keyof QuestionFormData,
+    value: unknown
+  ) => {
     setQuestions(
       questions.map((q, i) => (i === index ? { ...q, [field]: value } : q))
     );
@@ -104,7 +114,9 @@ export default function QuestionPaperForm({
     updateRubric(
       questionIndex,
       "key_points",
-      questions[questionIndex].rubric.key_points.filter((_, i) => i !== pointIndex)
+      questions[questionIndex].rubric.key_points.filter(
+        (_, i) => i !== pointIndex
+      )
     );
   };
 
@@ -133,13 +145,18 @@ export default function QuestionPaperForm({
             key_points: q.rubric.key_points,
             common_mistakes: q.rubric.common_mistakes,
             grading_notes: q.rubric.grading_notes || undefined,
-            total_marks: q.rubric.method_marks + q.rubric.calculation_marks + q.rubric.answer_marks,
+            total_marks:
+              q.rubric.method_marks +
+              q.rubric.calculation_marks +
+              q.rubric.answer_marks,
           },
         })),
       });
       onSuccess(paper);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create question paper");
+      setError(
+        err instanceof Error ? err.message : "Failed to create question paper"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -148,13 +165,13 @@ export default function QuestionPaperForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Paper Details */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+      <div className="bg-white rounded-xl p-6 border border-[#9ACBD0]">
+        <h2 className="text-lg font-semibold text-[#006A71] mb-4">
           Question Paper Details
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-[#006A71] mb-1">
               Title *
             </label>
             <input
@@ -162,18 +179,18 @@ export default function QuestionPaperForm({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Mid-Term Examination 2024"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-[#006A71] mb-1">
               Subject
             </label>
             <select
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
             >
               <option value="Mathematics">Mathematics</option>
               <option value="Physics">Physics</option>
@@ -182,13 +199,13 @@ export default function QuestionPaperForm({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-[#006A71] mb-1">
               Class Level
             </label>
             <select
               value={classLevel}
               onChange={(e) => setClassLevel(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
             >
               <option value="9">Class 9</option>
               <option value="10">Class 10</option>
@@ -197,7 +214,7 @@ export default function QuestionPaperForm({
             </select>
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-[#006A71] mb-1">
               Description (Optional)
             </label>
             <textarea
@@ -205,15 +222,15 @@ export default function QuestionPaperForm({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Additional notes about this question paper..."
               rows={2}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors resize-none"
             />
           </div>
         </div>
       </div>
 
       {/* Questions Tabs */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-        <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white rounded-xl border border-[#9ACBD0] overflow-hidden">
+        <div className="border-b border-[#9ACBD0]">
           <div className="flex overflow-x-auto">
             {questions.map((q, index) => (
               <button
@@ -222,8 +239,8 @@ export default function QuestionPaperForm({
                 onClick={() => setActiveQuestionIndex(index)}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   activeQuestionIndex === index
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    ? "border-[#48A6A7] text-[#006A71]"
+                    : "border-transparent text-[#9ACBD0] hover:text-[#48A6A7]"
                 }`}
               >
                 Q{q.question_number || index + 1}
@@ -232,7 +249,7 @@ export default function QuestionPaperForm({
             <button
               type="button"
               onClick={addQuestion}
-              className="px-4 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              className="px-4 py-3 text-sm font-medium text-[#48A6A7] hover:bg-[#48A6A7]/10"
             >
               + Add Question
             </button>
@@ -250,7 +267,7 @@ export default function QuestionPaperForm({
                 {/* Question Details */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-[#006A71] mb-1">
                       Question Number *
                     </label>
                     <input
@@ -260,12 +277,12 @@ export default function QuestionPaperForm({
                         updateQuestion(index, "question_number", e.target.value)
                       }
                       placeholder="e.g., 1, 2a, 2b"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-[#006A71] mb-1">
                       Question Type
                     </label>
                     <select
@@ -273,7 +290,7 @@ export default function QuestionPaperForm({
                       onChange={(e) =>
                         updateQuestion(index, "question_type", e.target.value)
                       }
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
                     >
                       <option value="mathematical">Mathematical Problem</option>
                       <option value="short">Short Answer</option>
@@ -282,23 +299,27 @@ export default function QuestionPaperForm({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-[#006A71] mb-1">
                       Max Marks
                     </label>
                     <input
                       type="number"
                       value={question.max_marks}
                       onChange={(e) =>
-                        updateQuestion(index, "max_marks", parseInt(e.target.value))
+                        updateQuestion(
+                          index,
+                          "max_marks",
+                          parseInt(e.target.value)
+                        )
                       }
                       min={1}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-[#006A71] mb-1">
                     Question Text *
                   </label>
                   <textarea
@@ -308,13 +329,13 @@ export default function QuestionPaperForm({
                     }
                     placeholder="Enter the question text..."
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors resize-none"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-[#006A71] mb-1">
                     Model Answer / Solution
                   </label>
                   <textarea
@@ -324,70 +345,82 @@ export default function QuestionPaperForm({
                     }
                     placeholder="Enter the correct solution or model answer..."
                     rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors resize-none"
                   />
                 </div>
 
                 {/* Rubric Section */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                  <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">
+                <div className="border-t border-[#9ACBD0] pt-4 mt-4">
+                  <h3 className="text-md font-semibold text-[#006A71] mb-4">
                     Grading Rubric
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[#006A71] mb-1">
                         Method Marks
                       </label>
                       <input
                         type="number"
                         value={question.rubric.method_marks}
                         onChange={(e) =>
-                          updateRubric(index, "method_marks", parseInt(e.target.value))
+                          updateRubric(
+                            index,
+                            "method_marks",
+                            parseInt(e.target.value)
+                          )
                         }
                         min={0}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[#006A71] mb-1">
                         Calculation Marks
                       </label>
                       <input
                         type="number"
                         value={question.rubric.calculation_marks}
                         onChange={(e) =>
-                          updateRubric(index, "calculation_marks", parseInt(e.target.value))
+                          updateRubric(
+                            index,
+                            "calculation_marks",
+                            parseInt(e.target.value)
+                          )
                         }
                         min={0}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[#006A71] mb-1">
                         Answer Marks
                       </label>
                       <input
                         type="number"
                         value={question.rubric.answer_marks}
                         onChange={(e) =>
-                          updateRubric(index, "answer_marks", parseInt(e.target.value))
+                          updateRubric(
+                            index,
+                            "answer_marks",
+                            parseInt(e.target.value)
+                          )
                         }
                         min={0}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] transition-colors"
                       />
                     </div>
                   </div>
 
                   {/* Key Points */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-[#006A71] mb-1">
                       Key Points to Check
                     </label>
                     <div className="flex flex-wrap gap-2 mb-2">
                       {question.rubric.key_points.map((point, pointIndex) => (
                         <span
                           key={pointIndex}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm"
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-[#48A6A7]/10 text-[#006A71] rounded-full text-sm"
                         >
                           {point}
                           <button
@@ -404,7 +437,7 @@ export default function QuestionPaperForm({
                       <input
                         type="text"
                         placeholder="Add a key point..."
-                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        className="flex-1 px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors"
                         onKeyPress={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -417,7 +450,7 @@ export default function QuestionPaperForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-[#006A71] mb-1">
                       Grading Notes
                     </label>
                     <textarea
@@ -427,7 +460,7 @@ export default function QuestionPaperForm({
                       }
                       placeholder="Additional grading instructions..."
                       rows={2}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] placeholder-[#9ACBD0] transition-colors resize-none"
                     />
                   </div>
                 </div>
@@ -438,7 +471,7 @@ export default function QuestionPaperForm({
                     <button
                       type="button"
                       onClick={() => removeQuestion(index)}
-                      className="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       Remove Question
                     </button>
@@ -452,8 +485,8 @@ export default function QuestionPaperForm({
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
@@ -463,7 +496,7 @@ export default function QuestionPaperForm({
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="px-6 py-2.5 border border-[#9ACBD0] rounded-lg text-[#48A6A7] hover:bg-[#F2EFE7] transition-colors"
           >
             Cancel
           </button>
@@ -471,11 +504,15 @@ export default function QuestionPaperForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          className="px-6 py-2.5 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {isSubmitting ? (
             <>
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+              <svg
+                className="animate-spin h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
                 <circle
                   className="opacity-25"
                   cx="12"
