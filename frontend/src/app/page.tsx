@@ -13,6 +13,7 @@ import {
   Brain,
   FileText,
   ClipboardCheck,
+  PenTool,
 } from "lucide-react";
 
 export default function Home() {
@@ -136,6 +137,26 @@ export default function Home() {
                 </span>
               </div>
             </Link>
+
+            {/* Whiteboard Card */}
+            <Link href="/whiteboard" className="group">
+              <div className="bg-white rounded-xl border border-[#9ACBD0] p-8 h-full transition-all duration-200 hover:border-[#48A6A7] hover:shadow-lg group-hover:-translate-y-1">
+                <div className="w-14 h-14 bg-[#F2EFE7] rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#9ACBD0]/20 transition-colors">
+                  <PenTool className="w-7 h-7 text-[#006A71]" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#006A71] mb-3">
+                  Interactive Whiteboard
+                </h3>
+                <p className="text-[#48A6A7] text-sm leading-relaxed mb-4">
+                  Digital whiteboard for teaching and learning with drawing
+                  tools, eraser, and real-time collaboration capabilities for
+                  interactive sessions.
+                </p>
+                <span className="inline-flex items-center text-sm font-medium text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
+                  Open whiteboard →
+                </span>
+              </div>
+            </Link>
           </div>
 
           {/* Additional Quick Links */}
@@ -162,6 +183,13 @@ export default function Home() {
               >
                 <FileText className="w-4 h-4" />
                 Rubrics
+              </Link>
+              <Link
+                href="/whiteboard"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm text-[#48A6A7] hover:border-[#48A6A7] hover:text-[#006A71] transition-colors"
+              >
+                <PenTool className="w-4 h-4" />
+                Whiteboard
               </Link>
             </div>
           </div>
