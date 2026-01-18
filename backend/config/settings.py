@@ -109,13 +109,19 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 conn_max_age = int(os.environ.get("DB_CONN_MAX_AGE", 60))
 
 if DATABASE_URL:
+    # Parse the database URL
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=conn_max_age,
-            ssl_require=True,
         )
     }
+    
+    # Add SSL configuration for Supabase/PostgreSQL
+    if 'postgresql' in DATABASE_URL or 'postgres' in DATABASE_URL:
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'require',
+        }
 else:
     # Fallback - local SQLite database for development
     DATABASES = {
@@ -161,6 +167,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media files (User uploads)
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

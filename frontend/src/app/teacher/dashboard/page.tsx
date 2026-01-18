@@ -374,6 +374,9 @@ export default function TeacherDashboardPage() {
 
     try {
       const response: SessionCreateResponse = await createSession();
+      console.log("[TeacherDashboard] Session created:", response);
+      console.log("[TeacherDashboard] LiveKit WS URL:", response.livekit_ws_url);
+      console.log("[TeacherDashboard] Token:", response.token ? "present" : "null");
       setSessionData(response);
     } catch (err) {
       const apiError = err as ApiError;

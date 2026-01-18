@@ -129,6 +129,16 @@ export function MediaSession({
     }
   };
 
+  // Debug logging
+  useEffect(() => {
+    console.log("[MediaSession] Props received:", {
+      wsUrl,
+      token: token ? "present" : "null",
+      role,
+      sessionId,
+    });
+  }, [wsUrl, token, role, sessionId]);
+
   // Show waiting message if not connected yet
   if (!wsUrl || !token) {
     return (
@@ -136,6 +146,11 @@ export function MediaSession({
         <div className="text-center" style={{ color: "#006A71" }}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "#48A6A7" }}></div>
           <p className="text-lg font-medium">Waiting for session...</p>
+          {/* Debug info */}
+          <div className="mt-4 text-xs text-gray-500">
+            <p>WebSocket URL: {wsUrl || "Not provided"}</p>
+            <p>Token: {token ? "Provided" : "Not provided"}</p>
+          </div>
         </div>
       </div>
     );

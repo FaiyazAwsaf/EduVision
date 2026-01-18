@@ -16,10 +16,41 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 from rest_framework.routers import DefaultRouter
 from apps.content_requests.api.views_study_plan import StudyPlanViewSet, StudyPlanItemViewSet
 from django.conf import settings
 from django.conf.urls.static import static
+
+
+# Health check endpoint for Docker/Kubernetes
+def health_check(request):
+    """Simple health check endpoint for container orchestration."""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'eduvision-backend'
+    })
+
+
+# Root API info endpoint
+def api_root(request):
+    """Root endpoint providing API information."""
+    return JsonResponse({
+        'name': 'EduVision API',
+        'version': '1.0.0',
+        'status': 'running',
+        'endpoints': {
+            'health': '/api/health/',
+            'content_requests': '/api/content-requests/',
+            'study_plans': '/api/study-plans/',
+            'intelligence': '/api/intelligence/',
+            'tutoring': '/api/tutoring/',
+            'evaluation': '/api/evaluation/',
+            'rubrics': '/api/rubrics/',
+            'admin': '/admin/',
+        }
+    })
+
 
 # Router for study plans (Phase 5)
 router = DefaultRouter()
@@ -28,6 +59,12 @@ router.register(r'study-plan-items', StudyPlanItemViewSet, basename='study-plan-
 
 
 urlpatterns = [
+    # Root API info
+    path('', api_root, name='api_root'),
+    
+    # Health check (for Docker/Kubernetes)
+    path('api/health/', health_check, name='health_check'),
+    
     # Admin interface
     path('admin/', admin.site.urls),
     

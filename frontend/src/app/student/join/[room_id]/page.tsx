@@ -303,6 +303,9 @@ export default function StudentJoinPage() {
 
     try {
       const response: SessionJoinResponse = await joinSession(roomId);
+      console.log("[StudentJoin] Session joined:", response);
+      console.log("[StudentJoin] LiveKit WS URL:", response.livekit_ws_url);
+      console.log("[StudentJoin] Token:", response.token ? "present" : "null");
       setJoinData(response);
     } catch (err) {
       const apiError = err as ApiError;
