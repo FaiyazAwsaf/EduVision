@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from .models import Rubric, RubricVersion
 from .schemas import (
     RubricMetadata, QuestionContext, EvaluationRule,
@@ -108,11 +109,32 @@ class RubricSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        """Create a new rubric."""
-        # Ensure created_by is set from the request user
+        """Create a new rubric with proper created_by handling."""
+        # Get request from context
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
+        
+        if request and request.user.is_authenticated:
+            # Use the authenticated user
             validated_data['created_by'] = request.user.id
+        else:
+            # DEVELOPMENT-ONLY: Fallback to a development user for unauthenticated requests
+            # Remove this entire else block once authentication is properly enabled in production
+            User = get_user_model()
+            
+            # Try to find a dev user by email
+            dev_user = User.objects.filter(email='dev@eduvision.local').first()
+            
+            if not dev_user:
+                # Fallback to the first user in the database
+                dev_user = User.objects.first()
+            
+            if not dev_user:
+                raise serializers.ValidationError(
+                    "Cannot create rubric: No authenticated user and no fallback DEV user available. "
+                    "Please create a user first or enable authentication."
+                )
+            
+            validated_data['created_by'] = dev_user.id
         
         # Ensure state is draft for new rubrics
         validated_data['state'] = Rubric.STATE_DRAFT

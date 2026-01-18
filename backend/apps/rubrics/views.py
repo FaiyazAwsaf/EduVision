@@ -1,8 +1,9 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
 from .models import Rubric, RubricVersion
 from .serializers import (
     RubricSerializer, RubricListSerializer,
@@ -24,7 +25,7 @@ class RubricViewSet(viewsets.ModelViewSet):
     - DELETE /api/rubrics/{id}/ → delete rubric (only if state=draft)
     """
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def get_queryset(self):
         """
@@ -50,6 +51,12 @@ class RubricViewSet(viewsets.ModelViewSet):
         elif self.action == 'publish':
             return RubricPublishSerializer
         return RubricSerializer
+    
+    def perform_create(self, serializer):
+        """
+        Save the rubric. Ownership (created_by) is handled in the serializer.
+        """
+        serializer.save()
     
     def create(self, request, *args, **kwargs):
         """
