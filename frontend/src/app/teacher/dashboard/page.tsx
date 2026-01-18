@@ -287,12 +287,12 @@ const STORAGE_KEY_TEACHER_USER = "tutoring_teacher_user";
 // Helper functions for session persistence
 function saveTeacherSession(
   sessionData: SessionCreateResponse,
-  user: TutoringUser
+  user: TutoringUser,
 ) {
   if (typeof window !== "undefined") {
     localStorage.setItem(
       STORAGE_KEY_TEACHER_SESSION,
-      JSON.stringify(sessionData)
+      JSON.stringify(sessionData),
     );
     localStorage.setItem(STORAGE_KEY_TEACHER_USER, JSON.stringify(user));
   }
@@ -328,7 +328,7 @@ function clearTeacherSession() {
 export default function TeacherDashboardPage() {
   const [user, setUser] = useState<TutoringUser | null>(null);
   const [sessionData, setSessionData] = useState<SessionCreateResponse | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -375,8 +375,14 @@ export default function TeacherDashboardPage() {
     try {
       const response: SessionCreateResponse = await createSession();
       console.log("[TeacherDashboard] Session created:", response);
-      console.log("[TeacherDashboard] LiveKit WS URL:", response.livekit_ws_url);
-      console.log("[TeacherDashboard] Token:", response.token ? "present" : "null");
+      console.log(
+        "[TeacherDashboard] LiveKit WS URL:",
+        response.livekit_ws_url,
+      );
+      console.log(
+        "[TeacherDashboard] Token:",
+        response.token ? "present" : "null",
+      );
       setSessionData(response);
     } catch (err) {
       const apiError = err as ApiError;

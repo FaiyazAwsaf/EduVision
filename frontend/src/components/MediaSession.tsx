@@ -100,7 +100,8 @@ export function MediaSession({
   const isAnyScreenSharing = hasLocalScreenShare || hasRemoteScreenShare;
 
   // Filter out expected disconnect errors
-  const shouldShowError = error && !error.includes("Client initiated disconnect");
+  const shouldShowError =
+    error && !error.includes("Client initiated disconnect");
 
   // Handle fullscreen state changes
   useEffect(() => {
@@ -142,9 +143,15 @@ export function MediaSession({
   // Show waiting message if not connected yet
   if (!wsUrl || !token) {
     return (
-      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: "#F2EFE7" }}>
+      <div
+        className="h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#F2EFE7" }}
+      >
         <div className="text-center" style={{ color: "#006A71" }}>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "#48A6A7" }}></div>
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
+            style={{ borderColor: "#48A6A7" }}
+          ></div>
           <p className="text-lg font-medium">Waiting for session...</p>
           {/* Debug info */}
           <div className="mt-4 text-xs text-gray-500">
@@ -157,15 +164,24 @@ export function MediaSession({
   }
 
   return (
-    <div className="h-screen flex flex-col" style={{ backgroundColor: "#F2EFE7" }}>
+    <div
+      className="h-screen flex flex-col"
+      style={{ backgroundColor: "#F2EFE7" }}
+    >
       {/* Header Bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b" style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}>
+      <div
+        className="flex items-center justify-between px-6 py-3 border-b"
+        style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}
+      >
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-semibold" style={{ color: "#006A71" }}>
             EduVision Tutoring
           </h1>
           {sessionId && (
-            <span className="text-sm px-3 py-1 rounded-full" style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}>
+            <span
+              className="text-sm px-3 py-1 rounded-full"
+              style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}
+            >
               {role === "teacher" ? "Teacher" : "Student"}
             </span>
           )}
@@ -184,7 +200,10 @@ export function MediaSession({
 
       {/* Error Display */}
       {shouldShowError && (
-        <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: "#fee", borderLeft: "4px solid #dc2626" }}>
+        <div
+          className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3"
+          style={{ backgroundColor: "#fee", borderLeft: "4px solid #dc2626" }}
+        >
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-red-900">Connection Error</p>
@@ -194,22 +213,33 @@ export function MediaSession({
       )}
 
       {/* Video/Screen Share error (non-critical) */}
-      {(localTracks.videoError || localTracks.screenShareError) && !shouldShowError && (
-        <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: "#fffbeb", borderLeft: "4px solid #f59e0b" }}>
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            {localTracks.videoError && (
-              <p className="text-sm text-amber-900">{localTracks.videoError}</p>
-            )}
-            {localTracks.screenShareError && (
-              <p className="text-sm text-amber-900">{localTracks.screenShareError}</p>
-            )}
+      {(localTracks.videoError || localTracks.screenShareError) &&
+        !shouldShowError && (
+          <div
+            className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3"
+            style={{
+              backgroundColor: "#fffbeb",
+              borderLeft: "4px solid #f59e0b",
+            }}
+          >
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              {localTracks.videoError && (
+                <p className="text-sm text-amber-900">
+                  {localTracks.videoError}
+                </p>
+              )}
+              {localTracks.screenShareError && (
+                <p className="text-sm text-amber-900">
+                  {localTracks.screenShareError}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Main Content Area */}
-      <div 
+      <div
         ref={videoContainerRef}
         className="flex-1 relative overflow-hidden"
         style={isFullscreen ? { backgroundColor: "#F2EFE7" } : undefined}
@@ -220,7 +250,10 @@ export function MediaSession({
             {/* Minimized Videos at Top */}
             <div className="absolute top-4 left-4 right-4 z-20 flex gap-3">
               {hasRemoteVideo && (
-                <div className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2" style={{ borderColor: "#48A6A7" }}>
+                <div
+                  className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2"
+                  style={{ borderColor: "#48A6A7" }}
+                >
                   <VideoRenderer
                     localTracks={localTracks}
                     remoteTracks={remoteTracks}
@@ -235,7 +268,10 @@ export function MediaSession({
                 </div>
               )}
               {hasLocalVideo && (
-                <div className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2" style={{ borderColor: "#9ACBD0" }}>
+                <div
+                  className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2"
+                  style={{ borderColor: "#9ACBD0" }}
+                >
                   <VideoRenderer
                     localTracks={localTracks}
                     remoteTracks={remoteTracks}
@@ -295,7 +331,10 @@ export function MediaSession({
             </div>
 
             {/* Small Local Video (bottom-right corner) */}
-            <div className="absolute bottom-6 right-6 w-64 h-48 rounded-lg overflow-hidden shadow-2xl border-3 z-10" style={{ borderColor: "#48A6A7" }}>
+            <div
+              className="absolute bottom-6 right-6 w-64 h-48 rounded-lg overflow-hidden shadow-2xl border-3 z-10"
+              style={{ borderColor: "#48A6A7" }}
+            >
               <VideoRenderer
                 localTracks={localTracks}
                 remoteTracks={remoteTracks}
@@ -313,7 +352,10 @@ export function MediaSession({
       </div>
 
       {/* Bottom Control Bar */}
-      <div className="px-6 py-4 border-t" style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}>
+      <div
+        className="px-6 py-4 border-t"
+        style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}
+      >
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           {/* Peer Status */}
           <div className="text-sm" style={{ color: "#006A71" }}>
@@ -323,7 +365,10 @@ export function MediaSession({
                 {role === "teacher" ? "Student" : "Teacher"} joined
               </span>
             ) : (
-              <span className="flex items-center gap-2" style={{ color: "#9ACBD0" }}>
+              <span
+                className="flex items-center gap-2"
+                style={{ color: "#9ACBD0" }}
+              >
                 <div className="w-2 h-2 rounded-full bg-gray-400"></div>
                 Waiting for {role === "teacher" ? "student" : "teacher"}...
               </span>
@@ -340,11 +385,15 @@ export function MediaSession({
                 !isConnected
                   ? "bg-gray-200 cursor-not-allowed"
                   : isAudioMuted
-                  ? "bg-red-500 hover:bg-red-600"
-                  : "hover:bg-gray-100"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "hover:bg-gray-100"
               }`}
               style={{
-                backgroundColor: !isConnected ? "#e5e7eb" : isAudioMuted ? "#ef4444" : "#48A6A7",
+                backgroundColor: !isConnected
+                  ? "#e5e7eb"
+                  : isAudioMuted
+                    ? "#ef4444"
+                    : "#48A6A7",
                 color: isAudioMuted || !isConnected ? "#fff" : "#fff",
               }}
               title={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
@@ -364,12 +413,20 @@ export function MediaSession({
                 !isConnected || !hasLocalVideo
                   ? "bg-gray-200 cursor-not-allowed"
                   : isVideoOff
-                  ? "bg-red-500 hover:bg-red-600"
-                  : "hover:bg-gray-100"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "hover:bg-gray-100"
               }`}
               style={{
-                backgroundColor: !isConnected || !hasLocalVideo ? "#e5e7eb" : isVideoOff ? "#ef4444" : "#48A6A7",
-                color: isVideoOff || !isConnected || !hasLocalVideo ? "#fff" : "#fff",
+                backgroundColor:
+                  !isConnected || !hasLocalVideo
+                    ? "#e5e7eb"
+                    : isVideoOff
+                      ? "#ef4444"
+                      : "#48A6A7",
+                color:
+                  isVideoOff || !isConnected || !hasLocalVideo
+                    ? "#fff"
+                    : "#fff",
               }}
               title={isVideoOff ? "Turn on camera" : "Turn off camera"}
             >
@@ -388,11 +445,15 @@ export function MediaSession({
                 !isConnected
                   ? "bg-gray-200 cursor-not-allowed"
                   : isScreenSharing
-                  ? "bg-red-500 hover:bg-red-600"
-                  : "hover:bg-gray-100"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "hover:bg-gray-100"
               }`}
               style={{
-                backgroundColor: !isConnected ? "#e5e7eb" : isScreenSharing ? "#ef4444" : "#48A6A7",
+                backgroundColor: !isConnected
+                  ? "#e5e7eb"
+                  : isScreenSharing
+                    ? "#ef4444"
+                    : "#48A6A7",
                 color: isScreenSharing || !isConnected ? "#fff" : "#fff",
               }}
               title={isScreenSharing ? "Stop sharing" : "Share screen"}

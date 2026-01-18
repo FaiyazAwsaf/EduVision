@@ -196,7 +196,7 @@ const STORAGE_KEY_STUDENT_ROOM = "tutoring_student_room";
 function saveStudentSession(
   joinData: SessionJoinResponse,
   user: TutoringUser,
-  roomId: string
+  roomId: string,
 ) {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY_STUDENT_SESSION, JSON.stringify(joinData));
@@ -218,7 +218,7 @@ function loadStudentSession(currentRoomId: string): {
       "[Session Restore] Current room:",
       currentRoomId,
       "Saved room:",
-      savedRoom
+      savedRoom,
     );
     // Only restore if it's the same room
     if (savedRoom !== currentRoomId) {
