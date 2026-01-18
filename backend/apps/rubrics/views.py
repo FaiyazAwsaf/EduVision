@@ -1,10 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
 from .models import Rubric, RubricVersion
 from .serializers import (
     RubricSerializer, RubricListSerializer,
@@ -51,6 +52,12 @@ class RubricViewSet(viewsets.ModelViewSet):
         elif self.action == 'publish':
             return RubricPublishSerializer
         return RubricSerializer
+    
+    def perform_create(self, serializer):
+        """
+        Save the rubric. Ownership (created_by) is handled in the serializer.
+        """
+        serializer.save()
     
     def create(self, request, *args, **kwargs):
         """
