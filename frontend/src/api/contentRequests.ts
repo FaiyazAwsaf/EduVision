@@ -1,0 +1,640 @@
+/**
+ * Content Request API Service
+ *
+ * Centralized API layer for all content request operations.
+ * Handles HTTP communication, error handling, and response parsing.
+ *
+ * Design principles:
+ * - No UI logic here
+ * - Throw errors for callers to handle
+ * - Type-safe responses
+ */
+
+import { API_ENDPOINTS } from "@/config/api";
+import type {
+  CreateContentRequestPayload,
+  ContentRequest,
+  GeneratedContent,
+  ApiError,
+  OutputFormat,
+} from "@/types/content";
+
+/**
+ * Create a new content generation request
+ *
+ * @param payload - Request creation data
+ * @returns Created content request with assigned ID
+ * @throws Error if request fails
+ */
+export async function createContentRequest(
+  payload: CreateContentRequestPayload
+): Promise<ContentRequest> {
+  const response = await fetch(API_ENDPOINTS.CONTENT_REQUESTS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to create content request",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get status and details of a content request
+ *
+ * @param requestId - UUID of the content request
+ * @returns Current request status and metadata
+ * @throws Error if request not found or network fails
+ */
+export async function getRequestStatus(
+  requestId: string
+): Promise<ContentRequest> {
+  const response = await fetch(
+    API_ENDPOINTS.CONTENT_REQUEST_DETAIL(requestId),
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Content request not found");
+    }
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to fetch request status",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get generated content for a completed request
+ *
+ * For TEXT format: Returns JSON with content_text
+ * For PDF/WORKSHEET: Use downloadGeneratedContent instead
+ *
+ * @param requestId - UUID of the content request
+ * @param format - Output format (defaults to 'json')
+ * @returns Generated content data
+ * @throws Error if content not available or request fails
+ */
+export async function getGeneratedContent(
+  requestId: string,
+  format: "json" | "text" = "json"
+): Promise<GeneratedContent> {
+  const url = `${API_ENDPOINTS.GENERATED_CONTENT(requestId)}?format=${format}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      const error: ApiError = await response.json().catch(() => ({
+        error: "Content not yet generated",
+      }));
+      throw new Error(error.error || error.detail || "Content not available");
+    }
+    throw new Error("Failed to fetch generated content");
+  }
+
+  return response.json();
+}
+
+/**
+ * Download generated content as a file (PDF or WORKSHEET)
+ *
+ * Triggers browser download with appropriate filename.
+ *
+ * @param requestId - UUID of the content request
+ * @param format - Output format ('pdf' or 'worksheet')
+ * @throws Error if download fails
+ */
+export async function downloadGeneratedContent(
+  requestId: string,
+  format: Extract<OutputFormat, OutputFormat.PDF | OutputFormat.WORKSHEET>
+): Promise<void> {
+  const formatParam = format.toLowerCase();
+  const url = `${API_ENDPOINTS.GENERATED_CONTENT(
+    requestId
+  )}download/?format=${formatParam}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    // Try to get error details from response
+    let errorMessage = "Failed to download content";
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorData.detail || errorMessage;
+    } catch {
+      // Response is not JSON, use default message
+      if (response.status === 404) {
+        errorMessage = "Content not available for download";
+      }
+    }
+    throw new Error(`${errorMessage} (Status: ${response.status})`);
+  }
+
+  // Extract filename from Content-Disposition header
+  const contentDisposition = response.headers.get("Content-Disposition");
+  let filename = `content_${requestId.slice(0, 8)}.pdf`;
+
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+    if (filenameMatch) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  // Create blob and trigger download
+  const blob = await response.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+}
+
+/**
+ * List all content requests (for future use)
+ *
+ * @returns Array of content requests
+ */
+export async function listContentRequests(): Promise<ContentRequest[]> {
+  const response = await fetch(API_ENDPOINTS.CONTENT_REQUESTS, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch content requests");
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// Phase 3: Feedback API Functions
+// ============================================================================
+
+import type { Feedback, FeedbackPayload } from "@/types/content";
+
+/**
+ * Submit feedback for generated content
+ *
+ * @param contentId - UUID of the generated content
+ * @param feedback - Feedback data
+ * @returns Created feedback record
+ * @throws Error if submission fails or feedback already exists
+ */
+export async function submitFeedback(
+  contentId: string,
+  feedback: FeedbackPayload
+): Promise<Feedback> {
+  const response = await fetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}generated-content/${contentId}/feedback/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(feedback),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData: ApiError = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || errorData.detail || "Failed to submit feedback"
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Get existing feedback for generated content
+ *
+ * @param contentId - UUID of the generated content
+ * @returns Feedback if it exists, null if not found
+ * @throws Error if request fails (other than 404)
+ */
+export async function getFeedback(contentId: string): Promise<Feedback | null> {
+  const response = await fetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}generated-content/${contentId}/feedback/`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null; // No feedback exists yet
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to check feedback status");
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// Phase 4: Learning Context API Functions
+// ============================================================================
+
+import type { LearningContext, LearningContextPayload } from "@/types/content";
+
+/**
+ * Submit learning context for a content request
+ *
+ * Creates or updates learning context to personalize AI generation.
+ * Should be called AFTER creating the content request but BEFORE generation starts.
+ *
+ * @param requestId - UUID of the content request
+ * @param context - Learning context data
+ * @returns Created/updated learning context record
+ * @throws Error if submission fails or request not found
+ */
+export async function submitLearningContext(
+  requestId: string,
+  context: LearningContextPayload
+): Promise<LearningContext> {
+  const response = await fetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(context),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData: ApiError = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || errorData.detail || "Failed to submit learning context"
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Get learning context for a content request
+ *
+ * @param requestId - UUID of the content request
+ * @returns Learning context if it exists, null if not found
+ * @throws Error if request fails (other than 404)
+ */
+export async function getLearningContext(
+  requestId: string
+): Promise<LearningContext | null> {
+  const response = await fetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null; // No context exists yet
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to get learning context");
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// Phase 5: Study Plan API Functions (Manual Mode Only)
+// ============================================================================
+
+import type {
+  StudyPlan,
+  StudyPlanItem,
+  CreateStudyPlanPayload,
+  CreateStudyPlanItemPayload,
+  UpdateStudyPlanItemPayload,
+} from "@/types/content";
+
+/**
+ * Create a new study plan
+ *
+ * Phase 5: Always creates in manual mode with auto_detect_weakness=false
+ *
+ * @param payload - Study plan creation data
+ * @returns Created study plan with assigned ID
+ * @throws Error if request fails
+ */
+export async function createStudyPlan(
+  payload: CreateStudyPlanPayload
+): Promise<StudyPlan> {
+  const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to create study plan",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * List all study plans
+ *
+ * [FUTURE] When auth is implemented, will filter by current user
+ *
+ * @returns Array of study plans with their items
+ * @throws Error if request fails
+ */
+export async function listStudyPlans(): Promise<StudyPlan[]> {
+  const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch study plans");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific study plan with all its items
+ *
+ * @param planId - UUID of the study plan
+ * @returns Study plan with all items
+ * @throws Error if request fails or plan not found
+ */
+export async function getStudyPlan(planId: string): Promise<StudyPlan> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Study plan not found");
+    }
+    throw new Error("Failed to fetch study plan");
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a study plan and all its items
+ *
+ * @param planId - UUID of the study plan
+ * @throws Error if request fails
+ */
+export async function deleteStudyPlan(planId: string): Promise<void> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete study plan");
+  }
+}
+
+/**
+ * Add an item to a study plan
+ *
+ * Phase 5: All items created with source='manual'
+ *
+ * @param planId - UUID of the study plan
+ * @param payload - Item creation data
+ * @returns Created study plan item
+ * @throws Error if request fails
+ */
+export async function addStudyPlanItem(
+  planId: string,
+  payload: CreateStudyPlanItemPayload
+): Promise<StudyPlanItem> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/items/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to add study plan item",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * List study plan items
+ *
+ * @param studyPlanId - Optional: filter items by study plan
+ * @returns Array of study plan items
+ * @throws Error if request fails
+ */
+export async function listStudyPlanItems(
+  studyPlanId?: string
+): Promise<StudyPlanItem[]> {
+  const url = studyPlanId
+    ? `${API_ENDPOINTS.STUDY_PLAN_ITEMS}?study_plan_id=${studyPlanId}`
+    : API_ENDPOINTS.STUDY_PLAN_ITEMS;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch study plan items");
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific study plan item
+ *
+ * @param itemId - UUID of the study plan item
+ * @returns Study plan item details
+ * @throws Error if request fails
+ */
+export async function getStudyPlanItem(itemId: string): Promise<StudyPlanItem> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Study plan item not found");
+    }
+    throw new Error("Failed to fetch study plan item");
+  }
+
+  return response.json();
+}
+
+/**
+ * Update a study plan item
+ *
+ * Commonly used to update status, priority, scheduled_date, or link content request
+ *
+ * @param itemId - UUID of the study plan item
+ * @param payload - Fields to update
+ * @returns Updated study plan item
+ * @throws Error if request fails
+ */
+export async function updateStudyPlanItem(
+  itemId: string,
+  payload: UpdateStudyPlanItemPayload
+): Promise<StudyPlanItem> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to update study plan item",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a study plan item
+ *
+ * @param itemId - UUID of the study plan item
+ * @throws Error if request fails
+ */
+export async function deleteStudyPlanItem(itemId: string): Promise<void> {
+  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete study plan item");
+  }
+}
+
+/**
+ * Mark a study plan item as completed
+ *
+ * Convenience function that calls the complete endpoint
+ *
+ * @param itemId - UUID of the study plan item
+ * @returns Updated study plan item
+ * @throws Error if request fails
+ */
+export async function markStudyPlanItemComplete(
+  itemId: string
+): Promise<StudyPlanItem> {
+  const response = await fetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/complete/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to mark item as complete");
+  }
+
+  return response.json();
+}
+
+/**
+ * Link a content request to a study plan item
+ *
+ * @param itemId - UUID of the study plan item
+ * @param requestId - UUID of the content request to link
+ * @returns Updated study plan item
+ * @throws Error if request fails
+ */
+export async function linkRequestToStudyPlanItem(
+  itemId: string,
+  requestId: string
+): Promise<StudyPlanItem> {
+  const response = await fetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/link-request/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ request_id: requestId }),
+    }
+  );
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to link content request",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}

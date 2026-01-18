@@ -1,6 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
@@ -10,37 +12,36 @@ from .serializers import (
     RubricVersionSerializer, RubricPublishSerializer
 )
 from .services import apply_rubric
+import uuid
 
 
+# Default user ID for when authentication is not implemented
+DEFAULT_USER_ID = uuid.UUID('00000000-0000-0000-0000-000000000001')
+
+
+@method_decorator(csrf_exempt, name='dispatch')
 class RubricViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing Rubrics.
     
     Endpoints:
     - POST /api/rubrics/ → create draft rubric
-    - GET /api/rubrics/ → list rubrics created by current user
+    - GET /api/rubrics/ → list rubrics (no authentication required)
     - GET /api/rubrics/{id}/ → retrieve rubric
     - PUT /api/rubrics/{id}/ → update rubric (only if state=draft)
     - PATCH /api/rubrics/{id}/ → partial update rubric (only if state=draft)
     - DELETE /api/rubrics/{id}/ → delete rubric (only if state=draft)
+    
+    Note: Authentication is not required. All rubrics are accessible to everyone.
     """
     
     permission_classes = [AllowAny]
     
     def get_queryset(self):
         """
-        Filter rubrics to only show those created by the current user.
+        Return all rubrics (no user filtering since authentication is not implemented).
         """
-        user = self.request.user
-        
-        # Convert user ID to UUID format if needed
-        if hasattr(user, 'id'):
-            user_id = user.id
-        else:
-            # For testing or when user ID is not available
-            return Rubric.objects.none()
-        
-        return Rubric.objects.filter(created_by=user_id).select_related().prefetch_related('versions')
+        return Rubric.objects.all().select_related().prefetch_related('versions')
     
     def get_serializer_class(self):
         """
@@ -64,7 +65,8 @@ class RubricViewSet(viewsets.ModelViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        # Use default user ID since authentication is not implemented
+        serializer.save(created_by=DEFAULT_USER_ID)
         headers = self.get_success_headers(serializer.data)
         return Response(
             serializer.data,
@@ -78,13 +80,6 @@ class RubricViewSet(viewsets.ModelViewSet):
         """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        
-        # Check ownership - compare UUID's integer value with user ID
-        if instance.created_by.int != request.user.id:
-            return Response(
-                {"detail": "You do not have permission to edit this rubric."},
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         # Check if rubric is editable
         if instance.state != Rubric.STATE_DRAFT:
@@ -104,13 +99,6 @@ class RubricViewSet(viewsets.ModelViewSet):
         Delete a rubric. Only draft rubrics can be deleted.
         """
         instance = self.get_object()
-        
-        # Check ownership - compare UUID's integer value with user ID
-        if instance.created_by.int != request.user.id:
-            return Response(
-                {"detail": "You do not have permission to delete this rubric."},
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         # Only allow deletion of draft rubrics
         if instance.state != Rubric.STATE_DRAFT:
@@ -135,13 +123,6 @@ class RubricViewSet(viewsets.ModelViewSet):
         - Prevent further edits after publishing
         """
         instance = self.get_object()
-        
-        # Check ownership - compare UUID's integer value with user ID
-        if instance.created_by.int != request.user.id:
-            return Response(
-                {"detail": "You do not have permission to publish this rubric."},
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         # Check if rubric is in draft state
         if instance.state != Rubric.STATE_DRAFT:
@@ -181,13 +162,6 @@ class RubricViewSet(viewsets.ModelViewSet):
         Archive a published rubric.
         """
         instance = self.get_object()
-        
-        # Check ownership - compare UUID's integer value with user ID
-        if instance.created_by.int != request.user.id:
-            return Response(
-                {"detail": "You do not have permission to archive this rubric."},
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         # Only published rubrics can be archived
         if instance.state != Rubric.STATE_PUBLISHED:
