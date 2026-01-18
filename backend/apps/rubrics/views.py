@@ -1,45 +1,30 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.shortcuts import get_object_or_404
-from django.contrib.auth import get_user_model
 from .models import Rubric, RubricVersion
 from .serializers import (
     RubricSerializer, RubricListSerializer,
     RubricVersionSerializer, RubricPublishSerializer
 )
 from .services import apply_rubric
-import uuid
 
 
-# Default user ID for when authentication is not implemented
-DEFAULT_USER_ID = uuid.UUID('00000000-0000-0000-0000-000000000001')
-
-
-@method_decorator(csrf_exempt, name='dispatch')
 class RubricViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing Rubrics.
     
     Endpoints:
     - POST /api/rubrics/ → create draft rubric
-    - GET /api/rubrics/ → list rubrics (no authentication required)
+    - GET /api/rubrics/ → list rubrics
     - GET /api/rubrics/{id}/ → retrieve rubric
     - PUT /api/rubrics/{id}/ → update rubric (only if state=draft)
     - PATCH /api/rubrics/{id}/ → partial update rubric (only if state=draft)
     - DELETE /api/rubrics/{id}/ → delete rubric (only if state=draft)
-    
-    Note: Authentication is not required. All rubrics are accessible to everyone.
     """
-    
-    permission_classes = [AllowAny]
     
     def get_queryset(self):
         """
-        Return all rubrics (no user filtering since authentication is not implemented).
+        Return all rubrics.
         """
         return Rubric.objects.all().select_related().prefetch_related('versions')
     
@@ -59,20 +44,7 @@ class RubricViewSet(viewsets.ModelViewSet):
         """
         serializer.save()
     
-    def create(self, request, *args, **kwargs):
-        """
-        Create a new draft rubric.
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        # Use default user ID since authentication is not implemented
-        serializer.save(created_by=DEFAULT_USER_ID)
-        headers = self.get_success_headers(serializer.data)
-        return Response(
-            serializer.data,
-            status=status.HTTP_201_CREATED,
-            headers=headers
-        )
+
     
     def update(self, request, *args, **kwargs):
         """
@@ -187,13 +159,12 @@ class RubricViewSet(viewsets.ModelViewSet):
         serializer = RubricVersionSerializer(versions, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['post'], permission_classes=[])
+    @action(detail=False, methods=['post'])
     def test(self, request):
         """
         Test a rubric against a sample answer without saving.
         
         This endpoint allows testing evaluation rules before creating/publishing a rubric.
-        No authentication required for testing.
         
         Request body:
         {

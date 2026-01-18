@@ -1,25 +1,16 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
-from django.contrib.auth import get_user_model
 from apps.rubrics.models import Rubric
 import uuid
-
-User = get_user_model()
 
 
 class RubricAPITestCase(TestCase):
     """Test cases for Rubric API endpoints."""
     
     def setUp(self):
-        """Set up test client and user."""
+        """Set up test client."""
         self.client = APIClient()
-        # Create a test user
-        self.user = User.objects.create_user(
-            username='testuser',
-            password='testpass123'
-        )
-        self.client.force_authenticate(user=self.user)
         
         # Sample rubric data
         self.rubric_data = {
@@ -53,7 +44,7 @@ class RubricAPITestCase(TestCase):
         self.assertEqual(response.data['title'], 'Test Rubric')
     
     def test_list_rubrics(self):
-        """Test listing rubrics filtered by current user."""
+        """Test listing rubrics."""
         # Create a rubric via API
         self.client.post('/api/rubrics/', self.rubric_data, format='json')
         
@@ -154,7 +145,6 @@ class RubricAPITestCase(TestCase):
             reference_answer='Test answer',
             total_marks=10.0,
             evaluation_rules=[],
-            created_by=self.user.id,
             state='draft'
         )
         

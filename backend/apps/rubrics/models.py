@@ -69,6 +69,8 @@ class Rubric(models.Model):
     
     # Audit fields
     created_by = models.UUIDField(
+        null=True,
+        blank=True,
         db_index=True,
         help_text="UUID of the user who created this rubric"
     )
