@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EduVision - AI Content Generator",
+  title: "EduVision",
   description: "Generate educational content powered by AI",
 };
 
