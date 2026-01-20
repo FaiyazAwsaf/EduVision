@@ -4,7 +4,8 @@
  * Provides functions to interact with the rubrics API endpoints.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = `${API_BASE_URL}/api`;
 
 // Types
 type RuleType = "keyword" | "numeric" | "stepwise";
@@ -243,8 +244,8 @@ export async function testRubric(
     // Testing a rubric configuration directly
     url = `${API_URL}/rubrics/test/`;
     body = {
-      ...rubricOrId,
-      sample_answer: sampleAnswer,
+      rubric: rubricOrId,
+      answer_text: sampleAnswer,
     };
   }
 
