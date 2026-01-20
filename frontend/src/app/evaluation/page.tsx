@@ -15,6 +15,7 @@ import {
   Edit3,
   Clock,
   CheckCircle,
+  Library,
 } from "lucide-react";
 import evaluationAPI, {
   QuestionPaper,
@@ -26,8 +27,9 @@ import EvaluationReportView from "@/components/evaluation/EvaluationReportView";
 import QuestionPaperForm from "@/components/evaluation/QuestionPaperForm";
 import PDFUploadForm from "@/components/evaluation/PDFUploadForm";
 import ScriptListItem from "@/components/evaluation/ScriptListItem";
+import RubricsLibrary from "@/components/evaluation/RubricsLibrary";
 
-type Tab = "upload" | "scripts" | "papers" | "new-paper";
+type Tab = "upload" | "scripts" | "papers" | "rubrics" | "new-paper";
 type PaperCreationMode = "manual" | "pdf";
 
 export default function EvaluationPage() {
@@ -37,7 +39,7 @@ export default function EvaluationPage() {
   const [questionPapers, setQuestionPapers] = useState<QuestionPaper[]>([]);
   const [scripts, setScripts] = useState<AnswerScript[]>([]);
   const [selectedReport, setSelectedReport] = useState<EvaluationReport | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export default function EvaluationPage() {
         await loadData();
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to delete script"
+          err instanceof Error ? err.message : "Failed to delete script",
         );
       }
     }
@@ -114,6 +116,7 @@ export default function EvaluationPage() {
     { id: "upload" as Tab, label: "Upload Script", icon: Upload },
     { id: "scripts" as Tab, label: "All Scripts", icon: FileText },
     { id: "papers" as Tab, label: "Question Papers", icon: ClipboardList },
+    { id: "rubrics" as Tab, label: "Rubrics", icon: Library },
     { id: "new-paper" as Tab, label: "New Paper", icon: Plus },
   ];
 
@@ -345,6 +348,13 @@ export default function EvaluationPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Rubrics Tab */}
+            {activeTab === "rubrics" && (
+              <div>
+                <RubricsLibrary />
               </div>
             )}
 

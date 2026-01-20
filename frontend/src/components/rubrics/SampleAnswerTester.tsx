@@ -37,17 +37,17 @@ export default function SampleAnswerTester({
   const [error, setError] = useState<string | null>(null);
 
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-green-600 dark:text-green-400";
-    if (percentage >= 60) return "text-blue-600 dark:text-blue-400";
-    if (percentage >= 40) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
+    if (percentage >= 80) return "text-[#006A71]";
+    if (percentage >= 60) return "text-[#48A6A7]";
+    if (percentage >= 40) return "text-[#9ACBD0]";
+    return "text-red-600";
   };
 
   const getScoreBgColor = (percentage: number) => {
-    if (percentage >= 80) return "bg-green-100 dark:bg-green-900/30";
-    if (percentage >= 60) return "bg-blue-100 dark:bg-blue-900/30";
-    if (percentage >= 40) return "bg-yellow-100 dark:bg-yellow-900/30";
-    return "bg-red-100 dark:bg-red-900/30";
+    if (percentage >= 80) return "bg-[#006A71]/10";
+    if (percentage >= 60) return "bg-[#48A6A7]/10";
+    if (percentage >= 40) return "bg-[#9ACBD0]/20";
+    return "bg-red-100";
   };
 
   const handleTestAnswer = async () => {
@@ -66,7 +66,7 @@ export default function SampleAnswerTester({
           evaluation_rules: evaluationRules,
           total_marks: totalMarks,
         },
-        sampleAnswer
+        sampleAnswer,
       );
 
       setTestResult(result);
@@ -90,19 +90,20 @@ export default function SampleAnswerTester({
   return (
     <div className="space-y-6">
       {/* Input Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+      <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+        <h2 className="text-xl font-semibold text-[#006A71] mb-4">
           Test Sample Answer
         </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Enter a sample student answer to see how your rubric would evaluate it.
+        <p className="text-sm text-[#48A6A7] mb-4">
+          Enter a sample student answer to see how your rubric would evaluate
+          it.
         </p>
 
         <div className="space-y-4">
           <div>
             <label
               htmlFor="sampleAnswer"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="block text-sm font-medium text-[#006A71] mb-2"
             >
               Sample Answer
             </label>
@@ -110,7 +111,7 @@ export default function SampleAnswerTester({
               id="sampleAnswer"
               value={sampleAnswer}
               onChange={(e) => setSampleAnswer(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71]"
               rows={8}
               placeholder="Enter the student's answer here..."
             />
@@ -121,11 +122,15 @@ export default function SampleAnswerTester({
               type="button"
               onClick={handleTestAnswer}
               disabled={isLoading || !sampleAnswer.trim()}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -144,7 +149,12 @@ export default function SampleAnswerTester({
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -160,7 +170,7 @@ export default function SampleAnswerTester({
               <button
                 type="button"
                 onClick={handleClear}
-                className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="px-6 py-2 border border-[#9ACBD0] text-[#006A71] rounded-lg hover:bg-[#F2EFE7] transition-colors"
               >
                 Clear
               </button>
@@ -171,8 +181,8 @@ export default function SampleAnswerTester({
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
@@ -180,15 +190,15 @@ export default function SampleAnswerTester({
       {testResult && (
         <div className="space-y-6">
           {/* Score Summary Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+            <h2 className="text-xl font-semibold text-[#006A71] mb-6">
               Test Results
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left: Info */}
               <div>
-                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="space-y-2 text-sm text-[#48A6A7]">
                   <p>
                     <span className="font-medium">Total Rules:</span>{" "}
                     {testResult.rule_results.length}
@@ -207,24 +217,27 @@ export default function SampleAnswerTester({
 
               {/* Right: Score */}
               <div className="flex flex-col items-center justify-center">
-                <div className={`text-5xl font-bold ${getScoreColor(percentage)}`}>
+                <div
+                  className={`text-5xl font-bold ${getScoreColor(percentage)}`}
+                >
                   {percentage.toFixed(1)}%
                 </div>
-                <div className="mt-2 text-lg text-gray-600 dark:text-gray-400">
-                  {testResult.total_score.toFixed(1)} / {testResult.max_score} marks
+                <div className="mt-2 text-lg text-[#48A6A7]">
+                  {testResult.total_score.toFixed(1)} / {testResult.max_score}{" "}
+                  marks
                 </div>
                 <div
                   className={`mt-4 px-4 py-1 rounded-full text-sm font-medium ${getScoreBgColor(
-                    percentage
+                    percentage,
                   )} ${getScoreColor(percentage)}`}
                 >
                   {percentage >= 80
                     ? "Excellent"
                     : percentage >= 60
-                    ? "Good"
-                    : percentage >= 40
-                    ? "Satisfactory"
-                    : "Needs Improvement"}
+                      ? "Good"
+                      : percentage >= 40
+                        ? "Satisfactory"
+                        : "Needs Improvement"}
                 </div>
               </div>
             </div>
@@ -232,34 +245,34 @@ export default function SampleAnswerTester({
 
           {/* Rule-by-Rule Results */}
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-[#006A71]">
               Rule-by-Rule Analysis
             </h2>
 
             {testResult.rule_results.map((result, index) => (
               <div
                 key={result.rule_id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
+                className="bg-white rounded-xl border border-[#9ACBD0] overflow-hidden"
               >
                 {/* Rule Header */}
-                <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-between items-center">
+                <div className="bg-[#F2EFE7] px-6 py-4 flex justify-between items-center">
                   <div>
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <span className="text-sm font-medium text-[#48A6A7]">
                       Rule {index + 1}
                     </span>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white capitalize">
+                    <h3 className="text-lg font-medium text-[#006A71] capitalize">
                       {result.rule_type} Evaluation
                     </h3>
                   </div>
                   <div className="text-right">
                     <div
                       className={`text-2xl font-bold ${getScoreColor(
-                        (result.score_awarded / result.max_marks) * 100
+                        (result.score_awarded / result.max_marks) * 100,
                       )}`}
                     >
                       {result.score_awarded.toFixed(1)} / {result.max_marks}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">marks</div>
+                    <div className="text-xs text-[#48A6A7]">marks</div>
                   </div>
                 </div>
 
@@ -270,8 +283,8 @@ export default function SampleAnswerTester({
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium ${
                         result.matched
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                          ? "bg-[#006A71]/10 text-[#006A71]"
+                          : "bg-red-100 text-red-800"
                       }`}
                     >
                       {result.matched ? "✓ Matched" : "✗ Not Matched"}
@@ -281,11 +294,11 @@ export default function SampleAnswerTester({
                   {/* Feedback */}
                   <div className="flex items-start gap-4">
                     <div className="shrink-0 w-20">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <span className="text-sm font-medium text-[#006A71]">
                         Feedback
                       </span>
                     </div>
-                    <div className="flex-1 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex-1 text-sm text-[#48A6A7]">
                       {result.feedback_message || "No feedback provided"}
                     </div>
                   </div>
@@ -296,12 +309,12 @@ export default function SampleAnswerTester({
 
           {/* Overall Feedback */}
           {testResult.feedback && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+              <h2 className="text-xl font-semibold text-[#006A71] mb-4">
                 Overall Feedback
               </h2>
-              <div className="prose dark:prose-invert max-w-none">
-                <pre className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-sans">
+              <div className="prose max-w-none">
+                <pre className="text-sm text-[#48A6A7] whitespace-pre-wrap font-sans">
                   {testResult.feedback}
                 </pre>
               </div>

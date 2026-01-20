@@ -54,7 +54,7 @@ export interface ApiError {
 }
 
 // API Base URL for tutoring
-const TUTORING_API_URL = `${API_BASE_URL}/api/tutoring`;
+const TUTORING_API_URL = `${API_BASE_URL}/tutoring`;
 
 // Utility to get user ID from localStorage
 export function getCurrentUserId(): string | null {

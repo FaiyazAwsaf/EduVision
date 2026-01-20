@@ -27,9 +27,7 @@ export default function Home() {
               <div className="w-10 h-10 bg-[#006A71] rounded-lg flex items-center justify-center">
                 <Brain className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-[#006A71]">
-                EduVision AI
-              </h1>
+              <h1 className="text-2xl font-bold text-[#006A71]">EduVision</h1>
             </div>
             <nav className="flex items-center gap-4">
               <Link
@@ -48,7 +46,7 @@ export default function Home() {
         <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-[#006A71] mb-4">
-              AI-Powered Education Platform
+              Education Platform
             </h2>
             <p className="text-lg text-[#48A6A7] max-w-2xl mx-auto">
               Empowering teachers and students with intelligent tools for
@@ -58,26 +56,6 @@ export default function Home() {
 
           {/* Feature Cards */}
           <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* Content Generation Card */}
-            <Link href="/content" className="group">
-              <div className="bg-white rounded-xl border border-[#9ACBD0] p-8 h-full transition-all duration-200 hover:border-[#48A6A7] hover:shadow-lg group-hover:-translate-y-1">
-                <div className="w-14 h-14 bg-[#F2EFE7] rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#9ACBD0]/20 transition-colors">
-                  <Sparkles className="w-7 h-7 text-[#006A71]" />
-                </div>
-                <h3 className="text-xl font-semibold text-[#006A71] mb-3">
-                  AI Content Generator
-                </h3>
-                <p className="text-[#48A6A7] text-sm leading-relaxed mb-4">
-                  Generate personalized educational content including topic
-                  summaries, concept explanations, formula sheets, and study
-                  plans powered by AI.
-                </p>
-                <span className="inline-flex items-center text-sm font-medium text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
-                  Start generating →
-                </span>
-              </div>
-            </Link>
-
             {/* Live Tutoring Card */}
             <Link href="/teacher/dashboard" className="group">
               <div className="bg-white rounded-xl border border-[#9ACBD0] p-8 h-full transition-all duration-200 hover:border-[#48A6A7] hover:shadow-lg group-hover:-translate-y-1">
@@ -157,6 +135,26 @@ export default function Home() {
                 </span>
               </div>
             </Link>
+
+            {/* Content Generation Card */}
+            <Link href="/content" className="group">
+              <div className="bg-white rounded-xl border border-[#9ACBD0] p-8 h-full transition-all duration-200 hover:border-[#48A6A7] hover:shadow-lg group-hover:-translate-y-1">
+                <div className="w-14 h-14 bg-[#F2EFE7] rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#9ACBD0]/20 transition-colors">
+                  <Sparkles className="w-7 h-7 text-[#006A71]" />
+                </div>
+                <h3 className="text-xl font-semibold text-[#006A71] mb-3">
+                  AI Content Generator
+                </h3>
+                <p className="text-[#48A6A7] text-sm leading-relaxed mb-4">
+                  Generate personalized educational content including topic
+                  summaries, concept explanations, formula sheets, and study
+                  plans powered by AI.
+                </p>
+                <span className="inline-flex items-center text-sm font-medium text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
+                  Start generating →
+                </span>
+              </div>
+            </Link>
           </div>
 
           {/* Additional Quick Links */}
@@ -200,7 +198,7 @@ export default function Home() {
       <footer className="border-t border-[#9ACBD0] bg-white">
         <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-[#48A6A7]">
-            EduVision AI Platform - Intelligent Education Tools
+            EduVision Platform - Intelligent Education Tools
           </p>
         </div>
       </footer>

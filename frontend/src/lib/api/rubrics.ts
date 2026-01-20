@@ -1,47 +1,42 @@
 /**
- * API client for Rubric Builder operations
+ * Rubrics API Client
+ *
+ * Provides functions to interact with the rubrics API endpoints.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 // Types
-export interface RubricCreateData {
-  title: string;
-  subject: string;
-  question_text: string;
-  reference_answer: string;
-  total_marks: number;
-  evaluation_rules: EvaluationRule[];
-}
+type RuleType = "keyword" | "numeric" | "stepwise";
 
-export interface RubricUpdateData extends Partial<RubricCreateData> {}
-
-export interface EvaluationRule {
-  id: string;
-  type: "keyword" | "numeric" | "stepwise";
-  marks: number;
-  config: KeywordConfig | NumericConfig | StepwiseConfig;
-  feedback: {
-    on_success: string;
-    on_partial?: string;
-    on_failure: string;
-  };
-}
-
-export interface KeywordConfig {
+interface KeywordConfig {
   required_keywords: string[];
   scoring_mode: "proportional" | "all_or_nothing";
 }
 
-export interface NumericConfig {
+interface NumericConfig {
   expected_value: number;
   tolerance: number;
 }
 
-export interface StepwiseConfig {
+interface StepwiseConfig {
   step_description: string;
   expected_patterns: string[];
   allow_partial_credit: boolean;
+}
+
+interface RuleFeedback {
+  on_success: string;
+  on_partial?: string;
+  on_failure: string;
+}
+
+export interface EvaluationRule {
+  id: string;
+  type: RuleType;
+  marks: number;
+  config: KeywordConfig | NumericConfig | StepwiseConfig;
+  feedback: RuleFeedback;
 }
 
 export interface Rubric {
@@ -54,228 +49,219 @@ export interface Rubric {
   reference_answer: string;
   total_marks: number;
   evaluation_rules: EvaluationRule[];
-  created_by: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
-  versions?: RubricVersion[];
 }
 
-export interface RubricVersion {
+export interface RubricListItem {
   id: string;
-  version_number: number;
-  snapshot: Record<string, any>;
+  title: string;
+  subject: string;
+  state: string;
+  version: number;
+  total_marks: number;
   created_at: string;
+  updated_at: string;
+}
+
+export interface CreateRubricPayload {
+  title: string;
+  subject: string;
+  question_text: string;
+  reference_answer: string;
+  total_marks: number;
+  evaluation_rules: EvaluationRule[];
+}
+
+export interface TestRubricPayload {
+  sample_answer: string;
 }
 
 export interface TestRubricResult {
   total_score: number;
   max_score: number;
-  rule_results: RuleResult[];
+  percentage: number;
+  rule_results: Array<{
+    rule_id: string;
+    rule_type: string;
+    score_awarded: number;
+    max_marks: number;
+    matched: boolean;
+    feedback_message: string;
+  }>;
   feedback: string;
 }
 
-export interface RuleResult {
-  rule_id: string;
-  rule_type: string;
-  score_awarded: number;
-  max_marks: number;
-  matched: boolean;
-  feedback_message: string;
-}
-
-export interface ApiError {
-  detail?: string;
-  message?: string;
-  [key: string]: any;
-}
-
 /**
- * Base fetch wrapper with error handling
+ * Create a new rubric
  */
-async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  const defaultHeaders: HeadersInit = {
-    "Content-Type": "application/json",
-  };
-
-  const config: RequestInit = {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-  };
-
-  try {
-    const response = await fetch(url, config);
-
-    // Handle non-2xx responses
-    if (!response.ok) {
-      let errorData: ApiError = {};
-      try {
-        errorData = await response.json();
-      } catch {
-        // If JSON parsing fails, use status text
-        errorData = { message: response.statusText };
-      }
-
-      const errorMessage =
-        errorData.detail ||
-        errorData.message ||
-        `API request failed with status ${response.status}`;
-
-      throw new Error(errorMessage);
-    }
-
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return {} as T;
-    }
-
-    // Parse JSON response
-    const data = await response.json();
-    return data as T;
-  } catch (error) {
-    // Re-throw with more context if it's a network error
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Network error: Unable to reach the API");
-  }
-}
-
-/**
- * Create a new draft rubric
- */
-export async function createRubric(data: RubricCreateData): Promise<Rubric> {
-  return apiFetch<Rubric>("/rubrics/", {
+export async function createRubric(
+  payload: CreateRubricPayload,
+): Promise<Rubric> {
+  const response = await fetch(`${API_URL}/rubrics/`, {
     method: "POST",
-    body: JSON.stringify(data),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to create rubric" }));
+    throw new Error(error.detail || "Failed to create rubric");
+  }
+
+  return response.json();
 }
 
 /**
- * Get a list of all rubrics (filtered by user on backend)
+ * Update an existing rubric
  */
-export async function listRubrics(): Promise<Rubric[]> {
-  return apiFetch<Rubric[]>("/rubrics/");
+export async function updateRubric(
+  id: string,
+  payload: Partial<CreateRubricPayload>,
+): Promise<Rubric> {
+  const response = await fetch(`${API_URL}/rubrics/${id}/`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to update rubric" }));
+    throw new Error(error.detail || "Failed to update rubric");
+  }
+
+  return response.json();
+}
+
+/**
+ * Publish a rubric (change state from draft to published)
+ */
+export async function publishRubric(id: string): Promise<Rubric> {
+  const response = await fetch(`${API_URL}/rubrics/${id}/publish/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to publish rubric" }));
+    throw new Error(error.detail || "Failed to publish rubric");
+  }
+
+  return response.json();
+}
+
+/**
+ * List all rubrics with optional filtering
+ */
+export async function listRubrics(params?: {
+  state?: "draft" | "published" | "archived";
+  subject?: string;
+}): Promise<RubricListItem[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.state) queryParams.append("state", params.state);
+  if (params?.subject) queryParams.append("subject", params.subject);
+
+  const url = `${API_URL}/rubrics/${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Failed to list rubrics");
+  }
+
+  const data = await response.json();
+  return data.results || data;
 }
 
 /**
  * Get a specific rubric by ID
  */
 export async function getRubric(id: string): Promise<Rubric> {
-  return apiFetch<Rubric>(`/rubrics/${id}/`);
+  const response = await fetch(`${API_URL}/rubrics/${id}/`);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Rubric not found");
+    }
+    throw new Error("Failed to get rubric");
+  }
+
+  return response.json();
 }
 
 /**
- * Update an existing draft rubric
- */
-export async function updateRubric(
-  id: string,
-  data: RubricUpdateData
-): Promise<Rubric> {
-  return apiFetch<Rubric>(`/rubrics/${id}/`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
-}
-
-/**
- * Partially update an existing draft rubric
- */
-export async function patchRubric(
-  id: string,
-  data: Partial<RubricUpdateData>
-): Promise<Rubric> {
-  return apiFetch<Rubric>(`/rubrics/${id}/`, {
-    method: "PATCH",
-    body: JSON.stringify(data),
-  });
-}
-
-/**
- * Delete a draft rubric
- */
-export async function deleteRubric(id: string): Promise<void> {
-  return apiFetch<void>(`/rubrics/${id}/`, {
-    method: "DELETE",
-  });
-}
-
-/**
- * Publish a draft rubric (makes it read-only)
- */
-export async function publishRubric(id: string): Promise<Rubric> {
-  return apiFetch<Rubric>(`/rubrics/${id}/publish/`, {
-    method: "POST",
-  });
-}
-
-/**
- * Archive a published rubric
+ * Archive a rubric (change state to archived)
  */
 export async function archiveRubric(id: string): Promise<Rubric> {
-  return apiFetch<Rubric>(`/rubrics/${id}/archive/`, {
+  const response = await fetch(`${API_URL}/rubrics/${id}/archive/`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
   });
-}
 
-/**
- * Get version history for a rubric
- */
-export async function getRubricVersions(
-  id: string
-): Promise<RubricVersion[]> {
-  return apiFetch<RubricVersion[]>(`/rubrics/${id}/versions/`);
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to archive rubric" }));
+    throw new Error(error.detail || "Failed to archive rubric");
+  }
+
+  return response.json();
 }
 
 /**
  * Test a rubric against a sample answer
- * Note: This uses the evaluation service to test the rubric
+ * Can accept either a rubric ID or a rubric configuration for testing
  */
 export async function testRubric(
-  rubricData: {
-    evaluation_rules: EvaluationRule[];
-    total_marks: number;
-  },
-  sampleAnswer: string
+  rubricOrId:
+    | string
+    | { evaluation_rules: EvaluationRule[]; total_marks: number },
+  sampleAnswer: string,
 ): Promise<TestRubricResult> {
-  // Build the request payload
-  const payload = {
-    rubric: {
-      evaluation_rules: rubricData.evaluation_rules,
-      total_marks: rubricData.total_marks,
-    },
-    answer_text: sampleAnswer,
-  };
+  let url: string;
+  let body: any;
 
-  // Call the apply_rubric endpoint (you may need to create this endpoint)
-  // For now, assuming an endpoint exists at /rubrics/test/
-  return apiFetch<TestRubricResult>("/rubrics/test/", {
+  if (typeof rubricOrId === "string") {
+    // Testing a saved rubric by ID
+    url = `${API_URL}/rubrics/${rubricOrId}/test/`;
+    body = { sample_answer: sampleAnswer };
+  } else {
+    // Testing a rubric configuration directly
+    url = `${API_URL}/rubrics/test/`;
+    body = {
+      ...rubricOrId,
+      sample_answer: sampleAnswer,
+    };
+  }
+
+  const response = await fetch(url, {
     method: "POST",
-    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
   });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Failed to test rubric" }));
+    throw new Error(error.detail || "Failed to test rubric");
+  }
+
+  return response.json();
 }
-
-/**
- * Export all API functions as a single object for convenience
- */
-export const rubricsApi = {
-  create: createRubric,
-  list: listRubrics,
-  get: getRubric,
-  update: updateRubric,
-  patch: patchRubric,
-  delete: deleteRubric,
-  publish: publishRubric,
-  archive: archiveRubric,
-  versions: getRubricVersions,
-  test: testRubric,
-};
-
-export default rubricsApi;
