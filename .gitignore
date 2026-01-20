@@ -127,3 +127,4 @@ yarn-error.log*
 next-env.d.ts
 
 # md file
+*.md
