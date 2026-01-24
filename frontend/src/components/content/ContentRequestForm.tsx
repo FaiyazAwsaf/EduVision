@@ -16,7 +16,7 @@ import {
   createContentRequest,
   submitLearningContext,
 } from "@/api/contentRequests";
-import ErrorMessage from "./ErrorMessage";
+import ErrorMessage from "@/components/shared/ErrorMessage";
 import LearningContextForm from "./LearningContextForm";
 import {
   ContentType,

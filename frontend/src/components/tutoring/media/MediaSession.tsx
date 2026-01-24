@@ -9,8 +9,8 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
-import { VideoRenderer } from "@/components/VideoRenderer";
-import { ScreenShareRenderer } from "@/components/ScreenShareRenderer";
+import { VideoRenderer } from "./VideoRenderer";
+import { ScreenShareRenderer } from "./ScreenShareRenderer";
 import { LiveKitConnectionState } from "@/lib/livekit";
 import {
   Mic,

@@ -21,10 +21,10 @@ import {
   submitFeedback,
   getFeedback,
 } from "@/api/contentRequests";
-import ErrorMessage from "./ErrorMessage";
-import FeedbackForm from "./FeedbackForm";
-import FeedbackDisplay from "./FeedbackDisplay";
-import AddToStudyPlanModal from "./AddToStudyPlanModal";
+import ErrorMessage from "@/components/shared/ErrorMessage";
+import FeedbackForm from "@/components/feedback/FeedbackForm";
+import FeedbackDisplay from "@/components/feedback/FeedbackDisplay";
+import AddToStudyPlanModal from "@/components/study-plans/AddToStudyPlanModal";
 import type {
   GeneratedContent,
   OutputFormat,
