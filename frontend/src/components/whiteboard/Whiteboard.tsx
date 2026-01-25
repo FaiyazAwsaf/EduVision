@@ -1,241 +1,240 @@
+/**
+ * Whiteboard Component
+ *
+ * Main orchestrator component that integrates:
+ * - WhiteboardCanvas (Fabric.js drawing)
+ * - WebSocket (real-time collaboration)
+ * - Toolbar (UI controls)
+ */
+
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import * as fabric from "fabric";
-import { PenTool, Eraser, Trash2, Home, Download } from "lucide-react";
-import Link from "next/link";
+import { useState, useRef, useCallback } from "react";
+import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
+import Toolbar, { Tool } from "./Toolbar";
+import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
 
-type Tool = "pen" | "eraser" | "clear";
+export type WhiteboardProps = {
+  sessionId: string;
+  userId: string;
+  role: "teacher" | "student";
+};
 
-export default function Whiteboard() {
-  const canvasRef = useRef<fabric.Canvas | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [tool, setTool] = useState<Tool>("pen");
-  const [penSize, setPenSize] = useState(2);
-  const [penColor, setPenColor] = useState("#006A71");
+export default function Whiteboard({
+  sessionId,
+  userId,
+  role,
+}: WhiteboardProps) {
+  // Canvas state
+  const canvasRef = useRef<WhiteboardCanvasHandle>(null);
+  const [currentTool, setCurrentTool] = useState<Tool>("pen");
+  const [penColor, setPenColor] = useState("#000000");
+  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [isDrawingLocked, setIsDrawingLocked] = useState(false);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  /**
+   * Handle incoming WebSocket messages
+   */
+  const handleWebSocketMessage = useCallback(
+    (message: WebSocketMessage) => {
+      console.log("[Whiteboard] Received message:", message.type);
 
-    const canvas = new fabric.Canvas("whiteboard-canvas", {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-      backgroundColor: "#ffffff",
-    });
+      switch (message.type) {
+        case "canvas_event":
+          // Handle remote drawing events
+          if (message.data?.pathData) {
+            canvasRef.current?.addPath(message.data.pathData);
+          }
+          break;
 
-    // Create the brush
-    const brush = new fabric.PencilBrush(canvas);
-    brush.width = penSize;
-    brush.color = penColor;
+        case "clear_canvas":
+          // Remote clear event
+          console.log("[Whiteboard] Remote clear canvas");
+          canvasRef.current?.clearCanvas();
+          break;
 
-    canvas.freeDrawingBrush = brush;
-    canvas.isDrawingMode = true;
+        case "lock_state":
+          // Update drawing lock state for students
+          if (role === "student") {
+            setIsDrawingLocked(message.data?.isLocked || false);
+            console.log(
+              "[Whiteboard] Drawing lock state:",
+              message.data?.isLocked,
+            );
+          }
+          break;
 
-    canvasRef.current = canvas;
+        case "user_joined":
+          console.log("[Whiteboard] User joined:", message.data?.userId);
+          break;
 
-    // Handle window resize
-    const handleResize = () => {
-      if (containerRef.current && canvas) {
-        canvas.setDimensions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-        canvas.renderAll();
+        case "user_left":
+          console.log("[Whiteboard] User left:", message.data?.userId);
+          break;
       }
-    };
+    },
+    [role],
+  );
 
-    window.addEventListener("resize", handleResize);
+  /**
+   * Initialize WebSocket connection
+   */
+  const websocket = useWebSocket({
+    sessionId,
+    userId,
+    role,
+    onMessage: handleWebSocketMessage,
+    onConnected: () => {
+      console.log("[Whiteboard] WebSocket connected");
+    },
+    onDisconnected: () => {
+      console.log("[Whiteboard] WebSocket disconnected");
+    },
+  });
 
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      canvas.dispose();
-    };
-  }, []);
+  /**
+   * Handle local drawing events
+   */
+  const handlePathCreated = useCallback(
+    (path: any) => {
+      // Broadcast drawing event to other participants
+      const pathData = path.toObject();
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !canvas.freeDrawingBrush) return;
+      websocket.sendMessage({
+        type: "canvas_event",
+        data: { pathData },
+      });
 
-    if (tool === "pen") {
-      canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = penColor;
-      canvas.freeDrawingBrush.width = penSize;
-    }
+      console.log("[Whiteboard] Broadcasted path to peers");
+    },
+    [websocket],
+  );
 
-    if (tool === "eraser") {
-      canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = "#ffffff";
-      canvas.freeDrawingBrush.width = 20;
-    }
+  /**
+   * Handle canvas clear (teacher only)
+   */
+  const handleClear = useCallback(() => {
+    if (role !== "teacher") return;
 
-    if (tool === "clear") {
-      canvas.clear();
-      canvas.backgroundColor = "#ffffff";
-      canvas.renderAll();
-      setTool("pen");
-    }
-  }, [tool, penColor, penSize]);
+    canvasRef.current?.clearCanvas();
 
-  const handleClear = () => {
-    if (confirm("Are you sure you want to clear the whiteboard?")) {
-      setTool("clear");
-    }
-  };
-
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
-    const dataURL = canvasRef.current.toDataURL({
-      format: "png",
-      quality: 1,
-      multiplier: 2,
+    // Broadcast clear event
+    websocket.sendMessage({
+      type: "clear_canvas",
+      data: {},
     });
-    const link = document.createElement("a");
-    link.download = `whiteboard-${Date.now()}.png`;
-    link.href = dataURL;
-    link.click();
-  };
+
+    console.log("[Whiteboard] Cleared canvas");
+  }, [role, websocket]);
+
+  /**
+   * Export canvas to JSON
+   */
+  const handleExport = useCallback(() => {
+    const state = canvasRef.current?.exportToJSON();
+    if (state) {
+      const dataStr = JSON.stringify(state, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(dataBlob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `whiteboard-${sessionId}-${Date.now()}.json`;
+      link.click();
+
+      URL.revokeObjectURL(url);
+      console.log("[Whiteboard] Exported canvas");
+    }
+  }, [sessionId]);
+
+  /**
+   * Toggle drawing lock (teacher only)
+   */
+  const handleToggleLock = useCallback(() => {
+    if (role !== "teacher") return;
+
+    const newLockState = !isDrawingLocked;
+    setIsDrawingLocked(newLockState);
+
+    // Broadcast lock state to students
+    websocket.sendMessage({
+      type: "lock_state",
+      data: { isLocked: newLockState },
+    });
+
+    console.log("[Whiteboard] Drawing lock:", newLockState);
+  }, [role, isDrawingLocked, websocket]);
+
+  // Determine if current user can draw
+  const canDraw = role === "teacher" || !isDrawingLocked;
 
   return (
-    <div className="min-h-screen bg-[#F2EFE7] flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <PenTool className="w-6 h-6 text-[#006A71]" />
-              <h1 className="text-xl font-bold text-[#006A71]">
-                Interactive Whiteboard
-              </h1>
-            </div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#48A6A7] hover:text-[#006A71] transition-colors"
-            >
-              <Home className="w-4 h-4" />
-              Home
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <div style={styles.container}>
       {/* Toolbar */}
-      <div className="bg-white border-b border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Tool Selection */}
-            <div className="flex items-center gap-2 border-r border-[#9ACBD0] pr-4">
-              <button
-                onClick={() => setTool("pen")}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tool === "pen"
-                    ? "bg-[#48A6A7] text-white"
-                    : "bg-white border border-[#9ACBD0] text-[#48A6A7] hover:border-[#48A6A7]"
-                }`}
-              >
-                <PenTool className="w-4 h-4" />
-                Pen
-              </button>
-              <button
-                onClick={() => setTool("eraser")}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tool === "eraser"
-                    ? "bg-[#48A6A7] text-white"
-                    : "bg-white border border-[#9ACBD0] text-[#48A6A7] hover:border-[#48A6A7]"
-                }`}
-              >
-                <Eraser className="w-4 h-4" />
-                Eraser
-              </button>
-            </div>
+      <Toolbar
+        role={role}
+        currentTool={currentTool}
+        penColor={penColor}
+        strokeWidth={strokeWidth}
+        isDrawingLocked={isDrawingLocked}
+        isConnected={websocket.isConnected}
+        onToolChange={setCurrentTool}
+        onColorChange={setPenColor}
+        onStrokeWidthChange={setStrokeWidth}
+        onClear={handleClear}
+        onExport={handleExport}
+        onToggleLock={role === "teacher" ? handleToggleLock : undefined}
+      />
 
-            {/* Pen Settings */}
-            {tool === "pen" && (
-              <div className="flex items-center gap-3 border-r border-[#9ACBD0] pr-4">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-[#006A71]">
-                    Size:
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={penSize}
-                    onChange={(e) => setPenSize(Number(e.target.value))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-[#48A6A7] w-8">
-                    {penSize}px
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-[#006A71]">
-                    Color:
-                  </label>
-                  <div className="flex gap-1">
-                    {[
-                      "#006A71",
-                      "#48A6A7",
-                      "#000000",
-                      "#DC2626",
-                      "#EA580C",
-                      "#16A34A",
-                      "#2563EB",
-                      "#9333EA",
-                    ].map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setPenColor(color)}
-                        className={`w-7 h-7 rounded border-2 transition-all ${
-                          penColor === color
-                            ? "border-[#006A71] scale-110"
-                            : "border-[#9ACBD0] hover:border-[#48A6A7]"
-                        }`}
-                        style={{ backgroundColor: color }}
-                        aria-label={`Select color ${color}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                onClick={handleDownload}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm font-medium text-[#48A6A7] hover:border-[#48A6A7] hover:text-[#006A71] transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-              <button
-                onClick={handleClear}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm font-medium text-red-500 hover:border-red-500 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Clear
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Canvas */}
+      <div style={styles.canvasContainer}>
+        <WhiteboardCanvas
+          ref={canvasRef}
+          isDrawingEnabled={canDraw}
+          penColor={penColor}
+          strokeWidth={strokeWidth}
+          tool={currentTool}
+          onPathCreated={handlePathCreated}
+        />
       </div>
 
-      {/* Canvas Container */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative bg-white m-4 rounded-xl border-2 border-[#9ACBD0] shadow-lg overflow-hidden"
-      >
-        <canvas id="whiteboard-canvas" />
+      {/* Session Info */}
+      <div style={styles.sessionInfo}>
+        <div>Session: {sessionId}</div>
+        <div>Role: {role}</div>
+        <div>Status: {websocket.connectionState}</div>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-[#48A6A7]">
-            Use the tools above to draw, erase, or clear the whiteboard
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    width: "100vw",
+    height: "100vh",
+    backgroundColor: "#1a1a1a",
+    position: "relative",
+    overflow: "hidden",
+  },
+  canvasContainer: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
+  sessionInfo: {
+    position: "fixed",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(44, 62, 80, 0.9)",
+    color: "#ecf0f1",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    zIndex: 900,
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+};
