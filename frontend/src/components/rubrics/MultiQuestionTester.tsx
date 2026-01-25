@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { QuestionRubric, testRubricSet, QuestionResult } from "@/lib/api/rubricSets";
+import { QuestionRubric, testRubricSet, QuestionResult } from "@/lib/api/rubrics";
 
 interface MultiQuestionTesterProps {
   questions: QuestionRubric[];

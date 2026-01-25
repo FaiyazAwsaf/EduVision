@@ -1,62 +1,61 @@
+"""
+ViewSet for RubricSet with CRUD operations and custom actions.
+"""
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Rubric, RubricVersion
+from .models import RubricSet, QuestionRubric
 from .serializers import (
-    RubricSerializer, RubricListSerializer,
-    RubricVersionSerializer, RubricPublishSerializer
+    RubricSetSerializer, RubricSetListSerializer,
+    RubricSetVersionSerializer, RubricSetPublishSerializer,
+    QuestionRubricSerializer
 )
-from .services import apply_rubric
+from .services import evaluate_rubric_set
 
 
-class RubricViewSet(viewsets.ModelViewSet):
+class RubricSetViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing Rubrics.
+    ViewSet for managing RubricSets (multi-question assessments).
     
     Endpoints:
-    - POST /api/rubrics/ → create draft rubric
-    - GET /api/rubrics/ → list rubrics
-    - GET /api/rubrics/{id}/ → retrieve rubric
-    - PUT /api/rubrics/{id}/ → update rubric (only if state=draft)
-    - PATCH /api/rubrics/{id}/ → partial update rubric (only if state=draft)
-    - DELETE /api/rubrics/{id}/ → delete rubric (only if state=draft)
+    - POST /api/rubric-sets/ → create draft rubric set
+    - GET /api/rubric-sets/ → list rubric sets
+    - GET /api/rubric-sets/{id}/ → retrieve rubric set
+    - PUT /api/rubric-sets/{id}/ → update rubric set (only if state=draft)
+    - PATCH /api/rubric-sets/{id}/ → partial update rubric set (only if state=draft)
+    - DELETE /api/rubric-sets/{id}/ → delete rubric set (only if state=draft)
+    - POST /api/rubric-sets/{id}/publish/ → publish rubric set
+    - POST /api/rubric-sets/{id}/archive/ → archive rubric set
+    - GET /api/rubric-sets/{id}/versions/ → get version history
+    - POST /api/rubric-sets/test/ → test rubric set without saving
     """
     
     def get_queryset(self):
-        """
-        Return all rubrics.
-        """
-        return Rubric.objects.all().select_related().prefetch_related('versions')
+        """Return all rubric sets with prefetched questions."""
+        return RubricSet.objects.all().prefetch_related('questions', 'versions')
     
     def get_serializer_class(self):
-        """
-        Return appropriate serializer based on action.
-        """
+        """Return appropriate serializer based on action."""
         if self.action == 'list':
-            return RubricListSerializer
+            return RubricSetListSerializer
         elif self.action == 'publish':
-            return RubricPublishSerializer
-        return RubricSerializer
+            return RubricSetPublishSerializer
+        return RubricSetSerializer
     
     def perform_create(self, serializer):
-        """
-        Save the rubric. Ownership (created_by) is handled in the serializer.
-        """
+        """Save the rubric set. Ownership (created_by) is handled in the serializer."""
         serializer.save()
     
-
-    
     def update(self, request, *args, **kwargs):
-        """
-        Update a rubric. Only draft rubrics can be updated.
-        """
+        """Update a rubric set. Only draft rubric sets can be updated."""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         
-        # Check if rubric is editable
-        if instance.state != Rubric.STATE_DRAFT:
+        # Check if rubric set is editable
+        if instance.state != RubricSet.STATE_DRAFT:
             return Response(
-                {"detail": f"Cannot edit {instance.state} rubrics. Only draft rubrics can be modified."},
+                {"detail": f"Cannot edit {instance.state} rubric sets. Only draft rubric sets can be modified."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -67,15 +66,13 @@ class RubricViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     def destroy(self, request, *args, **kwargs):
-        """
-        Delete a rubric. Only draft rubrics can be deleted.
-        """
+        """Delete a rubric set. Only draft rubric sets can be deleted."""
         instance = self.get_object()
         
-        # Only allow deletion of draft rubrics
-        if instance.state != Rubric.STATE_DRAFT:
+        # Only allow deletion of draft rubric sets
+        if instance.state != RubricSet.STATE_DRAFT:
             return Response(
-                {"detail": f"Cannot delete {instance.state} rubrics. Only draft rubrics can be deleted."},
+                {"detail": f"Cannot delete {instance.state} rubric sets. Only draft rubric sets can be deleted."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -85,125 +82,138 @@ class RubricViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
         """
-        Publish a draft rubric. Published rubrics become read-only.
+        Publish a draft rubric set. Published rubric sets become read-only.
         
         Logic:
-        - Validate sum of rule marks == total_marks
+        - Validate that sum of question marks == total_marks
+        - Validate that each question has rules and rule marks == max_marks
         - Change state from draft → published
         - Increment version
-        - Save full rubric snapshot into rubric_versions
-        - Prevent further edits after publishing
+        - Save full rubric set snapshot into rubric_set_versions
         """
         instance = self.get_object()
         
-        # Check if rubric is in draft state
-        if instance.state != Rubric.STATE_DRAFT:
+        # Check if rubric set is in draft state
+        if instance.state != RubricSet.STATE_DRAFT:
             return Response(
-                {"detail": f"Cannot publish {instance.state} rubrics. Only draft rubrics can be published."},
+                {"detail": f"Cannot publish {instance.state} rubric sets. Only draft rubric sets can be published."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validate that sum of rule marks equals total_marks
-        if instance.evaluation_rules:
-            rules_total = sum(float(rule.get('marks', 0)) for rule in instance.evaluation_rules)
-            total_marks = float(instance.total_marks)
-            
-            if abs(rules_total - total_marks) > 0.01:  # Allow small floating point differences
-                return Response(
-                    {
-                        "detail": f"Cannot publish: Sum of rule marks ({rules_total}) must equal total marks ({total_marks})"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        else:
+        # Use publish serializer for validation
+        serializer = RubricSetPublishSerializer(
+            data={},
+            context={'rubric_set': instance}
+        )
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
             return Response(
-                {"detail": "Cannot publish: At least one evaluation rule is required"},
+                {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         # Change state to published (version bump will be handled by model's save method)
-        instance.state = Rubric.STATE_PUBLISHED
+        instance.state = RubricSet.STATE_PUBLISHED
         instance.save()
         
-        serializer = RubricSerializer(instance)
-        return Response(serializer.data)
+        response_serializer = RubricSetSerializer(instance)
+        return Response(response_serializer.data)
     
     @action(detail=True, methods=['post'])
     def archive(self, request, pk=None):
-        """
-        Archive a published rubric.
-        """
+        """Archive a published rubric set."""
         instance = self.get_object()
         
-        # Only published rubrics can be archived
-        if instance.state != Rubric.STATE_PUBLISHED:
+        # Only published rubric sets can be archived
+        if instance.state != RubricSet.STATE_PUBLISHED:
             return Response(
-                {"detail": f"Cannot archive {instance.state} rubrics. Only published rubrics can be archived."},
+                {"detail": f"Cannot archive {instance.state} rubric sets. Only published rubric sets can be archived."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         # Update state to archived
-        instance.state = Rubric.STATE_ARCHIVED
+        instance.state = RubricSet.STATE_ARCHIVED
         instance.save()
         
-        serializer = RubricSerializer(instance)
+        serializer = RubricSetSerializer(instance)
         return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
     def versions(self, request, pk=None):
-        """
-        Get all versions of a rubric.
-        """
+        """Get all versions of a rubric set."""
         instance = self.get_object()
         versions = instance.versions.all()
-        serializer = RubricVersionSerializer(versions, many=True)
+        serializer = RubricSetVersionSerializer(versions, many=True)
         return Response(serializer.data)
     
     @action(detail=False, methods=['post'])
     def test(self, request):
         """
-        Test a rubric against a sample answer without saving.
-        
-        This endpoint allows testing evaluation rules before creating/publishing a rubric.
+        Test a rubric set against sample answers without saving.
         
         Request body:
         {
-            "rubric": {
-                "evaluation_rules": [...],
-                "total_marks": 10.0
+            "rubric_set": {
+                "questions": [
+                    {
+                        "question_number": 1,
+                        "question_text": "...",
+                        "max_marks": 5.0,
+                        "evaluation_rules": [...]
+                    },
+                    ...
+                ]
             },
-            "answer_text": "Student's answer text"
+            "answers": {
+                "1": "answer for question 1",
+                "2": "answer for question 2",
+                ...
+            }
         }
         
         Response:
         {
-            "total_score": 7.5,
-            "max_score": 10.0,
-            "rule_results": [...],
-            "feedback": "Combined feedback summary"
+            "total_score": 15.5,
+            "max_score": 20.0,
+            "percentage": 77.5,
+            "question_results": [...],
+            "feedback": "..."
         }
         """
-        rubric_data = request.data.get('rubric')
-        answer_text = request.data.get('answer_text')
+        rubric_set_data = request.data.get('rubric_set')
+        answers_data = request.data.get('answers', {})
         
-        if not rubric_data or not answer_text:
+        if not rubric_set_data:
             return Response(
-                {"detail": "Both 'rubric' and 'answer_text' are required"},
+                {"detail": "'rubric_set' is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if not rubric_data.get('evaluation_rules'):
+        if not rubric_set_data.get('questions'):
             return Response(
-                {"detail": "Rubric must contain 'evaluation_rules'"},
+                {"detail": "Rubric set must contain at least one question"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Convert string keys to integers
+        answers = {}
+        for key, value in answers_data.items():
+            try:
+                answers[int(key)] = value
+            except (ValueError, TypeError):
+                return Response(
+                    {"detail": f"Invalid question number in answers: {key}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         try:
-            # Apply the rubric to the answer text
-            result = apply_rubric(rubric_data, answer_text)
+            # Apply the rubric set evaluation
+            result = evaluate_rubric_set(rubric_set_data, answers)
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
-                {"detail": f"Error evaluating answer: {str(e)}"},
+                {"detail": f"Error evaluating answers: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
