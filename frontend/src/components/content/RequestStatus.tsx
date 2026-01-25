@@ -12,7 +12,7 @@ import { getRequestStatus, getGeneratedContent } from "@/api/contentRequests";
 import { POLLING_CONFIG } from "@/config/api";
 import StatusBadge from "./StatusBadge";
 import GeneratedContentView from "./GeneratedContentView";
-import ErrorMessage from "./ErrorMessage";
+import ErrorMessage from "@/components/shared/ErrorMessage";
 import {
   RequestStatus,
   type ContentRequest,

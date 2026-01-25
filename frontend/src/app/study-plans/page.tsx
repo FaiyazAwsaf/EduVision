@@ -29,9 +29,9 @@ import {
   getStudyPlan,
   deleteStudyPlan,
 } from "@/api/contentRequests";
-import CreateStudyPlanForm from "@/components/CreateStudyPlanForm";
-import AddStudyPlanItemForm from "@/components/AddStudyPlanItemForm";
-import StudyPlanItemCard from "@/components/StudyPlanItemCard";
+import CreateStudyPlanForm from "@/components/study-plans/CreateStudyPlanForm";
+import AddStudyPlanItemForm from "@/components/study-plans/AddStudyPlanItemForm";
+import StudyPlanItemCard from "@/components/study-plans/StudyPlanItemCard";
 import { StudyPlanItemStatus } from "@/types/content";
 import type { StudyPlan, StudyPlanItem } from "@/types/content";
 
