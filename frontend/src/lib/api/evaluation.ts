@@ -132,7 +132,7 @@ class EvaluationAPI {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = `${API_BASE_URL}/evaluation`;
+    this.baseUrl = `${API_BASE_URL}/api/evaluation`;
   }
 
   private async fetch<T>(

@@ -126,5 +126,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# md files
+# md file
 *.md
