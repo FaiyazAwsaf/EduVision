@@ -18,23 +18,16 @@ import {
 import * as fabric from "fabric";
 
 /**
- * custom defined type for type safety
+ * fabric.js path serialization options
+ * all properties needed to reconstruct a path
  */
-type SerializedFabricObject = {
-  type: string;
-  [key: string]: any;
-}
-
-type CanvasPath = {
-    toObject: () => unknown;
-};
 
 /**
  * canvas state export format
  */
 export type CanvasState = {
   version: string;
-  objects: SerializedFabricObject[];
+  objects: fabric.IPathOptions[];
 };
 
 /**
@@ -60,7 +53,7 @@ export type WhiteboardCanvasHandle = {
   clearCanvas: () => void;
   exportToJSON: () => CanvasState;
   loadFromJSON: (state: CanvasState) => Promise<void>;
-  addPath: (pathData: any) => void;
+  addPath: (pathData: fabric.IPathOptions) => void;
   setDrawingMode: (enabled: boolean) => void;
   setBrushColor: (color: string) => void;
   setBrushWidth: (width: number) => void;
@@ -93,13 +86,6 @@ const WhiteboardCanvas = forwardRef<
   const containerRef = useRef<HTMLDivElement>(null);
   const isRemoteUpdateRef = useRef(false);
 
-  const isValidPathData = (data: unknown): data is SerializedFabricObject => {
-    return (
-      typeof data === "object" && 
-      data !== null &&
-      (data as SerializedFabricObject).type === "path"
-    );
-  };
   // ============================================================
   // canvas initialization
   // ============================================================
@@ -138,11 +124,15 @@ const WhiteboardCanvas = forwardRef<
       const obj = event.path;
 
       if(!obj){
+        console.log("[Canvas] path:created event has no path object");
         return;
       }
 
       if(obj instanceof fabric.Path){
-            onPathCreated?.(obj);
+        console.log("[Canvas] path created event fired, calling onPathCreated");
+        onPathCreated?.(obj);
+      } else {
+        console.warn("[Canvas] path:created event object is not a fabric.Path", obj);
       }
     });
 
@@ -154,7 +144,7 @@ const WhiteboardCanvas = forwardRef<
       canvas.dispose();
       canvasRef.current = null;
     };
-  }, []);
+  }, [onPathCreated]);
 
   // ============================================================
   // window resize handler
@@ -272,28 +262,32 @@ const WhiteboardCanvas = forwardRef<
       }
     },
 
-    addPath: (pathData: SerializedFabricObject) => {
-      if(!isValidPathData(pathData)){
-        return;
-      }
-      
+    addPath: (pathData: fabric.IPathOptions) => {
       if (canvasRef.current) {
         isRemoteUpdateRef.current = true;
         try {
+          console.log("[Canvas] attempting to add remote path:", pathData);
+          console.log("[Canvas] current canvas object count before add:", canvasRef.current.getObjects().length);
 
           // create path from received data
           fabric.Path.fromObject(pathData).then((path: fabric.Path) => {
             if (canvasRef.current) {
               canvasRef.current.add(path);
               canvasRef.current.renderAll();
-              console.log("[Canvas] added remote path");
+              console.log("[Canvas] added remote path successfully");
+              console.log("[Canvas] current canvas object count after add:", canvasRef.current.getObjects().length);
             }
+            isRemoteUpdateRef.current = false;
+          }).catch((error) => {
+            console.error("[Canvas] error creating path from object:", error);
             isRemoteUpdateRef.current = false;
           });
         } catch (error) {
           console.error("[Canvas] error adding path:", error);
           isRemoteUpdateRef.current = false;
         }
+      } else {
+        console.warn("[Canvas] cannot add path - canvas ref is null");
       }
     },
 

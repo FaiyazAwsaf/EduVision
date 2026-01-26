@@ -24,9 +24,11 @@ export type WhiteboardProps = {
   role: "teacher" | "student";
 };
 
-type CanvasPath = {
-    toObject: () => unknown;
-};
+/**
+ * path object from fabric.js canvas
+ * represents a drawn stroke with all its properties
+ */
+type CanvasPath = fabric.Path;
 
 /**
  * main whiteboard component
@@ -64,7 +66,10 @@ export default function Whiteboard({
         case "canvas_event":
           // handle remote drawing events
           if (message.data?.pathData) {
+            console.log("[Whiteboard] received canvas_event with pathData:", message.data.pathData);
             canvasRef.current?.addPath(message.data.pathData);
+          } else {
+            console.warn("[Whiteboard] received canvas_event but no pathData in message:", message);
           }
           break;
 
@@ -117,23 +122,30 @@ export default function Whiteboard({
   });
 
   // ============================================================
-  // Canvas Event Handlers
+  // computed state
+  // ============================================================
+
+  const canDraw = role === "teacher" || !isDrawingLocked;
+
+  // ============================================================
+  // canvas event handlers
   // ============================================================
 
   /**
    * handle local drawing events
    * broadcasts path data to all connected peers
    */
-
   const handlePathCreated = useCallback(
     (path: CanvasPath) => {
-      const pathData = path.toObject();
+      const pathData = path.toObject() as fabric.IPathOptions;
 
       if (!websocket.isConnected){
+        console.log("[Whiteboard] Cannot broadcast: websocket not connected");
         return;
       }
 
       if(!canDraw){
+        console.log("[Whiteboard] Cannot broadcast: drawing is locked");
         return;
       }
 
@@ -144,7 +156,7 @@ export default function Whiteboard({
 
       console.log("[Whiteboard] Broadcasted path to peers");
     },
-    [websocket]
+    [websocket, canDraw]
   );
 
   /**
@@ -169,7 +181,7 @@ export default function Whiteboard({
   }, [role, websocket]);
 
   /**
-   * export canvas to JSON file
+   * export canvas to json file
    * allows saving whiteboard state for future reference
    */
   const handleExport = useCallback(() => {
@@ -196,26 +208,20 @@ export default function Whiteboard({
   const handleToggleLock = useCallback(() => {
     if (role !== "teacher") return;
 
-    const newLockState = !isDrawingLocked;
-    setIsDrawingLocked(newLockState);
+    setIsDrawingLocked((prevLocked) => {
+      const newLockState = !prevLocked;
 
-    if(!websocket.isConnected){
-      return;
-    }
+      if(websocket.isConnected){
+        websocket.sendMessage({
+          type: "lock_state",
+          data: { isLocked: newLockState },
+        });
+      }
 
-    websocket.sendMessage({
-      type: "lock_state",
-      data: { isLocked: newLockState },
+      console.log("[Whiteboard] Drawing lock:", newLockState);
+      return newLockState;
     });
-
-    console.log("[Whiteboard] Drawing lock:", newLockState);
-  }, [role, isDrawingLocked, websocket]);
-
-  // ============================================================
-  // Computed State
-  // ============================================================
-
-  const canDraw = role === "teacher" || !isDrawingLocked;
+  }, [role, websocket]);
 
   // ============================================================
   // Render
