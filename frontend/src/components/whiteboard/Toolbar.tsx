@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type Tool = "pen" | "eraser";
 
@@ -61,284 +61,174 @@ export default function Toolbar(props: ToolbarProps) {
   const [showStrokePicker, setShowStrokePicker] = useState(false);
 
   const canDraw = role === "teacher" || !isDrawingLocked;
+  const isDisabled = !isConnected || !canDraw;
+
+  // close pickers when tool changes
+  useEffect(() => {
+    setShowColorPicker(false);
+    setShowStrokePicker(false);
+  }, [currentTool]);
 
   return (
-    <div style={styles.container}>
-      {/* Connection Status */}
-      <div style={styles.section}>
+    <div className="fixed top-2.5 left-2.5 bg-[#F2EFE7] p-3 rounded-lg shadow-lg border border-[#9ACBD0] z-[1000] flex flex-col gap-2 min-w-[180px] max-h-[90vh] overflow-y-auto">
+      {/* connection Status */}
+      <div className="flex flex-col gap-1.5">
         <div
-          style={{
-            ...styles.indicator,
-            backgroundColor: isConnected ? "#00ff00" : "#ff0000",
-          }}
+          className={`px-2 py-1.5 rounded text-center text-sm font-bold text-[#F2EFE7] ${
+            isConnected ? "bg-green-500" : "bg-red-500"
+          }`}
         >
           {isConnected ? "🟢" : "🔴"}
         </div>
-        <span style={styles.label}>
+        <span className="text-[#006A71] text-xs text-center">
           {isConnected ? "Connected" : "Disconnected"}
         </span>
       </div>
 
-      <div style={styles.divider} />
+      <div className="h-px bg-[#9ACBD0] my-1" />
 
       {/* Drawing Tools */}
       {canDraw && (
         <>
-          <div style={styles.section}>
-            <span style={styles.sectionTitle}>Drawing</span>
-            <button
-              style={{
-                ...styles.button,
-                ...(currentTool === "pen" ? styles.buttonActive : {}),
-              }}
-              onClick={() => onToolChange("pen")}
-              title="Pen Tool"
-            >
-              ✏️ Pen
-            </button>
-            <button
-              style={{
-                ...styles.button,
-                ...(currentTool === "eraser" ? styles.buttonActive : {}),
-              }}
-              onClick={() => onToolChange("eraser")}
-              title="Eraser Tool"
-            >
-              🧹 Eraser
-            </button>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[#006A71] text-xs font-bold uppercase">
+              Drawing
+            </span>
+
+            {(["pen", "eraser"] as Tool[]).map((tool) => (
+              <button
+                key={tool}
+                type="button"
+                disabled={isDisabled}
+                onClick={() => onToolChange(tool)}
+                className={`px-3 py-2 border rounded text-sm flex items-center gap-1.5 transition-all
+                  ${
+                    currentTool === tool
+                      ? "bg-[#48A6A7] text-[#F2EFE7] font-bold border-[#48A6A7]"
+                      : "bg-[#F2EFE7] text-[#006A71] border-[#9ACBD0]"
+                  }
+                  ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                `}
+              >
+                {tool === "pen" ? "✏️ Pen" : "🧹 Eraser"}
+              </button>
+            ))}
           </div>
 
-          {/* Color Picker */}
+          {/* pen controls */}
           {currentTool === "pen" && (
-            <div style={styles.section}>
-              <button
-                style={styles.button}
-                onClick={() => setShowColorPicker(!showColorPicker)}
-              >
-                <span
-                  style={{
-                    ...styles.colorPreview,
-                    backgroundColor: penColor,
-                  }}
-                />
-                Color
-              </button>
-              {showColorPicker && (
-                <div style={styles.picker}>
-                  {COLORS.map((color) => (
-                    <button
-                      key={color}
-                      style={{
-                        ...styles.colorSwatch,
-                        backgroundColor: color,
-                        border:
-                          color === penColor
-                            ? "3px solid #fff"
-                            : "1px solid #ccc",
-                      }}
-                      onClick={() => {
-                        onColorChange(color);
-                        setShowColorPicker(false);
-                      }}
-                      title={color}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+            <>
+              {/* color picker */}
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => setShowColorPicker((v) => !v)}
+                  className="px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm flex items-center gap-2"
+                >
+                  <span
+                    className="w-4 h-4 rounded-full border-2 border-[#006A71]"
+                    style={{ backgroundColor: penColor }}
+                  />
+                  Color
+                </button>
+
+                {showColorPicker && (
+                  <div className="grid grid-cols-5 gap-1.5 p-2 border rounded">
+                    {COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => {
+                          onColorChange(color);
+                          setShowColorPicker(false);
+                        }}
+                        className="w-7 h-7 rounded hover:scale-110 transition-transform"
+                        style={{
+                          backgroundColor: color,
+                          border:
+                            color === penColor
+                              ? "3px solid white"
+                              : "1px solid #ccc",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* stroke width */}
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => setShowStrokePicker((v) => !v)}
+                  className="px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
+                >
+                  Width: {strokeWidth}px
+                </button>
+
+                {showStrokePicker && (
+                  <div className="grid grid-cols-3 gap-1.5 p-2 border rounded">
+                    {STROKE_WIDTHS.map((width) => (
+                      <button
+                        key={width}
+                        type="button"
+                        onClick={() => {
+                          onStrokeWidthChange(width);
+                          setShowStrokePicker(false);
+                        }}
+                        className={`px-2 py-1 rounded text-xs ${
+                          width === strokeWidth
+                            ? "bg-[#48A6A7] text-white"
+                            : "bg-[#F2EFE7] text-[#006A71]"
+                        }`}
+                      >
+                        {width}px
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
-          {/* Stroke Width Picker */}
-          {currentTool === "pen" && (
-            <div style={styles.section}>
-              <button
-                style={styles.button}
-                onClick={() => setShowStrokePicker(!showStrokePicker)}
-              >
-                Width: {strokeWidth}px
-              </button>
-              {showStrokePicker && (
-                <div style={styles.picker}>
-                  {STROKE_WIDTHS.map((width) => (
-                    <button
-                      key={width}
-                      style={{
-                        ...styles.widthButton,
-                        backgroundColor:
-                          width === strokeWidth ? "#48A6A7" : "#F2EFE7",
-                        color: width === strokeWidth ? "#F2EFE7" : "#006A71",
-                      }}
-                      onClick={() => {
-                        onStrokeWidthChange(width);
-                        setShowStrokePicker(false);
-                      }}
-                    >
-                      {width}px
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div style={styles.divider} />
+          <div className="h-px bg-[#9ACBD0] my-1" />
         </>
       )}
 
-      {/* Canvas Actions */}
-      <div style={styles.section}>
-        <span style={styles.sectionTitle}>Canvas</span>
+      {/* canvas actions */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[#006A71] text-xs font-bold uppercase">
+          Canvas
+        </span>
+
         {role === "teacher" && (
-          <button style={styles.button} onClick={onClear} title="Clear Canvas">
+          <button type="button" onClick={onClear} className="toolbar-btn">
             🗑️ Clear
           </button>
         )}
-        <button style={styles.button} onClick={onExport} title="Export Canvas">
+
+        <button type="button" onClick={onExport} className="toolbar-btn">
           💾 Export
         </button>
       </div>
 
-      {/* Permission Controls (Teacher Only) */}
+      {/* permissions */}
       {role === "teacher" && onToggleLock && (
         <>
-          <div style={styles.divider} />
-          <div style={styles.section}>
-            <span style={styles.sectionTitle}>Permissions</span>
-            <button
-              style={{
-                ...styles.button,
-                backgroundColor: isDrawingLocked ? "#006A71" : "#48A6A7",
-                color: "#F2EFE7",
-                border: "none",
-              }}
-              onClick={onToggleLock}
-              title="Toggle Student Drawing"
-            >
-              {isDrawingLocked ? "🔒 Locked" : "🔓 Unlocked"}
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Drawing Lock Indicator (Student) */}
-      {role === "student" && isDrawingLocked && (
-        <>
-          <div style={styles.divider} />
-          <div style={styles.section}>
-            <div
-              style={{
-                ...styles.indicator,
-                backgroundColor: "#f44336",
-              }}
-            >
-              🔒 Drawing Locked
-            </div>
-          </div>
+          <div className="h-px bg-[#9ACBD0] my-1" />
+          <button
+            type="button"
+            onClick={onToggleLock}
+            className={`px-3 py-2 rounded text-sm text-white ${
+              isDrawingLocked ? "bg-[#006A71]" : "bg-[#48A6A7]"
+            }`}
+          >
+            {isDrawingLocked ? "🔒 Locked" : "🔓 Unlocked"}
+          </button>
         </>
       )}
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    position: "fixed",
-    top: 10,
-    left: 10,
-    backgroundColor: "#F2EFE7",
-    padding: "12px",
-    borderRadius: "8px",
-    boxShadow: "0 4px 6px rgba(0,106,113,0.2)",
-    border: "1px solid #9ACBD0",
-    zIndex: 1000,
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    minWidth: "180px",
-    maxHeight: "90vh",
-    overflowY: "auto",
-  },
-  section: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    position: "relative",
-  },
-  sectionTitle: {
-    color: "#006A71",
-    fontSize: "11px",
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    marginBottom: "2px",
-  },
-  button: {
-    padding: "8px 12px",
-    border: "1px solid #9ACBD0",
-    borderRadius: "4px",
-    backgroundColor: "#F2EFE7",
-    color: "#006A71",
-    cursor: "pointer",
-    fontSize: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    transition: "all 0.2s",
-    whiteSpace: "nowrap",
-  },
-  buttonActive: {
-    backgroundColor: "#48A6A7",
-    color: "#F2EFE7",
-    fontWeight: "bold",
-    border: "1px solid #48A6A7",
-  },
-  divider: {
-    height: "1px",
-    backgroundColor: "#9ACBD0",
-    margin: "4px 0",
-  },
-  indicator: {
-    padding: "6px 8px",
-    borderRadius: "4px",
-    fontSize: "12px",
-    textAlign: "center",
-    color: "#F2EFE7",
-    fontWeight: "bold",
-  },
-  label: {
-    color: "#006A71",
-    fontSize: "12px",
-    textAlign: "center",
-  },
-  colorPreview: {
-    width: "16px",
-    height: "16px",
-    borderRadius: "50%",
-    border: "2px solid #006A71",
-  },
-  picker: {
-    display: "grid",
-    gridTemplateColumns: "repeat(5, 1fr)",
-    gap: "6px",
-    padding: "8px",
-    backgroundColor: "#F2EFE7",
-    borderRadius: "4px",
-    marginTop: "4px",
-    border: "1px solid #9ACBD0",
-  },
-  colorSwatch: {
-    width: "28px",
-    height: "28px",
-    borderRadius: "4px",
-    cursor: "pointer",
-    transition: "transform 0.2s",
-  },
-  widthButton: {
-    padding: "6px",
-    border: "1px solid #9ACBD0",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "12px",
-    backgroundColor: "#F2EFE7",
-    color: "#006A71",
-  },
-};

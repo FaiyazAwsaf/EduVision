@@ -5,35 +5,56 @@
  * - WhiteboardCanvas (Fabric.js drawing)
  * - WebSocket (real-time collaboration)
  * - Toolbar (UI controls)
+ * - Session info display
  */
 
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
 import Toolbar, { Tool } from "./Toolbar";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
 
+/**
+ * props for whiteboard component
+ */
 export type WhiteboardProps = {
   sessionId: string;
   userId: string;
   role: "teacher" | "student";
 };
 
+type CanvasPath = {
+    toObject: () => unknown;
+};
+
+/**
+ * main whiteboard component
+ * coordinates drawing canvas, toolbar controls, and real-time collaboration
+ */
 export default function Whiteboard({
   sessionId,
   userId,
   role,
 }: WhiteboardProps) {
-  // Canvas state
+  // ============================================================
+  // state management
+  // ============================================================
+
+  // canvas state
   const canvasRef = useRef<WhiteboardCanvasHandle>(null);
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [penColor, setPenColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [isDrawingLocked, setIsDrawingLocked] = useState(false);
 
+  // ============================================================
+  // websocket handlers
+  // ============================================================
+
   /**
-   * Handle incoming WebSocket messages
+   * handle incoming websocket messages
+   * routes different message types to appropriate handlers
    */
   const handleWebSocketMessage = useCallback(
     (message: WebSocketMessage) => {
@@ -41,25 +62,25 @@ export default function Whiteboard({
 
       switch (message.type) {
         case "canvas_event":
-          // Handle remote drawing events
+          // handle remote drawing events
           if (message.data?.pathData) {
             canvasRef.current?.addPath(message.data.pathData);
           }
           break;
 
         case "clear_canvas":
-          // Remote clear event
+          // remote clear event
           console.log("[Whiteboard] Remote clear canvas");
           canvasRef.current?.clearCanvas();
           break;
 
         case "lock_state":
-          // Update drawing lock state for students
+          // update drawing lock state for students
           if (role === "student") {
             setIsDrawingLocked(message.data?.isLocked || false);
             console.log(
               "[Whiteboard] Drawing lock state:",
-              message.data?.isLocked,
+              message.data?.isLocked
             );
           }
           break;
@@ -71,13 +92,16 @@ export default function Whiteboard({
         case "user_left":
           console.log("[Whiteboard] User left:", message.data?.userId);
           break;
+
+        default:
+          console.warn("[Whiteboard] Unknown message type:", message.type);
       }
     },
-    [role],
+    [role]
   );
 
   /**
-   * Initialize WebSocket connection
+   * initialize websocket connection with callbacks
    */
   const websocket = useWebSocket({
     sessionId,
@@ -92,13 +116,26 @@ export default function Whiteboard({
     },
   });
 
+  // ============================================================
+  // Canvas Event Handlers
+  // ============================================================
+
   /**
-   * Handle local drawing events
+   * handle local drawing events
+   * broadcasts path data to all connected peers
    */
+
   const handlePathCreated = useCallback(
-    (path: any) => {
-      // Broadcast drawing event to other participants
+    (path: CanvasPath) => {
       const pathData = path.toObject();
+
+      if (!websocket.isConnected){
+        return;
+      }
+
+      if(!canDraw){
+        return;
+      }
 
       websocket.sendMessage({
         type: "canvas_event",
@@ -107,18 +144,22 @@ export default function Whiteboard({
 
       console.log("[Whiteboard] Broadcasted path to peers");
     },
-    [websocket],
+    [websocket]
   );
 
   /**
-   * Handle canvas clear (teacher only)
+   * handle canvas clear (teacher only)
+   * broadcasts clear event to all students
    */
   const handleClear = useCallback(() => {
     if (role !== "teacher") return;
 
     canvasRef.current?.clearCanvas();
+    
+    if(!websocket.isConnected){
+      return;
+    }
 
-    // Broadcast clear event
     websocket.sendMessage({
       type: "clear_canvas",
       data: {},
@@ -128,7 +169,8 @@ export default function Whiteboard({
   }, [role, websocket]);
 
   /**
-   * Export canvas to JSON
+   * export canvas to JSON file
+   * allows saving whiteboard state for future reference
    */
   const handleExport = useCallback(() => {
     const state = canvasRef.current?.exportToJSON();
@@ -148,7 +190,8 @@ export default function Whiteboard({
   }, [sessionId]);
 
   /**
-   * Toggle drawing lock (teacher only)
+   * toggle drawing lock for students (teacher only)
+   * broadcasts lock state to all connected students
    */
   const handleToggleLock = useCallback(() => {
     if (role !== "teacher") return;
@@ -156,7 +199,10 @@ export default function Whiteboard({
     const newLockState = !isDrawingLocked;
     setIsDrawingLocked(newLockState);
 
-    // Broadcast lock state to students
+    if(!websocket.isConnected){
+      return;
+    }
+
     websocket.sendMessage({
       type: "lock_state",
       data: { isLocked: newLockState },
@@ -165,12 +211,19 @@ export default function Whiteboard({
     console.log("[Whiteboard] Drawing lock:", newLockState);
   }, [role, isDrawingLocked, websocket]);
 
-  // Determine if current user can draw
+  // ============================================================
+  // Computed State
+  // ============================================================
+
   const canDraw = role === "teacher" || !isDrawingLocked;
 
+  // ============================================================
+  // Render
+  // ============================================================
+
   return (
-    <div style={styles.container}>
-      {/* Toolbar */}
+    <div className="w-screen h-screen bg-[#1a1a1a] relative overflow-hidden">
+      {/* toolbar */}
       <Toolbar
         role={role}
         currentTool={currentTool}
@@ -186,8 +239,8 @@ export default function Whiteboard({
         onToggleLock={role === "teacher" ? handleToggleLock : undefined}
       />
 
-      {/* Canvas */}
-      <div style={styles.canvasContainer}>
+      {/* canvas */}
+      <div className="w-full h-full absolute top-0 left-0">
         <WhiteboardCanvas
           ref={canvasRef}
           isDrawingEnabled={canDraw}
@@ -198,8 +251,8 @@ export default function Whiteboard({
         />
       </div>
 
-      {/* Session Info */}
-      <div style={styles.sessionInfo}>
+      {/* session info */}
+      <div className="fixed top-2.5 right-2.5 bg-slate-700 bg-opacity-90 text-slate-100 px-3 py-2 rounded text-xs z-[900] flex flex-col gap-1">
         <div>Session: {sessionId}</div>
         <div>Role: {role}</div>
         <div>Status: {websocket.connectionState}</div>
@@ -207,34 +260,3 @@ export default function Whiteboard({
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    width: "100vw",
-    height: "100vh",
-    backgroundColor: "#1a1a1a",
-    position: "relative",
-    overflow: "hidden",
-  },
-  canvasContainer: {
-    width: "100%",
-    height: "100%",
-    position: "absolute",
-    top: 0,
-    left: 0,
-  },
-  sessionInfo: {
-    position: "fixed",
-    top: 10,
-    right: 10,
-    backgroundColor: "rgba(44, 62, 80, 0.9)",
-    color: "#ecf0f1",
-    padding: "8px 12px",
-    borderRadius: "6px",
-    fontSize: "12px",
-    zIndex: 900,
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-};

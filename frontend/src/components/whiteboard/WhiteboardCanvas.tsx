@@ -1,27 +1,45 @@
 /**
- * WhiteboardCanvas Component
+ * whiteboard canvas component
  *
- * Production-grade canvas component using Fabric.js
- * Handles drawing, eraser, canvas state management
- * Broadcasts events to remote peers via WebSocket
+ * production-grade canvas component using fabric.js
+ * handles drawing, eraser, canvas state management
+ * broadcasts events to remote peers via websocket
  */
 
 "use client";
 
 import {
-  useEffect,
-  useRef,
   useCallback,
-  forwardRef,
+  useEffect,
   useImperativeHandle,
+  forwardRef,
+  useRef,
 } from "react";
 import * as fabric from "fabric";
 
-export type CanvasState = {
-  version: string;
-  objects: any[];
+/**
+ * custom defined type for type safety
+ */
+type SerializedFabricObject = {
+  type: string;
+  [key: string]: any;
+}
+
+type CanvasPath = {
+    toObject: () => unknown;
 };
 
+/**
+ * canvas state export format
+ */
+export type CanvasState = {
+  version: string;
+  objects: SerializedFabricObject[];
+};
+
+/**
+ * props for whiteboard canvas component
+ */
 export type WhiteboardCanvasProps = {
   width?: number;
   height?: number;
@@ -33,6 +51,10 @@ export type WhiteboardCanvasProps = {
   onPathCreated?: (path: fabric.Path) => void;
 };
 
+/**
+ * imperative handle for whiteboard canvas
+ * exposes canvas methods to parent components
+ */
 export type WhiteboardCanvasHandle = {
   getCanvas: () => fabric.Canvas | null;
   clearCanvas: () => void;
@@ -44,6 +66,10 @@ export type WhiteboardCanvasHandle = {
   setBrushWidth: (width: number) => void;
 };
 
+/**
+ * whiteboard canvas component using fabric.js
+ * manages drawing surface and path synchronization
+ */
 const WhiteboardCanvas = forwardRef<
   WhiteboardCanvasHandle,
   WhiteboardCanvasProps
@@ -59,28 +85,44 @@ const WhiteboardCanvas = forwardRef<
     onPathCreated,
   } = props;
 
+  // ============================================================
+  // state management
+  // ============================================================
+
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isRemoteUpdateRef = useRef(false);
 
+  const isValidPathData = (data: unknown): data is SerializedFabricObject => {
+    return (
+      typeof data === "object" && 
+      data !== null &&
+      (data as SerializedFabricObject).type === "path"
+    );
+  };
+  // ============================================================
+  // canvas initialization
+  // ============================================================
+
   /**
-   * Initialize Fabric.js canvas
+   * initialize fabric.js canvas on component mount
+   * sets up canvas dimensions, brush, and event listeners
    */
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log("[Canvas] Initializing Fabric.js canvas...");
+    console.log("[Canvas] initializing fabric.js canvas...");
 
     const canvas = new fabric.Canvas("whiteboard-canvas", {
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
       backgroundColor: "#ffffff",
       isDrawingMode: isDrawingEnabled,
-      selection: false, // Disable object selection for drawing mode
+      selection: false,
       renderOnAddRemove: true,
     });
 
-    // Initialize brush
+    // initialize brush
     const brush = new fabric.PencilBrush(canvas);
     brush.width = strokeWidth;
     brush.color = penColor;
@@ -88,30 +130,39 @@ const WhiteboardCanvas = forwardRef<
 
     canvasRef.current = canvas;
 
-    // Notify parent component
+    // notify parent component
     onCanvasReady?.(canvas);
 
-    // Listen for path:created events (when user finishes drawing a stroke)
-    canvas.on("path:created", (event: any) => {
-      // Only broadcast if this is a local drawing (not a remote update)
-      if (!isRemoteUpdateRef.current && event.path) {
-        console.log("[Canvas] Local path created");
-        onPathCreated?.(event.path);
+    // listen for path:created events (when user finishes drawing a stroke)
+    canvas.on("path:created", (event) => {
+      const obj = event.path;
+
+      if(!obj){
+        return;
+      }
+
+      if(obj instanceof fabric.Path){
+            onPathCreated?.(obj);
       }
     });
 
-    console.log("[Canvas] Canvas initialized successfully");
+    console.log("[Canvas] canvas initialized successfully");
 
-    // Cleanup
+    // cleanup
     return () => {
-      console.log("[Canvas] Disposing canvas");
+      console.log("[Canvas] disposing canvas");
       canvas.dispose();
       canvasRef.current = null;
     };
-  }, []); // Run once on mount
+  }, []);
+
+  // ============================================================
+  // window resize handler
+  // ============================================================
 
   /**
-   * Handle window resize
+   * handle canvas resize when window is resized
+   * maintains responsive dimensions
    */
   useEffect(() => {
     const handleResize = () => {
@@ -124,7 +175,7 @@ const WhiteboardCanvas = forwardRef<
           height: newHeight,
         });
         canvasRef.current.renderAll();
-        console.log(`[Canvas] Resized to ${newWidth}x${newHeight}`);
+        console.log(`[Canvas] resized to ${newWidth}x${newHeight}`);
       }
     };
 
@@ -132,18 +183,28 @@ const WhiteboardCanvas = forwardRef<
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // ============================================================
+  // drawing mode handler
+  // ============================================================
+
   /**
-   * Update drawing mode based on isDrawingEnabled prop
+   * update drawing mode based on isDrawingEnabled prop
+   * enables/disables drawing on canvas
    */
   useEffect(() => {
     if (canvasRef.current) {
       canvasRef.current.isDrawingMode = isDrawingEnabled;
-      console.log("[Canvas] Drawing mode:", isDrawingEnabled);
+      console.log("[Canvas] drawing mode:", isDrawingEnabled);
     }
   }, [isDrawingEnabled]);
 
+  // ============================================================
+  // brush settings handler
+  // ============================================================
+
   /**
-   * Update brush settings based on tool prop
+   * update brush settings based on tool prop
+   * switches between pen and eraser modes
    */
   useEffect(() => {
     if (canvasRef.current && canvasRef.current.freeDrawingBrush) {
@@ -151,18 +212,23 @@ const WhiteboardCanvas = forwardRef<
         canvasRef.current.freeDrawingBrush.color = penColor;
         canvasRef.current.freeDrawingBrush.width = strokeWidth;
       } else if (tool === "eraser") {
-        // Eraser is implemented as white brush
+        // eraser is implemented as white brush
         canvasRef.current.freeDrawingBrush.color = "#ffffff";
         canvasRef.current.freeDrawingBrush.width = 20;
       }
       console.log(
-        `[Canvas] Tool: ${tool}, Color: ${canvasRef.current.freeDrawingBrush.color}, Width: ${canvasRef.current.freeDrawingBrush.width}`,
+        `[Canvas] tool: ${tool}, color: ${canvasRef.current.freeDrawingBrush.color}, width: ${canvasRef.current.freeDrawingBrush.width}`
       );
     }
   }, [tool, penColor, strokeWidth]);
 
+  // ============================================================
+  // imperative handle methods
+  // ============================================================
+
   /**
-   * Expose methods to parent via ref
+   * expose canvas methods and state to parent component
+   * allows parent to control canvas programmatically
    */
   useImperativeHandle(ref, () => ({
     getCanvas: () => canvasRef.current,
@@ -172,14 +238,14 @@ const WhiteboardCanvas = forwardRef<
         canvasRef.current.clear();
         canvasRef.current.backgroundColor = "#ffffff";
         canvasRef.current.renderAll();
-        console.log("[Canvas] Canvas cleared");
+        console.log("[Canvas] canvas cleared");
       }
     },
 
     exportToJSON: () => {
       if (canvasRef.current) {
         const json = canvasRef.current.toJSON();
-        console.log("[Canvas] Exported canvas state");
+        console.log("[Canvas] exported canvas state");
         return {
           version: "1.0",
           objects: json.objects || [],
@@ -197,30 +263,35 @@ const WhiteboardCanvas = forwardRef<
             objects: state.objects,
           });
           canvasRef.current.renderAll();
-          console.log("[Canvas] Loaded canvas state from JSON");
+          console.log("[Canvas] loaded canvas state from json");
         } catch (error) {
-          console.error("[Canvas] Error loading from JSON:", error);
+          console.error("[Canvas] error loading from json:", error);
         } finally {
           isRemoteUpdateRef.current = false;
         }
       }
     },
 
-    addPath: (pathData: any) => {
+    addPath: (pathData: SerializedFabricObject) => {
+      if(!isValidPathData(pathData)){
+        return;
+      }
+      
       if (canvasRef.current) {
         isRemoteUpdateRef.current = true;
         try {
-          // Create path from received data
+
+          // create path from received data
           fabric.Path.fromObject(pathData).then((path: fabric.Path) => {
             if (canvasRef.current) {
               canvasRef.current.add(path);
               canvasRef.current.renderAll();
-              console.log("[Canvas] Added remote path");
+              console.log("[Canvas] added remote path");
             }
             isRemoteUpdateRef.current = false;
           });
         } catch (error) {
-          console.error("[Canvas] Error adding path:", error);
+          console.error("[Canvas] error adding path:", error);
           isRemoteUpdateRef.current = false;
         }
       }
@@ -245,16 +316,12 @@ const WhiteboardCanvas = forwardRef<
     },
   }));
 
+  // ============================================================
+  // render
+  // ============================================================
+
   return (
-    <div
-      ref={containerRef}
-      style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
       <canvas id="whiteboard-canvas" />
     </div>
   );
