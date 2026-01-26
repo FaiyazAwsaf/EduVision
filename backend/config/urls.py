@@ -1,5 +1,5 @@
 """
-URL configuration for config project.
+URL configuration for EduVision project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.2/topics/http/urls/
@@ -15,8 +15,77 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.http import JsonResponse
+from rest_framework.routers import DefaultRouter
+from apps.content_requests.api.views_study_plan import StudyPlanViewSet, StudyPlanItemViewSet
+from django.conf import settings
+from django.conf.urls.static import static
+
+
+# Health check endpoint for Docker/Kubernetes
+def health_check(request):
+    """Simple health check endpoint for container orchestration."""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'eduvision-backend'
+    })
+
+
+# Root API info endpoint
+def api_root(request):
+    """Root endpoint providing API information."""
+    return JsonResponse({
+        'name': 'EduVision API',
+        'version': '1.0.0',
+        'status': 'running',
+        'endpoints': {
+            'health': '/api/health/',
+            'content_requests': '/api/content-requests/',
+            'study_plans': '/api/study-plans/',
+            'intelligence': '/api/intelligence/',
+            'tutoring': '/api/tutoring/',
+            'evaluation': '/api/evaluation/',
+            'rubrics': '/api/rubrics/',
+            'admin': '/admin/',
+        }
+    })
+
+
+# Router for study plans (Phase 5)
+router = DefaultRouter()
+router.register(r'study-plans', StudyPlanViewSet, basename='study-plan')
+router.register(r'study-plan-items', StudyPlanItemViewSet, basename='study-plan-item')
+
 
 urlpatterns = [
+    # Root API info
+    path('', api_root, name='api_root'),
+    
+    # Health check (for Docker/Kubernetes)
+    path('api/health/', health_check, name='health_check'),
+    
+    # Admin interface
     path('admin/', admin.site.urls),
+    
+    # API endpoints
+    path('api/content-requests/', include('apps.content_requests.api.urls')),
+    
+    # Study plan endpoints (Phase 5)
+    path('api/', include(router.urls)),
+    
+    # Intelligence & Adaptive Optimization endpoints (Phase 6)
+    path('api/intelligence/', include('apps.intelligence.api.urls', namespace='intelligence')),
+    
+    # Module 5: Tutoring endpoints
+    path('api/tutoring/', include('apps.tutoring.api.urls', namespace='tutoring')),
+    
+    # Add other module APIs here as they are implemented
+    # path('api/evaluation/', include('apps.evaluation.api.urls')),
+    path('api/evaluation/', include('apps.evaluation.urls')),
+    path('api/', include('apps.rubrics.urls')),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
