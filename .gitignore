@@ -16,7 +16,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+backend/lib/
 lib64/
 parts/
 sdist/
@@ -126,5 +126,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# md files
+# md file
 *.md

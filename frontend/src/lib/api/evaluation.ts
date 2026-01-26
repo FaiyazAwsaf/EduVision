@@ -1,5 +1,5 @@
 // API client for the script evaluation backend
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface QuestionPaper {
   id: string;
@@ -132,7 +132,7 @@ class EvaluationAPI {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = `${API_BASE_URL}/evaluation`;
+    this.baseUrl = `${API_BASE_URL}/api/evaluation`;
   }
 
   private async fetch<T>(
