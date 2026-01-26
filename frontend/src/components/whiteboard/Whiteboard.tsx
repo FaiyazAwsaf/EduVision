@@ -14,6 +14,7 @@ import { useCallback, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
 import Toolbar, { Tool } from "./Toolbar";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
+import * as fabric from "fabric";
 
 /**
  * props for whiteboard component
@@ -137,7 +138,7 @@ export default function Whiteboard({
    */
   const handlePathCreated = useCallback(
     (path: CanvasPath) => {
-      const pathData = path.toObject() as fabric.IPathOptions;
+      const pathData = path.toObject();
 
       if (!websocket.isConnected){
         console.log("[Whiteboard] Cannot broadcast: websocket not connected");

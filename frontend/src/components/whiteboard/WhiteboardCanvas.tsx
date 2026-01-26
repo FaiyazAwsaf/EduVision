@@ -19,15 +19,16 @@ import * as fabric from "fabric";
 
 /**
  * fabric.js path serialization options
- * all properties needed to reconstruct a path
+ * accepts any object that fabric.Path.fromObject can deserialize
  */
+type PathOptions = Record<string, any>;
 
 /**
  * canvas state export format
  */
 export type CanvasState = {
   version: string;
-  objects: fabric.IPathOptions[];
+  objects: PathOptions[];
 };
 
 /**
@@ -53,7 +54,7 @@ export type WhiteboardCanvasHandle = {
   clearCanvas: () => void;
   exportToJSON: () => CanvasState;
   loadFromJSON: (state: CanvasState) => Promise<void>;
-  addPath: (pathData: fabric.IPathOptions) => void;
+  addPath: (pathData: PathOptions) => void;
   setDrawingMode: (enabled: boolean) => void;
   setBrushColor: (color: string) => void;
   setBrushWidth: (width: number) => void;
@@ -113,6 +114,7 @@ const WhiteboardCanvas = forwardRef<
     brush.width = strokeWidth;
     brush.color = penColor;
     canvas.freeDrawingBrush = brush;
+    canvas.renderAll();
 
     canvasRef.current = canvas;
 
@@ -262,7 +264,7 @@ const WhiteboardCanvas = forwardRef<
       }
     },
 
-    addPath: (pathData: fabric.IPathOptions) => {
+    addPath: (pathData: PathOptions) => {
       if (canvasRef.current) {
         isRemoteUpdateRef.current = true;
         try {
