@@ -40,7 +40,7 @@ export type WhiteboardCanvasProps = {
   isDrawingEnabled?: boolean;
   penColor?: string;
   strokeWidth?: number;
-  tool?: "pen" | "eraser";
+  tool?: "pen" | "eraser" | "select";
   onCanvasReady?: (canvas: fabric.Canvas) => void;
   onPathCreated?: (path: fabric.Path) => void;
 };

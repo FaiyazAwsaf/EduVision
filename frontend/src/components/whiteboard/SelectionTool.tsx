@@ -49,16 +49,26 @@ export default function SelectionTool({
     canvas.isDrawingMode = false;
     canvas.selection = false;
 
+    const getSceneCoords = (ev: fabric.TPointerEventInfo<fabric.TPointerEvent>): { x: number; y: number } => {
+      if (ev.scenePoint) {
+        return { x: ev.scenePoint.x, y: ev.scenePoint.y };
+      }
+      const p = canvas.getScenePoint(ev.e);
+      return { x: p.x, y: p.y };
+    };
+
     // mouse down: start selection
-    const handleMouseDown = (event: fabric.TPointerEventInfo) => {
-      const pointer = canvas.getPointer(event.e);
-      setStartPoint({ x: pointer.x, y: pointer.y });
+    const handleMouseDown = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+
+      const { x, y } = getSceneCoords(event);
+ 
+      setStartPoint({ x, y });
       setIsSelecting(true);
 
       // create selection rectangle
       const rect = new fabric.Rect({
-        left: pointer.x,
-        top: pointer.y,
+        left: x,
+        top: y,
         width: 0,
         height: 0,
         fill: 'rgba(0, 123, 255, 0.1)',
@@ -75,25 +85,25 @@ export default function SelectionTool({
     };
 
     // mouse move: update selection rectangle
-    const handleMouseMove = (event: fabric.TPointerEventInfo) => {
+    const handleMouseMove = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
       if (!isSelecting || !startPoint || !selectionRectRef.current) return;
 
-      const pointer = canvas.getPointer(event.e);
+        const { x, y } = getSceneCoords(event);
       const rect = selectionRectRef.current;
 
       // calculate rectangle dimensions
-      const width = pointer.x - startPoint.x;
-      const height = pointer.y - startPoint.y;
+      const width = x - startPoint.x;
+      const height = y - startPoint.y;
 
       // update rectangle (handle negative dimensions for reverse dragging)
       if (width < 0) {
-        rect.set({ left: pointer.x, width: Math.abs(width) });
+        rect.set({ left: x, width: Math.abs(width) });
       } else {
         rect.set({ width });
       }
 
       if (height < 0) {
-        rect.set({ top: pointer.y, height: Math.abs(height) });
+        rect.set({ top: y, height: Math.abs(height) });
       } else {
         rect.set({ height });
       }
