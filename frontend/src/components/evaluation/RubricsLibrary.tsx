@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   BookOpen,
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   Filter,
   X,
+  Edit,
 } from "lucide-react";
 import { listRubrics, archiveRubric, getRubric } from "@/lib/api/rubrics";
 import type { RubricListItem, Rubric } from "@/lib/api/rubrics";
@@ -22,6 +24,7 @@ interface RubricsLibraryProps {
 export default function RubricsLibrary({
   onSelectRubric,
 }: RubricsLibraryProps) {
+  const router = useRouter();
   const [rubrics, setRubrics] = useState<RubricListItem[]>([]);
   const [filteredRubrics, setFilteredRubrics] = useState<RubricListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -101,6 +104,11 @@ export default function RubricsLibrary({
     if (onSelectRubric) {
       onSelectRubric(rubric);
     }
+  };
+
+  const handleEditRubric = async (id: string) => {
+    // Navigate directly to the rubrics editor page with the rubric ID
+    router.push(`/rubrics?id=${id}`);
   };
 
   // Get unique subjects for filter
@@ -371,6 +379,13 @@ export default function RubricsLibrary({
                 >
                   <Eye className="w-4 h-4" />
                   View
+                </button>
+                <button
+                  onClick={() => handleEditRubric(rubric.id)}
+                  className="flex items-center justify-center gap-2 px-3 py-2 text-sm border border-[#48A6A7] text-[#48A6A7] rounded-lg hover:bg-[#48A6A7] hover:text-white transition-colors"
+                  title="Edit rubric"
+                >
+                  <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleArchiveRubric(rubric.id, rubric.title)}

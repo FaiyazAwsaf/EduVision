@@ -228,6 +228,45 @@ export async function archiveRubricSet(id: string): Promise<RubricSet> {
 }
 
 /**
+ * Create a draft copy of a rubric set for editing
+ */
+export async function createDraftCopy(id: string): Promise<RubricSet> {
+  const response = await fetch(`${API_URL}/rubrics/${id}/create_draft_copy/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to create draft copy");
+  }
+
+  return response.json();
+}
+
+/**
+ * Parse a rubric document (PDF) to extract questions and marking schemes
+ */
+export async function parseRubricDocument(file: File): Promise<RubricSet> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_URL}/rubrics/parse_document/`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to parse rubric document");
+  }
+
+  return response.json();
+}
+
+/**
  * Get version history of a rubric set
  */
 export async function getRubricSetVersions(id: string): Promise<any[]> {

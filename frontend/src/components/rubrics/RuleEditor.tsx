@@ -112,7 +112,7 @@ export default function RuleEditor({
     if (newKeyword.trim() && rule.type === "keyword") {
       const config = rule.config as KeywordConfig;
       updateConfig("required_keywords", [
-        ...config.required_keywords,
+        ...(config.required_keywords || []),
         newKeyword.trim(),
       ]);
       setNewKeyword("");
@@ -125,7 +125,7 @@ export default function RuleEditor({
       const config = rule.config as KeywordConfig;
       updateConfig(
         "required_keywords",
-        config.required_keywords.filter((_, i) => i !== index)
+        (config.required_keywords || []).filter((_, i) => i !== index)
       );
     }
   };
@@ -135,7 +135,7 @@ export default function RuleEditor({
     if (newPattern.trim() && rule.type === "stepwise") {
       const config = rule.config as StepwiseConfig;
       updateConfig("expected_patterns", [
-        ...config.expected_patterns,
+        ...(config.expected_patterns || []),
         newPattern.trim(),
       ]);
       setNewPattern("");
@@ -148,7 +148,7 @@ export default function RuleEditor({
       const config = rule.config as StepwiseConfig;
       updateConfig(
         "expected_patterns",
-        config.expected_patterns.filter((_, i) => i !== index)
+        (config.expected_patterns || []).filter((_, i) => i !== index)
       );
     }
   };
@@ -270,9 +270,9 @@ export default function RuleEditor({
                   Add
                 </button>
               </div>
-              {(rule.config as KeywordConfig).required_keywords.length > 0 && (
+              {((rule.config as KeywordConfig).required_keywords || []).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {(rule.config as KeywordConfig).required_keywords.map(
+                  {((rule.config as KeywordConfig).required_keywords || []).map(
                     (keyword, index) => (
                       <span
                         key={index}
@@ -409,9 +409,9 @@ export default function RuleEditor({
                   Add
                 </button>
               </div>
-              {(rule.config as StepwiseConfig).expected_patterns.length > 0 && (
+              {((rule.config as StepwiseConfig).expected_patterns || []).length > 0 && (
                 <div className="mt-2 space-y-2">
-                  {(rule.config as StepwiseConfig).expected_patterns.map(
+                  {((rule.config as StepwiseConfig).expected_patterns || []).map(
                     (pattern, index) => (
                       <div
                         key={index}
