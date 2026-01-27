@@ -14,7 +14,6 @@ from .serializers import (
     RubricSetVersionSerializer, RubricSetPublishSerializer,
     QuestionRubricSerializer
 )
-from .services import evaluate_rubric_set
 from .pdf_parser import parse_rubric_document
 
 
@@ -32,7 +31,6 @@ class RubricSetViewSet(viewsets.ModelViewSet):
     - POST /api/rubric-sets/{id}/publish/ → publish rubric set
     - POST /api/rubric-sets/{id}/archive/ → archive rubric set
     - GET /api/rubric-sets/{id}/versions/ → get version history
-    - POST /api/rubric-sets/test/ → test rubric set without saving
     - POST /api/rubric-sets/parse_document/ → parse rubric from uploaded PDF
     """
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -178,76 +176,6 @@ class RubricSetViewSet(viewsets.ModelViewSet):
         versions = instance.versions.all()
         serializer = RubricSetVersionSerializer(versions, many=True)
         return Response(serializer.data)
-    
-    @action(detail=False, methods=['post'])
-    def test(self, request):
-        """
-        Test a rubric set against sample answers without saving.
-        
-        Request body:
-        {
-            "rubric_set": {
-                "questions": [
-                    {
-                        "question_number": 1,
-                        "question_text": "...",
-                        "max_marks": 5.0,
-                        "evaluation_rules": [...]
-                    },
-                    ...
-                ]
-            },
-            "answers": {
-                "1": "answer for question 1",
-                "2": "answer for question 2",
-                ...
-            }
-        }
-        
-        Response:
-        {
-            "total_score": 15.5,
-            "max_score": 20.0,
-            "percentage": 77.5,
-            "question_results": [...],
-            "feedback": "..."
-        }
-        """
-        rubric_set_data = request.data.get('rubric_set')
-        answers_data = request.data.get('answers', {})
-        
-        if not rubric_set_data:
-            return Response(
-                {"detail": "'rubric_set' is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not rubric_set_data.get('questions'):
-            return Response(
-                {"detail": "Rubric set must contain at least one question"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Convert string keys to integers
-        answers = {}
-        for key, value in answers_data.items():
-            try:
-                answers[int(key)] = value
-            except (ValueError, TypeError):
-                return Response(
-                    {"detail": f"Invalid question number in answers: {key}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        try:
-            # Apply the rubric set evaluation
-            result = evaluate_rubric_set(rubric_set_data, answers)
-            return Response(result, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {"detail": f"Error evaluating answers: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
     
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
     def parse_document(self, request):
