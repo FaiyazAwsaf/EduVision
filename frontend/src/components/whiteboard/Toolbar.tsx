@@ -95,11 +95,11 @@ export default function Toolbar(props: ToolbarProps) {
               Drawing
             </span>
 
-            {(["pen", "eraser"] as Tool[]).map((tool) => (
+            {(["pen", "eraser", "select"] as Tool[]).map((tool) => (
               <button
                 key={tool}
                 type="button"
-                disabled={isDisabled}
+                disabled={isDisabled && tool != "select"}
                 onClick={() => onToolChange(tool)}
                 className={`px-3 py-2 border rounded text-sm flex items-center gap-1.5 transition-all
                   ${
@@ -107,10 +107,10 @@ export default function Toolbar(props: ToolbarProps) {
                       ? "bg-[#48A6A7] text-[#F2EFE7] font-bold border-[#48A6A7]"
                       : "bg-[#F2EFE7] text-[#006A71] border-[#9ACBD0]"
                   }
-                  ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                  ${isDisabled && tool !== "select" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                {tool === "pen" ? "✏️ Pen" : "🧹 Eraser"}
+                {tool === "pen" ? "✏️ Pen" : tool === "eraser" ? "🧹 Eraser" : "🔲 Select"}
               </button>
             ))}
           </div>
