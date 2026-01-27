@@ -18,14 +18,14 @@ class AnswerScript(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
-    # Reference to RubricSet from rubrics module
+    # Reference to RubricSet from rubrics module (required for evaluation)
     rubric_set = models.ForeignKey(
         'rubrics.RubricSet',
         on_delete=models.CASCADE,
         related_name="evaluated_scripts",
         help_text="The rubric set (question paper) being evaluated",
-        null=True,  # Nullable - validation handled by serializer
-        blank=True
+        null=False,  # Required field
+        blank=False
     )
     
     # Student identification (optional, can be anonymous)
@@ -64,7 +64,8 @@ class AnswerScript(models.Model):
     
     def __str__(self):
         student = self.student_name or self.student_id or "Anonymous"
-        return f"Script by {student} - {self.rubric_set.title}"
+        rubric_title = self.rubric_set.title if self.rubric_set else "No Rubric Set"
+        return f"Script by {student} - {rubric_title}"
 
 
 class ScriptPage(models.Model):

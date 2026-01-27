@@ -29,7 +29,8 @@ export interface AnswerScript {
   id: string;
   student_name?: string;
   student_id?: string;
-  rubric_set: RubricSet;  // Changed from question_paper
+  rubric_set: RubricSet | string;  // Can be full object or just title string
+  rubric_set_title?: string;
   status: "pending" | "processing" | "evaluated" | "error";
   total_score?: number;
   percentage?: number;
@@ -37,6 +38,7 @@ export interface AnswerScript {
   strengths?: string[];
   areas_for_improvement?: string[];
   pages?: ScriptPage[];
+  page_count?: number;  // Added for list view
   question_evaluations?: QuestionEvaluation[];
   created_at: string;
   evaluated_at?: string;

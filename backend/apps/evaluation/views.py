@@ -70,6 +70,12 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
         """
         script = self.get_object()
         
+        if not script.rubric_set:
+            return Response(
+                {"detail": "Cannot evaluate: No rubric set associated with this script."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         if script.status == "processing":
             return Response(
                 {"detail": "Script is already being processed."},
@@ -92,6 +98,11 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
             
         except Exception as e:
+            import traceback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Evaluation failed for script {script.id}: {str(e)}")
+            logger.error(traceback.format_exc())
             return Response(
                 {"detail": f"Evaluation failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -140,11 +151,11 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
         
         # Add detailed question results
         for evaluation in evaluations:
-            # Extract marking scheme from evaluation_rules
-            eval_rules = evaluation.question_rubric.evaluation_rules or {}
-            method_max = float(eval_rules.get('method_marks', 0))
-            calc_max = float(eval_rules.get('calculation_marks', 0))
-            answer_max = float(eval_rules.get('answer_marks', 0))
+            # Calculate marks breakdown (30% method, 40% calculation, 30% answer)
+            total_max = float(evaluation.question_rubric.max_marks)
+            method_max = total_max * 0.3
+            calc_max = total_max * 0.4
+            answer_max = total_max * 0.3
             
             question_result = {
                 "question_number": evaluation.question_rubric.question_number,

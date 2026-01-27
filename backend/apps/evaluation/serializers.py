@@ -38,7 +38,11 @@ class QuestionEvaluationSerializer(serializers.ModelSerializer):
     """Serializer for question evaluations."""
     question_number = serializers.CharField(source="question_rubric.question_number", read_only=True)
     question_text = serializers.CharField(source="question_rubric.question_text", read_only=True)
-    max_marks = serializers.DecimalField(source="question_rubric.max_marks", max_digits=10, decimal_places=2, read_only=True)
+    max_marks = serializers.FloatField(source="question_rubric.max_marks", read_only=True)
+    method_marks_awarded = serializers.FloatField(read_only=True)
+    calculation_marks_awarded = serializers.FloatField(read_only=True)
+    answer_marks_awarded = serializers.FloatField(read_only=True)
+    total_marks_awarded = serializers.FloatField(read_only=True)
     
     class Meta:
         model = QuestionEvaluation
@@ -69,6 +73,8 @@ class AnswerScriptListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing answer scripts."""
     rubric_set_title = serializers.CharField(source="rubric_set.title", read_only=True)
     page_count = serializers.SerializerMethodField()
+    total_score = serializers.FloatField(read_only=True)
+    percentage = serializers.FloatField(read_only=True)
     
     class Meta:
         model = AnswerScript
@@ -94,6 +100,8 @@ class AnswerScriptDetailSerializer(serializers.ModelSerializer):
     rubric_set = RubricSetSerializer(read_only=True)
     pages = ScriptPageSerializer(many=True, read_only=True)
     question_evaluations = QuestionEvaluationSerializer(many=True, read_only=True)
+    total_score = serializers.FloatField(read_only=True)
+    percentage = serializers.FloatField(read_only=True)
     
     class Meta:
         model = AnswerScript
@@ -131,6 +139,11 @@ class AnswerScriptCreateSerializer(serializers.ModelSerializer):
             "student_id",
             "pages",
         ]
+    
+    def validate_rubric_set(self, value):
+        if value is None:
+            raise serializers.ValidationError("Rubric set is required.")
+        return value
     
     def validate_pages(self, value):
         if len(value) > 10:

@@ -35,12 +35,14 @@ def get_gemini_model():
     """
     Finds and returns an available Gemini model from a preference list.
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY_1")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable not set.")
     genai.configure(api_key=api_key)
 
     model_preference_list = [
+        'gemini-2.0-flash-exp',
+        'gemini-exp-1206',
         'gemini-2.5-pro',
         'gemini-1.5-pro-latest',
         'gemini-1.5-pro',
@@ -100,15 +102,18 @@ class ScriptEvaluationService:
                 
                 Instructions:
                 1. Extract all handwritten text exactly as written
-                2. Convert mathematical equations to LaTeX format
+                2. For mathematical equations, describe them in plain text or use double backslashes for LaTeX (e.g., \\\\frac{1}{2})
                 3. Identify question numbers if visible
                 4. Note any diagrams or figures present
                 5. Preserve the structure and flow of the answer
                 
+                IMPORTANT: In your JSON response, use double backslashes (\\\\) for any LaTeX commands to ensure valid JSON.
+                For example, use \\\\frac{1}{2} not \\frac{1}{2}
+                
                 Return your response in this JSON format:
                 {
-                    "extracted_text": "full extracted text with equations in LaTeX",
-                    "equations": ["equation1 in LaTeX", "equation2 in LaTeX"],
+                    "extracted_text": "full extracted text with equations",
+                    "equations": ["equation1", "equation2"],
                     "question_numbers_found": ["1", "2a", etc.],
                     "has_diagrams": true/false,
                     "confidence": 0.0-1.0,
@@ -131,7 +136,27 @@ class ScriptEvaluationService:
                     safety_settings=self.safety_settings
                 )
                 
-                result = json.loads(response.text)
+                # Try to parse JSON, handling LaTeX escape issues
+                try:
+                    result = json.loads(response.text)
+                except json.JSONDecodeError as json_err:
+                    logger.warning(f"JSON decode error on page {page.page_number}, attempting to fix LaTeX escapes: {json_err}")
+                    # Try to fix common LaTeX escape issues
+                    fixed_text = response.text.replace('\\', '\\\\')
+                    try:
+                        result = json.loads(fixed_text)
+                        logger.info(f"Successfully parsed JSON after fixing escapes on page {page.page_number}")
+                    except json.JSONDecodeError:
+                        # If still fails, extract text manually from response
+                        logger.error(f"Could not parse JSON even after fixes on page {page.page_number}")
+                        result = {
+                            "extracted_text": response.text[:1000],  # Use raw response as fallback
+                            "equations": [],
+                            "question_numbers_found": [],
+                            "has_diagrams": False,
+                            "confidence": 0.3,
+                            "notes": "JSON parsing failed, using raw response"
+                        }
                 
                 # Update page with extracted content
                 page.extracted_text = result.get("extracted_text", "")
@@ -175,19 +200,46 @@ class ScriptEvaluationService:
     ) -> dict:
         """
         Evaluate a single question answer against the rubric.
-        QuestionRubric.evaluation_rules contains the marking criteria in JSON format.
+        QuestionRubric.evaluation_rules contains automated checking rules in JSON format.
         
         Returns detailed marks breakdown and feedback.
         """
-        # Extract marking criteria from evaluation_rules
-        eval_rules = question_rubric.evaluation_rules or {}
-        method_marks = eval_rules.get('method_marks', 0)
-        calculation_marks = eval_rules.get('calculation_marks', 0)
-        answer_marks = eval_rules.get('answer_marks', 0)
-        key_points = eval_rules.get('key_points', [])
-        common_mistakes = eval_rules.get('common_mistakes', [])
-        grading_notes = eval_rules.get('grading_notes', '')
-        model_answer = eval_rules.get('model_answer', '')
+        # Get evaluation rules - now a list of rule objects
+        eval_rules_list = question_rubric.evaluation_rules or []
+        
+        # Handle case where evaluation_rules might not be a list
+        if not isinstance(eval_rules_list, list):
+            logger.warning(f"Question {question_rubric.question_number} has evaluation_rules as {type(eval_rules_list)}, expected list. Converting to list.")
+            eval_rules_list = []
+        
+        # Build description of expected answer from rules
+        rules_description = []
+        total_max_marks = question_rubric.max_marks
+        
+        for rule in eval_rules_list:
+            if isinstance(rule, dict):
+                rule_type = rule.get('type', 'unknown')
+                marks = rule.get('marks', 0)
+                config = rule.get('config', {})
+                
+                if rule_type == 'numeric':
+                    expected = config.get('expected_value', 'N/A')
+                    tolerance = config.get('tolerance', 0)
+                    rules_description.append(f"- Numeric answer: {expected} (±{tolerance}) [{marks} marks]")
+                elif rule_type == 'expression':
+                    expected = config.get('expected_expression', 'N/A')
+                    rules_description.append(f"- Expression: {expected} [{marks} marks]")
+                elif rule_type == 'keyword':
+                    keywords = config.get('required_keywords', [])
+                    rules_description.append(f"- Keywords required: {', '.join(keywords)} [{marks} marks]")
+        
+        rules_text = "\n".join(rules_description) if rules_description else "No specific automated rules defined"
+        
+        # For AI evaluation, divide marks into method, calculation, and answer
+        # Simple heuristic: 30% method, 40% calculation, 30% answer
+        method_marks = float(total_max_marks) * 0.3
+        calculation_marks = float(total_max_marks) * 0.4
+        answer_marks = float(total_max_marks) * 0.3
         
         evaluation_prompt = f"""
         You are an expert mathematics teacher evaluating a student's answer.
@@ -196,35 +248,31 @@ class ScriptEvaluationService:
         QUESTION:
         Question Number: {question_rubric.question_number}
         Question Text: {question_rubric.question_text}
-        Maximum Marks: {question_rubric.max_marks}
+        Maximum Marks: {total_max_marks}
         
-        MODEL ANSWER (Reference):
-        {model_answer or "Not provided"}
+        EXPECTED ANSWER COMPONENTS (from automated rules):
+        {rules_text}
         
-        RUBRIC:
-        - Method/Approach: {method_marks} marks
-        - Calculation/Steps: {calculation_marks} marks  
-        - Final Answer: {answer_marks} marks
-        
-        Key Points to Check:
-        {json.dumps(key_points, indent=2) if key_points else "Not specified"}
-        
-        Common Mistakes to Look For:
-        {json.dumps(common_mistakes, indent=2) if common_mistakes else "Not specified"}
-        
-        Additional Grading Notes:
-        {grading_notes or "None"}
+        MARKS BREAKDOWN:
+        - Method/Approach: {method_marks:.1f} marks (30%)
+        - Calculation/Steps: {calculation_marks:.1f} marks (40%)
+        - Final Answer: {answer_marks:.1f} marks (30%)
         
         STUDENT'S ANSWER:
         {student_answer}
         
         EVALUATION INSTRUCTIONS:
-        1. Assess if the correct method/approach was used
-        2. Check if calculations and steps are correct
-        3. Verify the final answer
-        4. Identify which key points were covered
-        5. Note any mistakes made
-        6. Provide constructive feedback
+        1. If the student's answer is empty or unclear, award 0 marks but note this in feedback
+        2. Be generous with partial credit for correct method even if the final answer is wrong
+        3. Award partial marks for showing work and attempting the problem
+        4. Check if calculations and steps are correct
+        5. Verify the final answer against expected values
+        6. Provide constructive and encouraging feedback
+        
+        IMPORTANT: Award partial credit generously. Even if the answer is wrong, give marks for:
+        - Correct identification of the method/formula
+        - Attempting calculations with correct approach
+        - Showing work and reasoning
         
         Respond with this exact JSON format:
         {{
@@ -264,19 +312,24 @@ class ScriptEvaluationService:
             
             result = json.loads(response.text)
             
-            # Ensure marks don't exceed maximums from evaluation_rules
-            eval_rules = question_rubric.evaluation_rules or {}
+            # Calculate max marks for each category based on total
+            total_max_marks = float(question_rubric.max_marks)
+            max_method = total_max_marks * 0.3
+            max_calculation = total_max_marks * 0.4
+            max_answer = total_max_marks * 0.3
+            
+            # Ensure marks don't exceed maximums
             result["method_marks_awarded"] = min(
                 float(result.get("method_marks_awarded", 0)),
-                float(eval_rules.get('method_marks', 0))
+                max_method
             )
             result["calculation_marks_awarded"] = min(
                 float(result.get("calculation_marks_awarded", 0)),
-                float(eval_rules.get('calculation_marks', 0))
+                max_calculation
             )
             result["answer_marks_awarded"] = min(
                 float(result.get("answer_marks_awarded", 0)),
-                float(eval_rules.get('answer_marks', 0))
+                max_answer
             )
             
             return result
@@ -430,6 +483,13 @@ class ScriptEvaluationService:
         5. Generate overall feedback
         """
         try:
+            # Validate rubric_set exists
+            if not script.rubric_set:
+                script.status = "error"
+                script.feedback_summary = "No rubric set associated with this script."
+                script.save()
+                raise ValueError("Script has no rubric_set assigned")
+            
             # Update status to processing
             script.status = "processing"
             script.save()
@@ -450,6 +510,7 @@ class ScriptEvaluationService:
             # Step 3: Segment answers by question
             logger.info(f"Segmenting answers for script {script.id}")
             segmented_answers = self.segment_answers_by_question(extracted_content, question_rubrics)
+            logger.info(f"Segmented answers: {list(segmented_answers.keys())}")
             
             # Step 4: Evaluate each question
             total_marks_awarded = Decimal("0")
@@ -457,12 +518,32 @@ class ScriptEvaluationService:
             evaluations = []
             
             for question_rubric in question_rubrics:
+                # Try exact match first
                 student_answer = segmented_answers.get(
                     str(question_rubric.question_number), 
                     segmented_answers.get(question_rubric.question_number, "")
                 )
                 
+                # If empty, try to find sub-questions (e.g., "1a", "1b" for question "1")
+                if not student_answer:
+                    question_num = str(question_rubric.question_number)
+                    sub_answers = []
+                    for key, value in segmented_answers.items():
+                        # Check if key starts with the question number (e.g., "1a", "1b" for "1")
+                        if str(key).startswith(question_num) and len(str(key)) > len(question_num):
+                            sub_answers.append(f"Part {key}: {value}")
+                    
+                    if sub_answers:
+                        student_answer = "\n\n".join(sub_answers)
+                        logger.info(f"Combined {len(sub_answers)} sub-parts for question {question_num}")
+                
                 logger.info(f"Evaluating question {question_rubric.question_number}")
+                logger.info(f"Student answer length: {len(student_answer)} chars")
+                if len(student_answer) < 200:
+                    logger.info(f"Student answer preview: {student_answer}")
+                else:
+                    logger.info(f"Student answer preview: {student_answer[:200]}...")
+                
                 eval_result = self.evaluate_question(question_rubric, student_answer)
                 
                 # Create QuestionEvaluation record
