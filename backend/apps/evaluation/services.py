@@ -518,24 +518,10 @@ class ScriptEvaluationService:
             evaluations = []
             
             for question_rubric in question_rubrics:
-                # Try exact match first
                 student_answer = segmented_answers.get(
                     str(question_rubric.question_number), 
                     segmented_answers.get(question_rubric.question_number, "")
                 )
-                
-                # If empty, try to find sub-questions (e.g., "1a", "1b" for question "1")
-                if not student_answer:
-                    question_num = str(question_rubric.question_number)
-                    sub_answers = []
-                    for key, value in segmented_answers.items():
-                        # Check if key starts with the question number (e.g., "1a", "1b" for "1")
-                        if str(key).startswith(question_num) and len(str(key)) > len(question_num):
-                            sub_answers.append(f"Part {key}: {value}")
-                    
-                    if sub_answers:
-                        student_answer = "\n\n".join(sub_answers)
-                        logger.info(f"Combined {len(sub_answers)} sub-parts for question {question_num}")
                 
                 logger.info(f"Evaluating question {question_rubric.question_number}")
                 logger.info(f"Student answer length: {len(student_answer)} chars")
