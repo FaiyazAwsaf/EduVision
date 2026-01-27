@@ -24,10 +24,9 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from .models import (
     AnswerScript,
     ScriptPage,
-    Question,
-    Rubric,
     QuestionEvaluation,
 )
+from apps.rubrics.models import QuestionRubric
 
 logger = logging.getLogger(__name__)
 
@@ -171,41 +170,50 @@ class ScriptEvaluationService:
     
     def evaluate_question(
         self,
-        question: Question,
-        student_answer: str,
-        rubric: Rubric
+        question_rubric: QuestionRubric,
+        student_answer: str
     ) -> dict:
         """
         Evaluate a single question answer against the rubric.
+        QuestionRubric.evaluation_rules contains the marking criteria in JSON format.
         
         Returns detailed marks breakdown and feedback.
         """
+        # Extract marking criteria from evaluation_rules
+        eval_rules = question_rubric.evaluation_rules or {}
+        method_marks = eval_rules.get('method_marks', 0)
+        calculation_marks = eval_rules.get('calculation_marks', 0)
+        answer_marks = eval_rules.get('answer_marks', 0)
+        key_points = eval_rules.get('key_points', [])
+        common_mistakes = eval_rules.get('common_mistakes', [])
+        grading_notes = eval_rules.get('grading_notes', '')
+        model_answer = eval_rules.get('model_answer', '')
+        
         evaluation_prompt = f"""
         You are an expert mathematics teacher evaluating a student's answer.
         Be strict on correctness but fair in giving partial credit for effort and reasoning.
         
         QUESTION:
-        Question Number: {question.question_number}
-        Question Text: {question.question_text}
-        Question Type: {question.question_type}
-        Maximum Marks: {question.max_marks}
+        Question Number: {question_rubric.question_number}
+        Question Text: {question_rubric.question_text}
+        Maximum Marks: {question_rubric.max_marks}
         
         MODEL ANSWER (Reference):
-        {question.model_answer or "Not provided"}
+        {model_answer or "Not provided"}
         
         RUBRIC:
-        - Method/Approach: {rubric.method_marks} marks
-        - Calculation/Steps: {rubric.calculation_marks} marks  
-        - Final Answer: {rubric.answer_marks} marks
+        - Method/Approach: {method_marks} marks
+        - Calculation/Steps: {calculation_marks} marks  
+        - Final Answer: {answer_marks} marks
         
         Key Points to Check:
-        {json.dumps(rubric.key_points, indent=2) if rubric.key_points else "Not specified"}
+        {json.dumps(key_points, indent=2) if key_points else "Not specified"}
         
         Common Mistakes to Look For:
-        {json.dumps(rubric.common_mistakes, indent=2) if rubric.common_mistakes else "Not specified"}
+        {json.dumps(common_mistakes, indent=2) if common_mistakes else "Not specified"}
         
         Additional Grading Notes:
-        {rubric.grading_notes or "None"}
+        {grading_notes or "None"}
         
         STUDENT'S ANSWER:
         {student_answer}
@@ -237,9 +245,9 @@ class ScriptEvaluationService:
         
         Be precise with decimal marks (e.g., 1.5 for partial credit).
         Maximum marks for each category:
-        - method_marks_awarded: max {rubric.method_marks}
-        - calculation_marks_awarded: max {rubric.calculation_marks}
-        - answer_marks_awarded: max {rubric.answer_marks}
+        - method_marks_awarded: max {method_marks}
+        - calculation_marks_awarded: max {calculation_marks}
+        - answer_marks_awarded: max {answer_marks}
         
         Respond ONLY with valid JSON, no additional text.
         """
@@ -256,24 +264,25 @@ class ScriptEvaluationService:
             
             result = json.loads(response.text)
             
-            # Ensure marks don't exceed maximums
+            # Ensure marks don't exceed maximums from evaluation_rules
+            eval_rules = question_rubric.evaluation_rules or {}
             result["method_marks_awarded"] = min(
                 float(result.get("method_marks_awarded", 0)),
-                rubric.method_marks
+                float(eval_rules.get('method_marks', 0))
             )
             result["calculation_marks_awarded"] = min(
                 float(result.get("calculation_marks_awarded", 0)),
-                rubric.calculation_marks
+                float(eval_rules.get('calculation_marks', 0))
             )
             result["answer_marks_awarded"] = min(
                 float(result.get("answer_marks_awarded", 0)),
-                rubric.answer_marks
+                float(eval_rules.get('answer_marks', 0))
             )
             
             return result
             
         except Exception as e:
-            logger.error(f"Error evaluating question {question.question_number}: {str(e)}")
+            logger.error(f"Error evaluating question {question_rubric.question_number}: {str(e)}")
             return {
                 "method_marks_awarded": 0,
                 "method_feedback": "Error during evaluation",
@@ -293,14 +302,14 @@ class ScriptEvaluationService:
     def segment_answers_by_question(
         self,
         extracted_content: dict,
-        questions: list
+        question_rubrics: list
     ) -> dict:
         """
         Use AI to segment the extracted text into individual question answers.
         """
         question_list = "\n".join([
             f"Q{q.question_number}: {q.question_text[:100]}..."
-            for q in questions
+            for q in question_rubrics
         ])
         
         segmentation_prompt = f"""
@@ -343,7 +352,7 @@ class ScriptEvaluationService:
         except Exception as e:
             logger.error(f"Error segmenting answers: {str(e)}")
             # Fallback: return full text for each question
-            return {str(q.question_number): extracted_content['full_text'] for q in questions}
+            return {str(q.question_number): extracted_content['full_text'] for q in question_rubrics}
     
     def generate_overall_feedback(
         self,
@@ -354,7 +363,7 @@ class ScriptEvaluationService:
         Generate overall feedback summary for the entire script.
         """
         eval_summary = "\n".join([
-            f"Q{e.question.question_number}: {e.total_marks_awarded}/{e.question.max_marks} marks"
+            f"Q{e.question_rubric.question_number}: {e.total_marks_awarded}/{e.question_rubric.max_marks} marks"
             for e in evaluations
         ])
         
@@ -365,12 +374,12 @@ class ScriptEvaluationService:
         EVALUATION RESULTS:
         {eval_summary}
         
-        Total Score: {script.total_score}/{script.question_paper.total_marks}
+        Total Score: {script.total_score}/{script.rubric_set.total_marks}
         Percentage: {script.percentage}%
         
         Individual Question Feedback:
         {json.dumps([{
-            'question': e.question.question_number,
+            'question': e.question_rubric.question_number,
             'feedback': e.overall_feedback,
             'mistakes': e.mistakes_identified
         } for e in evaluations], indent=2)}
@@ -429,48 +438,37 @@ class ScriptEvaluationService:
             logger.info(f"Extracting text from script {script.id}")
             extracted_content = self.extract_text_from_pages(script)
             
-            # Step 2: Get all questions for this paper
-            questions = list(script.question_paper.questions.all().order_by("question_number"))
+            # Step 2: Get all questions from RubricSet
+            question_rubrics = list(script.rubric_set.questions.all().order_by("question_number"))
             
-            if not questions:
+            if not question_rubrics:
                 script.status = "error"
-                script.feedback_summary = "No questions found in the question paper."
+                script.feedback_summary = "No questions found in the rubric set."
                 script.save()
                 return script
             
             # Step 3: Segment answers by question
             logger.info(f"Segmenting answers for script {script.id}")
-            segmented_answers = self.segment_answers_by_question(extracted_content, questions)
+            segmented_answers = self.segment_answers_by_question(extracted_content, question_rubrics)
             
             # Step 4: Evaluate each question
             total_marks_awarded = Decimal("0")
             total_max_marks = Decimal("0")
             evaluations = []
             
-            for question in questions:
+            for question_rubric in question_rubrics:
                 student_answer = segmented_answers.get(
-                    str(question.question_number), 
-                    segmented_answers.get(question.question_number, "")
+                    str(question_rubric.question_number), 
+                    segmented_answers.get(question_rubric.question_number, "")
                 )
                 
-                # Get or create rubric
-                try:
-                    rubric = question.rubric
-                except Rubric.DoesNotExist:
-                    rubric = Rubric.objects.create(
-                        question=question,
-                        method_marks=2,
-                        calculation_marks=2,
-                        answer_marks=1
-                    )
-                
-                logger.info(f"Evaluating question {question.question_number}")
-                eval_result = self.evaluate_question(question, student_answer, rubric)
+                logger.info(f"Evaluating question {question_rubric.question_number}")
+                eval_result = self.evaluate_question(question_rubric, student_answer)
                 
                 # Create QuestionEvaluation record
                 evaluation = QuestionEvaluation.objects.create(
                     script=script,
-                    question=question,
+                    question_rubric=question_rubric,
                     method_marks_awarded=Decimal(str(eval_result.get("method_marks_awarded", 0))),
                     calculation_marks_awarded=Decimal(str(eval_result.get("calculation_marks_awarded", 0))),
                     answer_marks_awarded=Decimal(str(eval_result.get("answer_marks_awarded", 0))),
@@ -489,7 +487,7 @@ class ScriptEvaluationService:
                 
                 evaluations.append(evaluation)
                 total_marks_awarded += evaluation.total_marks_awarded
-                total_max_marks += Decimal(str(question.max_marks))
+                total_max_marks += Decimal(str(question_rubric.max_marks))
             
             # Step 5: Calculate totals and generate overall feedback
             script.total_score = total_marks_awarded

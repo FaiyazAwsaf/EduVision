@@ -58,9 +58,9 @@ export default function ScriptListItem({
           </div>
 
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            {typeof script.question_paper === "object"
-              ? script.question_paper.title
-              : "Question Paper"}
+            {typeof script.rubric_set === "object"
+              ? script.rubric_set.title
+              : "Rubric Set"}
           </p>
 
           <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-500">

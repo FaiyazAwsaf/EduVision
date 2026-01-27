@@ -9,20 +9,11 @@ import os
 import tempfile
 
 from .models import (
-    QuestionPaper,
-    Question,
-    Rubric,
     AnswerScript,
     ScriptPage,
     QuestionEvaluation,
 )
 from .serializers import (
-    QuestionPaperListSerializer,
-    QuestionPaperDetailSerializer,
-    QuestionPaperCreateSerializer,
-    QuestionSerializer,
-    QuestionCreateSerializer,
-    RubricSerializer,
     AnswerScriptListSerializer,
     AnswerScriptDetailSerializer,
     AnswerScriptCreateSerializer,
@@ -30,225 +21,7 @@ from .serializers import (
     QuestionEvaluationSerializer,
 )
 from .services import ScriptEvaluationService
-from .pdf_service import PDFExtractionService
 
-
-class QuestionPaperViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing question papers.
-    
-    Endpoints:
-    - GET /api/evaluation/question-papers/ - List all question papers
-    - POST /api/evaluation/question-papers/ - Create new question paper
-    - GET /api/evaluation/question-papers/{id}/ - Get question paper details
-    - PUT /api/evaluation/question-papers/{id}/ - Update question paper
-    - DELETE /api/evaluation/question-papers/{id}/ - Delete question paper
-    - POST /api/evaluation/question-papers/{id}/add-question/ - Add question to paper
-    """
-    queryset = QuestionPaper.objects.all()
-    parser_classes = [JSONParser, MultiPartParser, FormParser]
-    
-    def get_serializer_class(self):
-        if self.action == "list":
-            return QuestionPaperListSerializer
-        elif self.action in ["create"]:
-            return QuestionPaperCreateSerializer
-        return QuestionPaperDetailSerializer
-    
-    @action(detail=True, methods=["post"])
-    def add_question(self, request, pk=None):
-        """Add a new question to an existing question paper."""
-        question_paper = self.get_object()
-        serializer = QuestionCreateSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            question = serializer.save(question_paper=question_paper)
-            
-            # Update total marks
-            question_paper.total_marks = question_paper.calculate_total_marks()
-            question_paper.save()
-            
-            return Response(
-                QuestionSerializer(question).data,
-                status=status.HTTP_201_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=["get"])
-    def questions(self, request, pk=None):
-        """Get all questions for a question paper."""
-        question_paper = self.get_object()
-        questions = question_paper.questions.all()
-        serializer = QuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser, FormParser])
-    def upload_pdf(self, request):
-        """
-        Upload a PDF file containing questions and/or rubrics.
-        
-        Parameters:
-        - pdf: The PDF file
-        - paper_type: "question", "rubric", or "combined" (default: "combined")
-        - title: Optional title override
-        - subject: Optional subject override  
-        - class_level: Optional class level override ("9", "10", "11", "12")
-        """
-        if "pdf" not in request.FILES:
-            return Response(
-                {"detail": "No PDF file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        pdf_file = request.FILES["pdf"]
-        paper_type = request.data.get("paper_type", "combined")
-        
-        # Validate file type
-        if not pdf_file.name.lower().endswith('.pdf'):
-            return Response(
-                {"detail": "File must be a PDF"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Save temporarily
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, pdf_file.name)
-        
-        try:
-            with open(temp_path, 'wb+') as destination:
-                for chunk in pdf_file.chunks():
-                    destination.write(chunk)
-            
-            # Extract using Gemini
-            pdf_service = PDFExtractionService()
-            extracted_data = pdf_service.extract_from_pdf(temp_path, paper_type)
-            
-            # Create question paper
-            question_paper = pdf_service.create_question_paper_from_extraction(
-                extracted_data,
-                title_override=request.data.get("title"),
-                subject_override=request.data.get("subject"),
-                class_level_override=request.data.get("class_level")
-            )
-            
-            serializer = QuestionPaperDetailSerializer(question_paper)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            return Response(
-                {"detail": f"Failed to process PDF: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        finally:
-            # Clean up temp file
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if os.path.exists(temp_dir):
-                os.rmdir(temp_dir)
-    
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
-    def upload_rubric_pdf(self, request, pk=None):
-        """
-        Upload a rubric/marking scheme PDF for an existing question paper.
-        
-        This updates the rubrics for existing questions.
-        """
-        question_paper = self.get_object()
-        
-        if "pdf" not in request.FILES:
-            return Response(
-                {"detail": "No PDF file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        pdf_file = request.FILES["pdf"]
-        
-        if not pdf_file.name.lower().endswith('.pdf'):
-            return Response(
-                {"detail": "File must be a PDF"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, pdf_file.name)
-        
-        try:
-            with open(temp_path, 'wb+') as destination:
-                for chunk in pdf_file.chunks():
-                    destination.write(chunk)
-            
-            # Extract rubrics
-            pdf_service = PDFExtractionService()
-            rubric_data = pdf_service.extract_from_pdf(temp_path, "rubric")
-            
-            # Update question paper with rubrics
-            updated_paper = pdf_service.update_rubrics_from_extraction(
-                question_paper, rubric_data
-            )
-            
-            serializer = QuestionPaperDetailSerializer(updated_paper)
-            return Response(serializer.data)
-            
-        except Exception as e:
-            return Response(
-                {"detail": f"Failed to process rubric PDF: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if os.path.exists(temp_dir):
-                os.rmdir(temp_dir)
-
-
-class QuestionViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing individual questions.
-    """
-    queryset = Question.objects.all()
-    parser_classes = [JSONParser]
-    
-    def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
-            return QuestionCreateSerializer
-        return QuestionSerializer
-    
-    @action(detail=True, methods=["get", "put", "patch"])
-    def rubric(self, request, pk=None):
-        """Get or update the rubric for a question."""
-        question = self.get_object()
-        
-        try:
-            rubric = question.rubric
-        except Rubric.DoesNotExist:
-            if request.method == "GET":
-                return Response(
-                    {"detail": "No rubric defined for this question."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            rubric = None
-        
-        if request.method == "GET":
-            serializer = RubricSerializer(rubric)
-            return Response(serializer.data)
-        
-        elif request.method in ["PUT", "PATCH"]:
-            if rubric:
-                serializer = RubricSerializer(
-                    rubric,
-                    data=request.data,
-                    partial=(request.method == "PATCH")
-                )
-            else:
-                serializer = RubricSerializer(data=request.data)
-            
-            if serializer.is_valid():
-                if rubric:
-                    serializer.save()
-                else:
-                    serializer.save(question=question)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AnswerScriptViewSet(viewsets.ModelViewSet):
@@ -276,10 +49,10 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = AnswerScript.objects.all()
         
-        # Filter by question paper
-        question_paper_id = self.request.query_params.get("question_paper")
-        if question_paper_id:
-            queryset = queryset.filter(question_paper_id=question_paper_id)
+        # Filter by rubric set
+        rubric_set_id = self.request.query_params.get("rubric_set")
+        if rubric_set_id:
+            queryset = queryset.filter(rubric_set_id=rubric_set_id)
         
         # Filter by status
         status_filter = self.request.query_params.get("status")
@@ -344,15 +117,15 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
             "script_id": str(script.id),
             "student_name": script.student_name,
             "student_id": script.student_id,
-            "question_paper": {
-                "title": script.question_paper.title,
-                "subject": script.question_paper.subject,
-                "class_level": script.question_paper.class_level,
-                "total_marks": script.question_paper.total_marks,
+            "rubric_set": {
+                "id": str(script.rubric_set.id),
+                "title": script.rubric_set.title,
+                "subject": script.rubric_set.subject,
+                "total_marks": float(script.rubric_set.total_marks),
             },
             "evaluation_summary": {
                 "total_score": float(script.total_score) if script.total_score else 0,
-                "max_score": script.question_paper.total_marks,
+                "max_score": float(script.rubric_set.total_marks),
                 "percentage": float(script.percentage) if script.percentage else 0,
                 "status": script.status,
                 "evaluated_at": script.evaluated_at.isoformat() if script.evaluated_at else None,
@@ -367,28 +140,33 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
         
         # Add detailed question results
         for evaluation in evaluations:
+            # Extract marking scheme from evaluation_rules
+            eval_rules = evaluation.question_rubric.evaluation_rules or {}
+            method_max = float(eval_rules.get('method_marks', 0))
+            calc_max = float(eval_rules.get('calculation_marks', 0))
+            answer_max = float(eval_rules.get('answer_marks', 0))
+            
             question_result = {
-                "question_number": evaluation.question.question_number,
-                "question_text": evaluation.question.question_text,
-                "question_type": evaluation.question.question_type,
+                "question_number": evaluation.question_rubric.question_number,
+                "question_text": evaluation.question_rubric.question_text,
                 "marks": {
                     "method": {
                         "awarded": float(evaluation.method_marks_awarded),
-                        "max": evaluation.question.rubric.method_marks if hasattr(evaluation.question, 'rubric') else 0,
+                        "max": method_max,
                         "feedback": evaluation.method_feedback,
                     },
                     "calculation": {
                         "awarded": float(evaluation.calculation_marks_awarded),
-                        "max": evaluation.question.rubric.calculation_marks if hasattr(evaluation.question, 'rubric') else 0,
+                        "max": calc_max,
                         "feedback": evaluation.calculation_feedback,
                     },
                     "answer": {
                         "awarded": float(evaluation.answer_marks_awarded),
-                        "max": evaluation.question.rubric.answer_marks if hasattr(evaluation.question, 'rubric') else 0,
+                        "max": answer_max,
                         "feedback": evaluation.answer_feedback,
                     },
                     "total": float(evaluation.total_marks_awarded),
-                    "max_total": evaluation.question.max_marks,
+                    "max_total": float(evaluation.question_rubric.max_marks),
                 },
                 "student_answer": evaluation.student_answer_text,
                 "key_points_found": evaluation.key_points_found,
@@ -487,8 +265,8 @@ class QuestionEvaluationViewSet(viewsets.ReadOnlyModelViewSet):
             for e in script.question_evaluations.all()
         )
         script.total_score = total
-        if script.question_paper.total_marks > 0:
-            script.percentage = (total / script.question_paper.total_marks) * 100
+        if script.rubric_set.total_marks > 0:
+            script.percentage = (total / script.rubric_set.total_marks) * 100
         script.save()
         
         return Response(QuestionEvaluationSerializer(evaluation).data)

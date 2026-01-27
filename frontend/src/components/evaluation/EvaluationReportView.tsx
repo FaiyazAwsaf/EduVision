@@ -26,7 +26,7 @@ export default function EvaluationReportView({
     return "bg-red-100 dark:bg-red-900/30";
   };
 
-  const { evaluation_summary, question_paper, question_results, overall_feedback } = report;
+  const { evaluation_summary, rubric_set, question_results, overall_feedback } = report;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -52,14 +52,14 @@ export default function EvaluationReportView({
       {/* Summary Card */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left: Paper Info */}
+          {/* Left: Rubric Set Info */}
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {question_paper.title}
+              {rubric_set.title}
             </h2>
             <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-              <p><span className="font-medium">Subject:</span> {question_paper.subject}</p>
-              <p><span className="font-medium">Class:</span> {question_paper.class_level}</p>
+              <p><span className="font-medium">Subject:</span> {rubric_set.subject}</p>
+              <p><span className="font-medium">Total Marks:</span> {rubric_set.total_marks}</p>
               {report.student_name && (
                 <p><span className="font-medium">Student:</span> {report.student_name}</p>
               )}
@@ -137,7 +137,7 @@ export default function EvaluationReportView({
             <div className="px-6 py-4 space-y-4">
               {/* Method */}
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-28">
+                <div className="shrink-0 w-28">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Method
                   </span>
@@ -152,7 +152,7 @@ export default function EvaluationReportView({
 
               {/* Calculation */}
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-28">
+                <div className="shrink-0 w-28">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Calculation
                   </span>
@@ -167,7 +167,7 @@ export default function EvaluationReportView({
 
               {/* Answer */}
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-28">
+                <div className="shrink-0 w-28">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Answer
                   </span>

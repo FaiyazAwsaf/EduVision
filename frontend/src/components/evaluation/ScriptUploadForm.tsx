@@ -2,19 +2,19 @@
 
 import React, { useRef, useState } from "react";
 import { useScriptUpload } from "@/hooks/useScriptUpload";
-import evaluationAPI, { QuestionPaper } from "@/lib/api/evaluation";
+import evaluationAPI, { RubricSet } from "@/lib/api/evaluation";
 
 interface ScriptUploadFormProps {
-  questionPapers: QuestionPaper[];
+  rubricSets: RubricSet[];
   onUploadComplete: (scriptId: string) => void;
 }
 
 export default function ScriptUploadForm({
-  questionPapers,
+  rubricSets,
   onUploadComplete,
 }: ScriptUploadFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedPaper, setSelectedPaper] = useState<string>("");
+  const [selectedRubricSet, setSelectedRubricSet] = useState<string>("");
   const [studentName, setStudentName] = useState<string>("");
   const [studentId, setStudentId] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
@@ -48,8 +48,8 @@ export default function ScriptUploadForm({
     e.preventDefault();
     setErrors([]);
 
-    if (!selectedPaper) {
-      setErrors(["Please select a question paper"]);
+    if (!selectedRubricSet) {
+      setErrors(["Please select a rubric set"]);
       return;
     }
 
@@ -62,7 +62,7 @@ export default function ScriptUploadForm({
 
     try {
       const script = await evaluationAPI.uploadScript({
-        question_paper: selectedPaper,
+        rubric_set: selectedRubricSet,
         student_name: studentName || undefined,
         student_id: studentId || undefined,
         pages: files,
@@ -83,25 +83,25 @@ export default function ScriptUploadForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Question Paper Selection */}
+      {/* Rubric Set Selection */}
       <div>
         <label
-          htmlFor="questionPaper"
+          htmlFor="rubricSet"
           className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
-          Question Paper *
+          Rubric Set (Question Paper) *
         </label>
         <select
-          id="questionPaper"
-          value={selectedPaper}
-          onChange={(e) => setSelectedPaper(e.target.value)}
+          id="rubricSet"
+          value={selectedRubricSet}
+          onChange={(e) => setSelectedRubricSet(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
           required
         >
-          <option value="">Select a question paper...</option>
-          {questionPapers.map((paper) => (
-            <option key={paper.id} value={paper.id}>
-              {paper.title} - {paper.subject} (Class {paper.class_level})
+          <option value="">Select a rubric set...</option>
+          {rubricSets.filter(rs => rs.state === "published").map((rubricSet) => (
+            <option key={rubricSet.id} value={rubricSet.id}>
+              {rubricSet.title} - {rubricSet.subject} ({rubricSet.questions?.length || 0} questions, {rubricSet.total_marks} marks)
             </option>
           ))}
         </select>
@@ -265,7 +265,7 @@ export default function ScriptUploadForm({
         </button>
         <button
           type="submit"
-          disabled={isUploading || files.length === 0 || !selectedPaper}
+          disabled={isUploading || files.length === 0 || !selectedRubricSet}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {isUploading ? (
