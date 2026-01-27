@@ -88,26 +88,7 @@ class RubricSetSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """Cross-field validation."""
-        # Validate state transitions
-        if self.instance:  # Update operation
-            current_state = self.instance.state
-            new_state = data.get('state', current_state)
-            
-            # Enforce that published rubric sets cannot be edited
-            if current_state == RubricSet.STATE_PUBLISHED:
-                if new_state == RubricSet.STATE_ARCHIVED:
-                    # Only allow state change to archived
-                    allowed_fields = {'state'}
-                    changed_fields = set(data.keys()) - {'state'}
-                    if changed_fields:
-                        raise serializers.ValidationError(
-                            "Published rubric sets can only be archived. No other changes allowed."
-                        )
-                else:
-                    raise serializers.ValidationError(
-                        "Published rubric sets cannot be modified. They can only be archived."
-                    )
-        
+        # No state restrictions - all rubric sets can be edited
         return data
     
     def create(self, validated_data):
