@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Tool = "pen" | "eraser";
+export type Tool = "pen" | "eraser" | "select";
 
 export type ToolbarProps = {
   role: "teacher" | "student";
