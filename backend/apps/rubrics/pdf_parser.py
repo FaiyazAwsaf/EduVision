@@ -43,14 +43,8 @@ def get_gemini_model():
     genai.configure(api_key=api_key)
 
     model_preference_list = [
+        'gemini-2.5-flash',
         'gemini-2.0-flash-exp',
-        'gemini-exp-1206',
-        'gemini-2.5-pro',
-        'gemini-1.5-pro-latest',
-        'gemini-1.5-pro',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash',
-        'gemini-pro-vision',
     ]
 
     for model_name in model_preference_list:

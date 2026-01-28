@@ -14,11 +14,11 @@ import {
   X,
   Edit,
 } from "lucide-react";
-import { listRubrics, archiveRubric, getRubric } from "@/lib/api/rubrics";
-import type { RubricListItem, Rubric } from "@/lib/api/rubrics";
+import { listRubrics, archiveRubric, getRubricSet } from "@/lib/api/rubrics";
+import type { RubricListItem, RubricSet } from "@/lib/api/rubrics";
 
 interface RubricsLibraryProps {
-  onSelectRubric?: (rubric: Rubric) => void;
+  onSelectRubric?: (rubric: RubricSet) => void;
 }
 
 export default function RubricsLibrary({
@@ -31,7 +31,7 @@ export default function RubricsLibrary({
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRubric, setSelectedRubric] = useState<Rubric | null>(null);
+  const [selectedRubric, setSelectedRubric] = useState<RubricSet | null>(null);
 
   // Load rubrics on mount
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function RubricsLibrary({
 
   const handleViewRubric = async (id: string) => {
     try {
-      const rubric = await getRubric(id);
+      const rubric = await getRubricSet(id);
       setSelectedRubric(rubric);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load rubric");
@@ -100,7 +100,7 @@ export default function RubricsLibrary({
     }
   };
 
-  const handleUseRubric = (rubric: Rubric) => {
+  const handleUseRubric = (rubric: RubricSet) => {
     if (onSelectRubric) {
       onSelectRubric(rubric);
     }
@@ -146,90 +146,124 @@ export default function RubricsLibrary({
               </div>
             </div>
 
-            {/* Question */}
-            <div>
-              <h4 className="text-sm font-semibold text-[#006A71] mb-2">
-                Question
-              </h4>
-              <p className="text-[#48A6A7] bg-[#F2EFE7] p-4 rounded-lg">
-                {selectedRubric.question_text}
-              </p>
-            </div>
-
-            {/* Reference Answer */}
-            <div>
-              <h4 className="text-sm font-semibold text-[#006A71] mb-2">
-                Reference Answer
-              </h4>
-              <p className="text-[#48A6A7] bg-[#F2EFE7] p-4 rounded-lg whitespace-pre-wrap">
-                {selectedRubric.reference_answer}
-              </p>
-            </div>
-
-            {/* Evaluation Rules */}
+            {/* Questions */}
             <div>
               <h4 className="text-sm font-semibold text-[#006A71] mb-3">
-                Evaluation Rules
+                Questions ({selectedRubric.questions?.length || 0})
               </h4>
-              <div className="space-y-3">
-                {selectedRubric.evaluation_rules.map((rule, index) => (
+              <div className="space-y-6">
+                {selectedRubric.questions?.map((question, qIndex) => (
                   <div
-                    key={rule.id}
-                    className="bg-[#F2EFE7] p-4 rounded-lg border border-[#9ACBD0]"
+                    key={question.id}
+                    className="border border-[#9ACBD0] rounded-lg p-5 bg-white"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="text-sm font-medium text-[#006A71]">
-                        Rule {index + 1} -{" "}
-                        {rule.type.charAt(0).toUpperCase() + rule.type.slice(1)}
-                      </span>
-                      <span className="text-sm font-semibold text-[#48A6A7]">
-                        {rule.marks} marks
+                    {/* Question Header */}
+                    <div className="flex items-start justify-between mb-4 pb-3 border-b border-[#9ACBD0]">
+                      <h5 className="text-base font-semibold text-[#006A71]">
+                        Question {qIndex + 1}
+                      </h5>
+                      <span className="text-sm font-semibold text-[#48A6A7] bg-[#F2EFE7] px-3 py-1 rounded">
+                        {question.max_marks} marks
                       </span>
                     </div>
-                    <div className="text-sm text-[#48A6A7] space-y-2">
-                      {rule.type === "keyword" &&
-                        "required_keywords" in rule.config && (
-                          <div>
-                            <span className="font-medium">Keywords:</span>{" "}
-                            {Array.isArray(rule.config.required_keywords)
-                              ? rule.config.required_keywords.join(", ")
-                              : "None"}
-                            <div className="text-xs mt-1">
-                              Mode:{" "}
-                              {rule.config.scoring_mode === "proportional"
-                                ? "Proportional"
-                                : "All or Nothing"}
+
+                    {/* Question Text */}
+                    <div className="mb-4">
+                      <h6 className="text-xs font-semibold text-[#006A71] mb-2">
+                        Question Text
+                      </h6>
+                      <p className="text-[#48A6A7] bg-[#F2EFE7] p-3 rounded text-sm">
+                        {question.question_text}
+                      </p>
+                    </div>
+
+                    {/* Reference Answer */}
+                    {question.reference_answer && (
+                      <div className="mb-4">
+                        <h6 className="text-xs font-semibold text-[#006A71] mb-2">
+                          Reference Answer
+                        </h6>
+                        <p className="text-[#48A6A7] bg-[#F2EFE7] p-3 rounded text-sm whitespace-pre-wrap">
+                          {question.reference_answer}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Evaluation Rules */}
+                    <div>
+                      <h6 className="text-xs font-semibold text-[#006A71] mb-2">
+                        Evaluation Rules ({question.evaluation_rules.length})
+                      </h6>
+                      <div className="space-y-2">
+                        {question.evaluation_rules.map((rule, rIndex) => (
+                          <div
+                            key={rule.id}
+                            className="bg-[#F2EFE7] p-3 rounded border border-[#9ACBD0]"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="text-xs font-medium text-[#006A71]">
+                                Rule {rIndex + 1} -{" "}
+                                {rule.type.charAt(0).toUpperCase() +
+                                  rule.type.slice(1)}
+                              </span>
+                              <span className="text-xs font-semibold text-[#48A6A7]">
+                                {rule.marks} marks
+                              </span>
                             </div>
-                          </div>
-                        )}
-                      {rule.type === "numeric" &&
-                        "expected_value" in rule.config && (
-                          <div>
-                            <span className="font-medium">Expected Value:</span>{" "}
-                            {String(rule.config.expected_value)}
-                            <div className="text-xs mt-1">
-                              Tolerance: ±{rule.config.tolerance}
-                            </div>
-                          </div>
-                        )}
-                      {rule.type === "stepwise" &&
-                        "step_description" in rule.config && (
-                          <div>
-                            <span className="font-medium">Step:</span>{" "}
-                            {rule.config.step_description}
-                            {rule.config.allow_partial_credit && (
-                              <div className="text-xs mt-1">
-                                Partial credit allowed
+                            <div className="text-xs text-[#48A6A7] space-y-2">
+                              {rule.type === "keyword" &&
+                                "required_keywords" in rule.config && (
+                                  <div>
+                                    <span className="font-medium">
+                                      Keywords:
+                                    </span>{" "}
+                                    {Array.isArray(rule.config.required_keywords)
+                                      ? rule.config.required_keywords.join(", ")
+                                      : "None"}
+                                    <div className="text-xs mt-1">
+                                      Mode:{" "}
+                                      {rule.config.scoring_mode === "proportional"
+                                        ? "Proportional"
+                                        : "All or Nothing"}
+                                    </div>
+                                  </div>
+                                )}
+                              {rule.type === "numeric" &&
+                                "expected_value" in rule.config && (
+                                  <div>
+                                    <span className="font-medium">
+                                      Expected Value:
+                                    </span>{" "}
+                                    {String(rule.config.expected_value)}
+                                    <div className="text-xs mt-1">
+                                      Tolerance: ±{rule.config.tolerance}
+                                    </div>
+                                  </div>
+                                )}
+                              {rule.type === "stepwise" &&
+                                "step_description" in rule.config && (
+                                  <div>
+                                    <span className="font-medium">Step:</span>{" "}
+                                    {rule.config.step_description}
+                                    {rule.config.allow_partial_credit && (
+                                      <div className="text-xs mt-1">
+                                        Partial credit allowed
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              <div className="text-xs text-[#9ACBD0] mt-2 space-y-1">
+                                <div>✓ Success: {rule.feedback.on_success}</div>
+                                {rule.feedback.on_partial && (
+                                  <div>
+                                    ◐ Partial: {rule.feedback.on_partial}
+                                  </div>
+                                )}
+                                <div>✗ Failure: {rule.feedback.on_failure}</div>
                               </div>
-                            )}
+                            </div>
                           </div>
-                        )}
-                      <div className="text-xs text-[#9ACBD0] mt-2 space-y-1">
-                        <div>✓ Success: {rule.feedback.on_success}</div>
-                        {rule.feedback.on_partial && (
-                          <div>◐ Partial: {rule.feedback.on_partial}</div>
-                        )}
-                        <div>✗ Failure: {rule.feedback.on_failure}</div>
+                        ))}
                       </div>
                     </div>
                   </div>
