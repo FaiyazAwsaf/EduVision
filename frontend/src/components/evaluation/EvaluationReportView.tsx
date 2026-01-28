@@ -13,17 +13,17 @@ export default function EvaluationReportView({
   onBack,
 }: EvaluationReportViewProps) {
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-green-600 dark:text-green-400";
-    if (percentage >= 60) return "text-blue-600 dark:text-blue-400";
-    if (percentage >= 40) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
+    if (percentage >= 80) return "text-emerald-500";
+    if (percentage >= 60) return "text-[#48A6A7]";
+    if (percentage >= 40) return "text-yellow-500";
+    return "text-red-500";
   };
 
   const getScoreBgColor = (percentage: number) => {
-    if (percentage >= 80) return "bg-green-100 dark:bg-green-900/30";
-    if (percentage >= 60) return "bg-blue-100 dark:bg-blue-900/30";
-    if (percentage >= 40) return "bg-yellow-100 dark:bg-yellow-900/30";
-    return "bg-red-100 dark:bg-red-900/30";
+    if (percentage >= 80) return "bg-emerald-500/10";
+    if (percentage >= 60) return "bg-[#48A6A7]/10";
+    if (percentage >= 40) return "bg-yellow-500/10";
+    return "bg-red-500/10";
   };
 
   const { evaluation_summary, rubric_set, question_results, overall_feedback } = report;
@@ -35,7 +35,7 @@ export default function EvaluationReportView({
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            className="flex items-center gap-2 text-[#48A6A7] hover:text-[#006A71] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -43,21 +43,21 @@ export default function EvaluationReportView({
             Back
           </button>
         )}
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <h1 className="text-2xl font-bold text-[#006A71]">
           Evaluation Report
         </h1>
         <div />
       </div>
 
       {/* Summary Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+      <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left: Rubric Set Info */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-lg font-semibold text-[#006A71] mb-4">
               {rubric_set.title}
             </h2>
-            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="space-y-2 text-sm text-[#48A6A7]">
               <p><span className="font-medium">Subject:</span> {rubric_set.subject}</p>
               <p><span className="font-medium">Total Marks:</span> {rubric_set.total_marks}</p>
               {report.student_name && (
@@ -82,7 +82,7 @@ export default function EvaluationReportView({
             >
               {evaluation_summary.percentage.toFixed(1)}%
             </div>
-            <div className="mt-2 text-lg text-gray-600 dark:text-gray-400">
+            <div className="mt-2 text-lg text-[#48A6A7]">
               {evaluation_summary.total_score.toFixed(1)} / {evaluation_summary.max_score} marks
             </div>
             <div
@@ -104,22 +104,22 @@ export default function EvaluationReportView({
 
       {/* Question-by-Question Results */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-xl font-semibold text-[#006A71]">
           Question-by-Question Analysis
         </h2>
 
         {question_results.map((result, index) => (
           <div
             key={index}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
+            className="bg-white rounded-xl border border-[#9ACBD0] overflow-hidden"
           >
             {/* Question Header */}
-            <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-between items-center">
+            <div className="bg-[#F2EFE7] px-6 py-4 flex justify-between items-center">
               <div>
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                <span className="text-sm font-medium text-[#9ACBD0]">
                   Question {result.question_number}
                 </span>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                <h3 className="text-lg font-medium text-[#006A71]">
                   {result.question_text}
                 </h3>
               </div>
@@ -129,7 +129,7 @@ export default function EvaluationReportView({
                 )}`}>
                   {result.marks.total.toFixed(1)} / {result.marks.max_total}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">marks</div>
+                <div className="text-xs text-[#9ACBD0]">marks</div>
               </div>
             </div>
 
@@ -138,14 +138,14 @@ export default function EvaluationReportView({
               {/* Method */}
               <div className="flex items-start gap-4">
                 <div className="shrink-0 w-28">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-[#006A71]">
                     Method
                   </span>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <div className="text-lg font-semibold text-[#48A6A7]">
                     {result.marks.method.awarded} / {result.marks.method.max}
                   </div>
                 </div>
-                <div className="flex-1 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex-1 text-sm text-[#48A6A7]">
                   {result.marks.method.feedback || "No specific feedback"}
                 </div>
               </div>
@@ -153,14 +153,14 @@ export default function EvaluationReportView({
               {/* Calculation */}
               <div className="flex items-start gap-4">
                 <div className="shrink-0 w-28">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-[#006A71]">
                     Calculation
                   </span>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <div className="text-lg font-semibold text-[#48A6A7]">
                     {result.marks.calculation.awarded} / {result.marks.calculation.max}
                   </div>
                 </div>
-                <div className="flex-1 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex-1 text-sm text-[#48A6A7]">
                   {result.marks.calculation.feedback || "No specific feedback"}
                 </div>
               </div>
@@ -168,31 +168,31 @@ export default function EvaluationReportView({
               {/* Answer */}
               <div className="flex items-start gap-4">
                 <div className="shrink-0 w-28">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="text-sm font-medium text-[#006A71]">
                     Answer
                   </span>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <div className="text-lg font-semibold text-[#48A6A7]">
                     {result.marks.answer.awarded} / {result.marks.answer.max}
                   </div>
                 </div>
-                <div className="flex-1 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex-1 text-sm text-[#48A6A7]">
                   {result.marks.answer.feedback || "No specific feedback"}
                 </div>
               </div>
 
               {/* Key Points */}
               {(result.key_points_found?.length || result.key_points_missing?.length) && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="border-t border-[#9ACBD0] pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {result.key_points_found && result.key_points_found.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">
+                        <h4 className="text-sm font-medium text-emerald-600 mb-2">
                           ✓ Key Points Covered
                         </h4>
-                        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                        <ul className="text-sm text-[#48A6A7] space-y-1">
                           {result.key_points_found.map((point, i) => (
                             <li key={i} className="flex items-start gap-2">
-                              <span className="text-green-500">•</span>
+                              <span className="text-emerald-500">•</span>
                               {point}
                             </li>
                           ))}
@@ -201,10 +201,10 @@ export default function EvaluationReportView({
                     )}
                     {result.key_points_missing && result.key_points_missing.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
+                        <h4 className="text-sm font-medium text-red-500 mb-2">
                           ✗ Key Points Missing
                         </h4>
-                        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                        <ul className="text-sm text-[#48A6A7] space-y-1">
                           {result.key_points_missing.map((point, i) => (
                             <li key={i} className="flex items-start gap-2">
                               <span className="text-red-500">•</span>
@@ -220,11 +220,11 @@ export default function EvaluationReportView({
 
               {/* Mistakes */}
               {result.mistakes_identified && result.mistakes_identified.length > 0 && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h4 className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-2">
+                <div className="border-t border-[#9ACBD0] pt-4">
+                  <h4 className="text-sm font-medium text-orange-500 mb-2">
                     ⚠ Mistakes Identified
                   </h4>
-                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <ul className="text-sm text-[#48A6A7] space-y-1">
                     {result.mistakes_identified.map((mistake, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <span className="text-orange-500">•</span>
@@ -237,11 +237,11 @@ export default function EvaluationReportView({
 
               {/* Overall Feedback */}
               {result.overall_feedback && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <div className="border-t border-[#9ACBD0] pt-4">
+                  <h4 className="text-sm font-medium text-[#006A71] mb-2">
                     Feedback
                   </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-[#48A6A7]">
                     {result.overall_feedback}
                   </p>
                 </div>
@@ -249,9 +249,9 @@ export default function EvaluationReportView({
 
               {/* Manual Review Flag */}
               {result.needs_manual_review && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <div className="border-t border-[#9ACBD0] pt-4">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-sm text-yellow-700">
                       ⚠ This question has been flagged for manual review
                       {result.review_reason && `: ${result.review_reason}`}
                     </p>
@@ -264,14 +264,14 @@ export default function EvaluationReportView({
       </div>
 
       {/* Overall Feedback */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+      <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+        <h2 className="text-xl font-semibold text-[#006A71] mb-4">
           Overall Feedback
         </h2>
 
         {overall_feedback.summary && (
-          <div className="prose dark:prose-invert max-w-none mb-6">
-            <p className="text-gray-600 dark:text-gray-400">{overall_feedback.summary}</p>
+          <div className="prose max-w-none mb-6">
+            <p className="text-[#48A6A7]">{overall_feedback.summary}</p>
           </div>
         )}
 
@@ -279,7 +279,7 @@ export default function EvaluationReportView({
           {/* Strengths */}
           {overall_feedback.strengths && overall_feedback.strengths.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-emerald-600 mb-3 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -289,9 +289,9 @@ export default function EvaluationReportView({
                 {overall_feedback.strengths.map((strength, i) => (
                   <li
                     key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                    className="flex items-start gap-2 text-sm text-[#48A6A7]"
                   >
-                    <span className="text-green-500 mt-1">✓</span>
+                    <span className="text-emerald-500 mt-1">✓</span>
                     {strength}
                   </li>
                 ))}
@@ -303,7 +303,7 @@ export default function EvaluationReportView({
           {overall_feedback.areas_for_improvement &&
             overall_feedback.areas_for_improvement.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-medium text-[#48A6A7] mb-3 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
@@ -313,9 +313,9 @@ export default function EvaluationReportView({
                   {overall_feedback.areas_for_improvement.map((area, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                      className="flex items-start gap-2 text-sm text-[#48A6A7]"
                     >
-                      <span className="text-blue-500 mt-1">→</span>
+                      <span className="text-[#006A71] mt-1">→</span>
                       {area}
                     </li>
                   ))}
@@ -329,7 +329,7 @@ export default function EvaluationReportView({
       <div className="flex justify-center gap-4">
         <button
           onClick={() => window.print()}
-          className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />

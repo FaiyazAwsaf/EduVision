@@ -74,7 +74,9 @@ export default function ScriptUploadForm({
       onUploadComplete(script.id);
     } catch (error) {
       setErrors([
-        error instanceof Error ? error.message : "Upload failed. Please try again.",
+        error instanceof Error
+          ? error.message
+          : "Upload failed. Please try again.",
       ]);
     } finally {
       setIsUploading(false);
@@ -87,7 +89,7 @@ export default function ScriptUploadForm({
       <div>
         <label
           htmlFor="rubricSet"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          className="block text-sm font-medium text-[#9ACBD0] mb-2"
         >
           Rubric Set (Question Paper) *
         </label>
@@ -95,15 +97,19 @@ export default function ScriptUploadForm({
           id="rubricSet"
           value={selectedRubricSet}
           onChange={(e) => setSelectedRubricSet(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+          className="w-full px-4 py-3  border border-[#334155] rounded-lg text-white placeholder-[#48A6A7] focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent"
           required
         >
           <option value="">Select a rubric set...</option>
-          {rubricSets.filter(rs => rs.state === "published").map((rubricSet) => (
-            <option key={rubricSet.id} value={rubricSet.id}>
-              {rubricSet.title} - {rubricSet.subject} ({rubricSet.questions?.length || 0} questions, {rubricSet.total_marks} marks)
-            </option>
-          ))}
+          {rubricSets
+            .filter((rs) => rs.state === "published")
+            .map((rubricSet) => (
+              <option key={rubricSet.id} value={rubricSet.id}>
+                {rubricSet.title} - {rubricSet.subject} (
+                {rubricSet.questions?.length || 0} questions,{" "}
+                {rubricSet.total_marks} marks)
+              </option>
+            ))}
         </select>
       </div>
 
@@ -112,7 +118,7 @@ export default function ScriptUploadForm({
         <div>
           <label
             htmlFor="studentName"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="block text-sm font-medium text-[#9ACBD0] mb-2"
           >
             Student Name (Optional)
           </label>
@@ -122,13 +128,13 @@ export default function ScriptUploadForm({
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
             placeholder="Enter student name"
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-[#48A6A7] focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent"
           />
         </div>
         <div>
           <label
             htmlFor="studentId"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="block text-sm font-medium text-[#9ACBD0] mb-2"
           >
             Student ID (Optional)
           </label>
@@ -138,14 +144,14 @@ export default function ScriptUploadForm({
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             placeholder="Enter student ID"
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-[#48A6A7] focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent"
           />
         </div>
       </div>
 
       {/* File Upload Area */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-[#9ACBD0] mb-2">
           Answer Script Pages * ({fileCount}/{maxFiles})
         </label>
         <div
@@ -155,9 +161,10 @@ export default function ScriptUploadForm({
           onClick={() => fileInputRef.current?.click()}
           className={`
             border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-            ${isDragging
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-              : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+            ${
+              isDragging
+                ? "border-[#48A6A7] bg-[#48A6A7]/10"
+                : "border-[#9ACBD0] hover:border-[#48A6A7]"
             }
             ${!canAddMore ? "opacity-50 cursor-not-allowed" : ""}
           `}
@@ -172,7 +179,7 @@ export default function ScriptUploadForm({
             disabled={!canAddMore}
           />
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-[#9ACBD0]"
             stroke="currentColor"
             fill="none"
             viewBox="0 0 48 48"
@@ -184,10 +191,10 @@ export default function ScriptUploadForm({
               strokeLinejoin="round"
             />
           </svg>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-sm text-[#48A6A7]">
             {canAddMore ? (
               <>
-                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                <span className="font-semibold text-[#006A71]">
                   Click to upload
                 </span>{" "}
                 or drag and drop
@@ -196,7 +203,7 @@ export default function ScriptUploadForm({
               "Maximum files reached"
             )}
           </p>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+          <p className="mt-1 text-xs text-[#9ACBD0]">
             PNG, JPG, WEBP up to 10MB each (max 10 pages)
           </p>
         </div>
@@ -210,7 +217,7 @@ export default function ScriptUploadForm({
               <img
                 src={preview}
                 alt={`Page ${index + 1}`}
-                className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                className="w-full h-32 object-cover rounded-lg border border-[#9ACBD0]"
               />
               <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-2 py-1 rounded">
                 Page {index + 1}
@@ -244,8 +251,8 @@ export default function ScriptUploadForm({
 
       {/* Errors */}
       {errors.length > 0 && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <ul className="list-disc list-inside text-sm text-red-600">
             {errors.map((error, index) => (
               <li key={index}>{error}</li>
             ))}
@@ -258,7 +265,7 @@ export default function ScriptUploadForm({
         <button
           type="button"
           onClick={clearFiles}
-          className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="px-6 py-2 border border-[#9ACBD0] rounded-lg text-[#48A6A7] hover:bg-[#9ACBD0]/10 transition-colors"
           disabled={isUploading || files.length === 0}
         >
           Clear All
@@ -266,7 +273,7 @@ export default function ScriptUploadForm({
         <button
           type="submit"
           disabled={isUploading || files.length === 0 || !selectedRubricSet}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {isUploading ? (
             <>
