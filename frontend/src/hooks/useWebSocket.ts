@@ -14,7 +14,8 @@ export type WebSocketMessage = {
     | "user_joined"
     | "user_left"
     | "lock_state"
-    | "clear_canvas";
+    | "clear_canvas"
+    | "latex_added";
   data?: any;
   senderId?: string;
   sessionId?: string;
