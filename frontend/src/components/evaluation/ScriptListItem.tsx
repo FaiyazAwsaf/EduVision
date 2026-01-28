@@ -20,13 +20,10 @@ export default function ScriptListItem({
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      pending:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-      processing:
-        "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-      evaluated:
-        "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-      error: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+      pending: "bg-yellow-100 text-yellow-700",
+      processing: "bg-blue-100 text-blue-700",
+      evaluated: "bg-emerald-100 text-emerald-700",
+      error: "bg-red-100 text-red-700",
     };
     return styles[status as keyof typeof styles] || styles.pending;
   };
@@ -101,20 +98,25 @@ export default function ScriptListItem({
             </span>
           </div>
 
-          {script.status === "evaluated" &&
-            script.total_score !== undefined && (
-              <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Score
-                  </span>
-                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                    {script.total_score.toFixed(1)} (
-                    {script.percentage?.toFixed(1)}%)
-                  </span>
-                </div>
+          {script.status === "evaluated" && script.total_score != null && (
+            <div className="mt-3 p-3 bg-[#F2EFE7] rounded-lg border border-[#9ACBD0]">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[#006A71]">
+                  Score
+                </span>
+                <span className="text-lg font-bold text-emerald-600">
+                  {typeof script.total_score === "number"
+                    ? script.total_score.toFixed(1)
+                    : script.total_score}{" "}
+                  (
+                  {typeof script.percentage === "number"
+                    ? script.percentage.toFixed(1)
+                    : script.percentage}
+                  %)
+                </span>
               </div>
-            )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -171,7 +173,7 @@ export default function ScriptListItem({
         )}
 
         {script.status === "processing" && (
-          <span className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
+          <span className="px-4 py-2 text-sm text-[#48A6A7] flex items-center gap-2">
             <svg
               className="animate-spin h-4 w-4"
               fill="none"
