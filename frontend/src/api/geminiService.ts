@@ -1,15 +1,17 @@
 /**
- * 
+ *
  * gemini API service
  * handles communication with backend for handwriting-to-LaTeX conversion
  */
 
-export type ConversionType = 'math' | 'text';
+import { API_BASE_URL } from "@/config/api";
+
+export type ConversionType = "math" | "text";
 
 export type ConversionResponse = {
-    success : boolean;
-    latex : string | null;
-    error : string | null;
+  success: boolean;
+  latex: string | null;
+  error: string | null;
 };
 
 /**
@@ -20,35 +22,34 @@ export type ConversionResponse = {
  */
 
 export async function convertHandwritingToLatex(
-    imageData : string,
-    type : ConversionType = 'math' 
+  imageData: string,
+  type: ConversionType = "math",
 ): Promise<ConversionResponse> {
-    try{
-        const response = await fetch('/whiteboard/convert/', {
-            method : 'POST',
-            headers : {
-                'Content-Type' : 'application/json',
-            },
-            body : JSON.stringify({
-                image : imageData,
-                type,
-            }),
-        });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/whiteboard/convert/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        image: imageData,
+        type,
+      }),
+    });
 
-        if (!response.ok){
-            throw new Error(`HTTP error! Status : ${response.status}`)
-        }
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status : ${response.status}`);
+    }
 
-        const data : ConversionResponse = await response.json();
-        return data;
-    }
-    catch (error){
-        console.error('[Gemini Service] Error:', error);
-        
-        return {
-            success : false,
-            latex : null,
-            error : error instanceof Error ? error.message : 'Unknown error',
-        };
-    }
+    const data: ConversionResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error("[Gemini Service] Error:", error);
+
+    return {
+      success: false,
+      latex: null,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }

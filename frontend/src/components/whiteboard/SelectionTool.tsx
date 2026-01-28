@@ -1,12 +1,13 @@
 /**
- * selection Tool Component
- * 
+ * selection tool component
+ *
  * allows users to draw a rectangular selection on the canvas
  * extracts the selected region as an image for processing
+ * shows a convert button after selection is made
  */
 
-import { useEffect, useRef, useState } from 'react';
-import * as fabric from 'fabric';
+import { useEffect, useRef, useState, useCallback } from "react";
+import * as fabric from "fabric";
 
 export type SelectionBounds = {
   left: number;
@@ -28,14 +29,70 @@ export default function SelectionTool({
   onSelectionComplete,
   onCancel,
 }: SelectionToolProps) {
-
   const [isSelecting, setIsSelecting] = useState(false);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [selectionComplete, setSelectionComplete] = useState(false);
+  const [currentBounds, setCurrentBounds] = useState<SelectionBounds | null>(
+    null,
+  );
+  // store screen position for button placement
+  const [buttonPosition, setButtonPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const selectionRectRef = useRef<fabric.Rect | null>(null);
+
+  // reset selection state when tool becomes inactive
+  useEffect(() => {
+    if (!isActive) {
+      setSelectionComplete(false);
+      setCurrentBounds(null);
+      setIsSelecting(false);
+      setStartPoint(null);
+      setButtonPosition(null);
+    }
+  }, [isActive]);
+
+  // handle convert button click
+  const handleConvert = useCallback(() => {
+    if (!canvas || !currentBounds || !selectionRectRef.current) return;
+
+    // extract image data from selection
+    const imageData = extractImageFromBounds(canvas, currentBounds);
+
+    // remove selection rectangle
+    canvas.remove(selectionRectRef.current);
+    canvas.renderAll();
+    selectionRectRef.current = null;
+
+    // reset state
+    setSelectionComplete(false);
+    setCurrentBounds(null);
+    setButtonPosition(null);
+
+    // trigger conversion
+    onSelectionComplete(imageData, currentBounds);
+  }, [canvas, currentBounds, onSelectionComplete]);
+
+  // handle cancel
+  const handleCancel = useCallback(() => {
+    if (canvas && selectionRectRef.current) {
+      canvas.remove(selectionRectRef.current);
+      canvas.renderAll();
+      selectionRectRef.current = null;
+    }
+    setSelectionComplete(false);
+    setCurrentBounds(null);
+    setButtonPosition(null);
+    setIsSelecting(false);
+    setStartPoint(null);
+    onCancel();
+  }, [canvas, onCancel]);
 
   useEffect(() => {
     if (!canvas || !isActive) {
-
       // clean up selection rectangle if tool deactivated
       if (selectionRectRef.current && canvas) {
         canvas.remove(selectionRectRef.current);
@@ -45,34 +102,71 @@ export default function SelectionTool({
       return;
     }
 
-    // disable drawing mode when tool active
-    canvas.isDrawingMode = false;
-    canvas.selection = false;
+    // only set up mouse handlers if not in selection complete state
+    if (selectionComplete) return;
 
-    const getSceneCoords = (ev: fabric.TPointerEventInfo<fabric.TPointerEvent>): { x: number; y: number } => {
-      if (ev.scenePoint) {
-        return { x: ev.scenePoint.x, y: ev.scenePoint.y };
-      }
-      const p = canvas.getScenePoint(ev.e);
-      return { x: p.x, y: p.y };
+    // get the canvas element for coordinate calculations
+    const canvasEl = canvas.getElement();
+
+    // get pointer coordinates relative to canvas
+    // in fabric.js 7, we need to use the pointer property from the event
+    const getCoordinates = (
+      ev: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+    ): {
+      canvasX: number;
+      canvasY: number;
+      screenX: number;
+      screenY: number;
+    } => {
+      const mouseEvent = ev.e as MouseEvent;
+
+      // screen position (for button placement)
+      const screenX = mouseEvent.clientX;
+      const screenY = mouseEvent.clientY;
+
+      // get canvas bounding rect
+      const rect = canvasEl.getBoundingClientRect();
+
+      // calculate canvas coordinates accounting for any CSS scaling
+      const scaleX = canvas.getWidth() / rect.width;
+      const scaleY = canvas.getHeight() / rect.height;
+
+      const canvasX = (mouseEvent.clientX - rect.left) * scaleX;
+      const canvasY = (mouseEvent.clientY - rect.top) * scaleY;
+
+      return {
+        canvasX,
+        canvasY,
+        screenX,
+        screenY,
+      };
     };
 
     // mouse down: start selection
-    const handleMouseDown = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+    const handleMouseDown = (
+      event: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+    ) => {
+      // clear any existing selection rectangle
+      if (selectionRectRef.current) {
+        canvas.remove(selectionRectRef.current);
+        selectionRectRef.current = null;
+      }
 
-      const { x, y } = getSceneCoords(event);
- 
-      setStartPoint({ x, y });
+      const { canvasX, canvasY } = getCoordinates(event);
+
+      setStartPoint({ x: canvasX, y: canvasY });
       setIsSelecting(true);
+      setSelectionComplete(false);
+      setCurrentBounds(null);
 
       // create selection rectangle
       const rect = new fabric.Rect({
-        left: x,
-        top: y,
+        left: canvasX,
+        top: canvasY,
         width: 0,
         height: 0,
-        fill: 'rgba(0, 123, 255, 0.1)',
-        stroke: '#007bff',
+        fill: "rgba(72, 166, 167, 0.15)",
+        stroke: "#48A6A7",
         strokeWidth: 2,
         strokeDashArray: [5, 5],
         selectable: false,
@@ -85,34 +179,39 @@ export default function SelectionTool({
     };
 
     // mouse move: update selection rectangle
-    const handleMouseMove = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+    // track the last screen position for button placement
+    let lastScreenX = 0;
+    let lastScreenY = 0;
+
+    const handleMouseMove = (
+      event: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+    ) => {
       if (!isSelecting || !startPoint || !selectionRectRef.current) return;
 
-        const { x, y } = getSceneCoords(event);
+      const { canvasX, canvasY, screenX, screenY } = getCoordinates(event);
       const rect = selectionRectRef.current;
 
-      // calculate rectangle dimensions
-      const width = x - startPoint.x;
-      const height = y - startPoint.y;
+      // calculate rectangle bounds (handle dragging in any direction)
+      const left = Math.min(startPoint.x, canvasX);
+      const top = Math.min(startPoint.y, canvasY);
+      const width = Math.abs(canvasX - startPoint.x);
+      const height = Math.abs(canvasY - startPoint.y);
 
-      // update rectangle (handle negative dimensions for reverse dragging)
-      if (width < 0) {
-        rect.set({ left: x, width: Math.abs(width) });
-      } else {
-        rect.set({ width });
-      }
+      // update all rectangle properties at once
+      rect.set({ left, top, width, height });
+      rect.setCoords();
 
-      if (height < 0) {
-        rect.set({ top: y, height: Math.abs(height) });
-      } else {
-        rect.set({ height });
-      }
+      // track screen position for button
+      lastScreenX = screenX;
+      lastScreenY = screenY;
 
       canvas.renderAll();
     };
 
-    // mouse up: complete selection
-    const handleMouseUp = () => {
+    // mouse up: complete selection and show convert button
+    const handleMouseUp = (
+      event: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+    ) => {
       if (!isSelecting || !selectionRectRef.current) return;
 
       const rect = selectionRectRef.current;
@@ -123,52 +222,98 @@ export default function SelectionTool({
         height: rect.height || 0,
       };
 
+      // get final screen position for button placement
+      const { screenX, screenY } = getCoordinates(event);
+
+      setIsSelecting(false);
+      setStartPoint(null);
+
       if (bounds.width < 20 || bounds.height < 20) {
-        console.log('[SelectionTool] Selection too small, canceling');
+        console.log("[SelectionTool] selection too small, canceling");
         canvas.remove(rect);
         canvas.renderAll();
-        setIsSelecting(false);
-        setStartPoint(null);
         selectionRectRef.current = null;
         return;
       }
 
-      // extract image data from selection
-      const imageData = extractImageFromBounds(canvas, bounds);
+      // calculate button position based on canvas element position
+      const canvasEl = canvas.getElement();
+      const canvasRect = canvasEl.getBoundingClientRect();
 
-      canvas.remove(rect);
-      canvas.renderAll();
-      selectionRectRef.current = null;
-      setIsSelecting(false);
-      setStartPoint(null);
+      // position button below the selection rectangle
+      // convert canvas coordinates to screen coordinates
+      const scaleX = canvasRect.width / canvas.getWidth();
+      const scaleY = canvasRect.height / canvas.getHeight();
 
-      onSelectionComplete(imageData, bounds);
+      const buttonX =
+        canvasRect.left + (bounds.left + bounds.width / 2) * scaleX;
+      const buttonY =
+        canvasRect.top + (bounds.top + bounds.height) * scaleY + 10;
+
+      setButtonPosition({ x: buttonX, y: buttonY });
+
+      // keep the rectangle visible and show convert button
+      setCurrentBounds(bounds);
+      setSelectionComplete(true);
+      console.log(
+        "[SelectionTool] selection complete, waiting for user action",
+      );
     };
 
-    canvas.on('mouse:down', handleMouseDown);
-    canvas.on('mouse:move', handleMouseMove);
-    canvas.on('mouse:up', handleMouseUp);
+    canvas.on("mouse:down", handleMouseDown);
+    canvas.on("mouse:move", handleMouseMove);
+    canvas.on("mouse:up", handleMouseUp);
 
     return () => {
-      canvas.off('mouse:down', handleMouseDown);
-      canvas.off('mouse:move', handleMouseMove);
-      canvas.off('mouse:up', handleMouseUp);
+      canvas.off("mouse:down", handleMouseDown);
+      canvas.off("mouse:move", handleMouseMove);
+      canvas.off("mouse:up", handleMouseUp);
     };
-  }, [canvas, isActive, isSelecting, startPoint, onSelectionComplete]);
+  }, [canvas, isActive, isSelecting, startPoint, selectionComplete]);
 
   // handle ESC key to cancel selection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isActive) {
-        onCancel();
+      if (e.key === "Escape" && isActive) {
+        handleCancel();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isActive, onCancel]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isActive, handleCancel]);
 
-  return null; 
+  // render convert button when selection is complete
+  if (!isActive || !selectionComplete || !currentBounds || !buttonPosition) {
+    return null;
+  }
+
+  // position the button near the selection using screen coordinates
+  const buttonStyle = {
+    position: "fixed" as const,
+    left: `${buttonPosition.x}px`,
+    top: `${buttonPosition.y}px`,
+    transform: "translateX(-50%)",
+    zIndex: 2000,
+  };
+
+  return (
+    <div style={buttonStyle} className="flex gap-2">
+      <button
+        onClick={handleConvert}
+        className="px-4 py-2 bg-[#48A6A7] text-white rounded-lg shadow-lg hover:bg-[#006A71] transition-colors font-medium flex items-center gap-2"
+      >
+        <span>📝</span>
+        Convert to Notation
+      </button>
+      <button
+        onClick={handleCancel}
+        className="px-4 py-2 bg-[#9ACBD0] text-[#006A71] rounded-lg shadow-lg hover:bg-[#F2EFE7] transition-colors font-medium"
+      >
+        Cancel
+      </button>
+    </div>
+  );
 }
 
 /**
@@ -177,17 +322,16 @@ export default function SelectionTool({
  */
 function extractImageFromBounds(
   canvas: fabric.Canvas,
-  bounds: SelectionBounds
+  bounds: SelectionBounds,
 ): string {
-
   // create temp canvas to extract region
-  const tempCanvas = document.createElement('canvas');
+  const tempCanvas = document.createElement("canvas");
   tempCanvas.width = bounds.width;
   tempCanvas.height = bounds.height;
-  const tempCtx = tempCanvas.getContext('2d');
+  const tempCtx = tempCanvas.getContext("2d");
 
   if (!tempCtx) {
-    throw new Error('Failed to get canvas context');
+    throw new Error("Failed to get canvas context");
   }
 
   // get main canvas element
@@ -203,12 +347,15 @@ function extractImageFromBounds(
     0,
     0,
     bounds.width,
-    bounds.height
+    bounds.height,
   );
 
   // convert to base64 PNG
-  const imageData = tempCanvas.toDataURL('image/png');
-  console.log('[SelectionTool] Extracted image data:', imageData.substring(0, 50) + '...');
+  const imageData = tempCanvas.toDataURL("image/png");
+  console.log(
+    "[SelectionTool] Extracted image data:",
+    imageData.substring(0, 50) + "...",
+  );
 
   return imageData;
 }

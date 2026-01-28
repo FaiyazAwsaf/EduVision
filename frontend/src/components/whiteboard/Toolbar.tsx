@@ -1,8 +1,8 @@
 /**
- * Toolbar Component
+ * toolbar component
  *
- * Provides UI controls for the whiteboard
- * Handles tool selection, color picker, and canvas controls
+ * provides ui controls for the whiteboard
+ * handles tool selection, color picker, and canvas controls
  */
 
 "use client";
@@ -16,30 +16,33 @@ export type ToolbarProps = {
   currentTool: Tool;
   penColor: string;
   strokeWidth: number;
+  eraserWidth: number;
   isDrawingLocked: boolean;
   isConnected: boolean;
   onToolChange: (tool: Tool) => void;
   onColorChange: (color: string) => void;
   onStrokeWidthChange: (width: number) => void;
+  onEraserWidthChange: (width: number) => void;
   onClear: () => void;
   onExport: () => void;
   onToggleLock?: () => void;
 };
 
 const COLORS = [
-  "#000000", // Black
-  "#FF0000", // Red
-  "#00FF00", // Green
-  "#0000FF", // Blue
-  "#FFFF00", // Yellow
-  "#FF00FF", // Magenta
-  "#00FFFF", // Cyan
-  "#FFA500", // Orange
-  "#800080", // Purple
-  "#A52A2A", // Brown
+  "#000000", // black
+  "#FF0000", // red
+  "#00FF00", // green
+  "#0000FF", // blue
+  "#FFFF00", // yellow
+  "#FF00FF", // magenta
+  "#00FFFF", // cyan
+  "#FFA500", // orange
+  "#800080", // purple
+  "#A52A2A", // brown
 ];
 
 const STROKE_WIDTHS = [1, 2, 3, 5, 8, 12];
+const ERASER_WIDTHS = [10, 20, 30, 40, 50];
 
 export default function Toolbar(props: ToolbarProps) {
   const {
@@ -47,11 +50,13 @@ export default function Toolbar(props: ToolbarProps) {
     currentTool,
     penColor,
     strokeWidth,
+    eraserWidth,
     isDrawingLocked,
     isConnected,
     onToolChange,
     onColorChange,
     onStrokeWidthChange,
+    onEraserWidthChange,
     onClear,
     onExport,
     onToggleLock,
@@ -59,6 +64,7 @@ export default function Toolbar(props: ToolbarProps) {
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showStrokePicker, setShowStrokePicker] = useState(false);
+  const [showEraserPicker, setShowEraserPicker] = useState(false);
 
   const canDraw = role === "teacher" || !isDrawingLocked;
   const isDisabled = !isConnected || !canDraw;
@@ -67,6 +73,7 @@ export default function Toolbar(props: ToolbarProps) {
   useEffect(() => {
     setShowColorPicker(false);
     setShowStrokePicker(false);
+    setShowEraserPicker(false);
   }, [currentTool]);
 
   return (
@@ -110,7 +117,11 @@ export default function Toolbar(props: ToolbarProps) {
                   ${isDisabled && tool !== "select" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                {tool === "pen" ? "✏️ Pen" : tool === "eraser" ? "🧹 Eraser" : "🔲 Select"}
+                {tool === "pen"
+                  ? "✏️ Pen"
+                  : tool === "eraser"
+                    ? "🧹 Eraser"
+                    : "🔲 Select"}
               </button>
             ))}
           </div>
@@ -191,6 +202,50 @@ export default function Toolbar(props: ToolbarProps) {
                 )}
               </div>
             </>
+          )}
+
+          {/* eraser controls */}
+          {currentTool === "eraser" && (
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                disabled={isDisabled}
+                onClick={() => setShowEraserPicker((v) => !v)}
+                className="px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
+              >
+                Eraser: {eraserWidth}px
+              </button>
+
+              {showEraserPicker && (
+                <div className="grid grid-cols-3 gap-1.5 p-2 border rounded">
+                  {ERASER_WIDTHS.map((width) => (
+                    <button
+                      key={width}
+                      type="button"
+                      onClick={() => {
+                        onEraserWidthChange(width);
+                        setShowEraserPicker(false);
+                      }}
+                      className={`px-2 py-1 rounded text-xs ${
+                        width === eraserWidth
+                          ? "bg-[#48A6A7] text-white"
+                          : "bg-[#F2EFE7] text-[#006A71]"
+                      }`}
+                    >
+                      {width}px
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* select tool info */}
+          {currentTool === "select" && (
+            <div className="text-xs text-[#48A6A7] p-2 bg-[#9ACBD0]/20 rounded">
+              Draw a rectangle to select an area, then click "Convert to
+              Notation"
+            </div>
           )}
 
           <div className="h-px bg-[#9ACBD0] my-1" />

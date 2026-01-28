@@ -1,13 +1,16 @@
 import os
+import json
 import base64
 import google.generativeai as genai
 from rest_framework import status
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from services.prompt_builder import create_math_prompt, create_text_prompt
+from django.views.decorators.csrf import csrf_exempt
+from .services.prompt_builder import create_math_prompt, create_text_prompt
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY_1"))
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY_2"))
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def convert_to_latex(request):
 
@@ -29,31 +32,32 @@ def convert_to_latex(request):
     """
 
     try:
-        data = request.body
+        # parse json body
+        data = json.loads(request.body)
         image_data = data.get("image")
-        conversion_type = data.get("type")
+        conversion_type = data.get("type", "math")
 
-        model = genai.GenerativeModel("gemini-3-flash-preview")
+        model = genai.GenerativeModel("gemini-2.0-flash")
 
         if not image_data:
-            response = JsonResponse(
+            return JsonResponse(
                 {
                 "success": False,
                 "latex": None,
                 "error": "Image data not provided",
                 },
                 status = status.HTTP_400_BAD_REQUEST,
-        )
+            )
             
         if "base64," in image_data:
             image_data = image_data.split("base64,")[1]
 
         image_bytes = base64.b64decode(image_data)
         
-        if conversion_type=="math":
-            prompt=create_math_prompt
+        if conversion_type == "math":
+            prompt = create_math_prompt()
         else:
-            prompt=create_text_prompt
+            prompt = create_text_prompt()
 
         image_parts = [
             {
@@ -73,10 +77,19 @@ def convert_to_latex(request):
                 latex_output = latex_output[5:]
             
             latex_output = latex_output.strip()
-            
+        
+        # return success response
+        return JsonResponse(
+            {
+                "success": True,
+                "latex": latex_output,
+                "error": None,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     except Exception as e:
-        response = JsonResponse(
+        return JsonResponse(
             {
             "success": False,
             "latex": None,
@@ -84,4 +97,3 @@ def convert_to_latex(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-        return response
