@@ -1,0 +1,47 @@
+# ==========================================
+# EduVision - Docker Compose Development Override
+# ==========================================
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # Frontend with hot reload
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    ports:
+      - "3000:3000"
+
+  # Backend with hot reload
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend:/app
+      - backend-media:/app/media
+    environment:
+      - DEBUG=True
+      - DJANGO_SETTINGS_MODULE=config.settings
+    ports:
+      - "8000:8000"
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # Celery worker with auto-reload
+  celery-worker:
+    volumes:
+      - ./backend:/app
+    command: celery -A config worker -l debug --autoreload
+
+  # Celery beat with auto-reload
+  celery-beat:
+    volumes:
+      - ./backend:/app
+    command: celery -A config beat -l debug

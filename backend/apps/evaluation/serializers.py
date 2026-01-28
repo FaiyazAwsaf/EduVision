@@ -1,162 +1,11 @@
 from rest_framework import serializers
 from .models import (
-    QuestionPaper, 
-    Question, 
-    Rubric, 
     AnswerScript, 
     ScriptPage, 
     QuestionEvaluation
 )
-
-
-class RubricSerializer(serializers.ModelSerializer):
-    """Serializer for grading rubrics."""
-    total_marks = serializers.ReadOnlyField()
-    
-    class Meta:
-        model = Rubric
-        fields = [
-            "id",
-            "method_marks",
-            "calculation_marks", 
-            "answer_marks",
-            "total_marks",
-            "key_points",
-            "common_mistakes",
-            "grading_notes",
-        ]
-
-
-class QuestionSerializer(serializers.ModelSerializer):
-    """Serializer for questions."""
-    rubric = RubricSerializer(read_only=True)
-    
-    class Meta:
-        model = Question
-        fields = [
-            "id",
-            "question_number",
-            "question_text",
-            "question_type",
-            "max_marks",
-            "model_answer",
-            "rubric",
-        ]
-
-
-class QuestionCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating questions with rubrics."""
-    rubric = RubricSerializer(required=False)
-    
-    class Meta:
-        model = Question
-        fields = [
-            "question_number",
-            "question_text",
-            "question_type",
-            "max_marks",
-            "model_answer",
-            "rubric",
-        ]
-    
-    def create(self, validated_data):
-        rubric_data = validated_data.pop("rubric", None)
-        question = Question.objects.create(**validated_data)
-        
-        if rubric_data:
-            Rubric.objects.create(question=question, **rubric_data)
-        else:
-            # Create default rubric
-            Rubric.objects.create(
-                question=question,
-                method_marks=2,
-                calculation_marks=2,
-                answer_marks=1,
-            )
-        
-        return question
-
-
-class QuestionPaperListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for listing question papers."""
-    question_count = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = QuestionPaper
-        fields = [
-            "id",
-            "title",
-            "subject",
-            "class_level",
-            "total_marks",
-            "question_count",
-            "created_at",
-        ]
-    
-    def get_question_count(self, obj):
-        return obj.questions.count()
-
-
-class QuestionPaperDetailSerializer(serializers.ModelSerializer):
-    """Detailed serializer for question papers with questions."""
-    questions = QuestionSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = QuestionPaper
-        fields = [
-            "id",
-            "title",
-            "subject",
-            "class_level",
-            "total_marks",
-            "description",
-            "questions",
-            "created_at",
-            "updated_at",
-        ]
-
-
-class QuestionPaperCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating question papers with questions."""
-    questions = QuestionCreateSerializer(many=True, required=False)
-    
-    class Meta:
-        model = QuestionPaper
-        fields = [
-            "title",
-            "subject",
-            "class_level",
-            "description",
-            "questions",
-        ]
-    
-    def create(self, validated_data):
-        questions_data = validated_data.pop("questions", [])
-        question_paper = QuestionPaper.objects.create(**validated_data)
-        
-        total_marks = 0
-        for question_data in questions_data:
-            rubric_data = question_data.pop("rubric", None)
-            question = Question.objects.create(
-                question_paper=question_paper,
-                **question_data
-            )
-            total_marks += question.max_marks
-            
-            if rubric_data:
-                Rubric.objects.create(question=question, **rubric_data)
-            else:
-                Rubric.objects.create(
-                    question=question,
-                    method_marks=2,
-                    calculation_marks=2,
-                    answer_marks=1,
-                )
-        
-        question_paper.total_marks = total_marks
-        question_paper.save()
-        
-        return question_paper
+from apps.rubrics.models import RubricSet, QuestionRubric
+from apps.rubrics.serializers import RubricSetSerializer
 
 
 class ScriptPageSerializer(serializers.ModelSerializer):
@@ -187,9 +36,13 @@ class ScriptPageSerializer(serializers.ModelSerializer):
 
 class QuestionEvaluationSerializer(serializers.ModelSerializer):
     """Serializer for question evaluations."""
-    question_number = serializers.CharField(source="question.question_number", read_only=True)
-    question_text = serializers.CharField(source="question.question_text", read_only=True)
-    max_marks = serializers.IntegerField(source="question.max_marks", read_only=True)
+    question_number = serializers.CharField(source="question_rubric.question_number", read_only=True)
+    question_text = serializers.CharField(source="question_rubric.question_text", read_only=True)
+    max_marks = serializers.FloatField(source="question_rubric.max_marks", read_only=True)
+    method_marks_awarded = serializers.FloatField(read_only=True)
+    calculation_marks_awarded = serializers.FloatField(read_only=True)
+    answer_marks_awarded = serializers.FloatField(read_only=True)
+    total_marks_awarded = serializers.FloatField(read_only=True)
     
     class Meta:
         model = QuestionEvaluation
@@ -218,8 +71,10 @@ class QuestionEvaluationSerializer(serializers.ModelSerializer):
 
 class AnswerScriptListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing answer scripts."""
-    question_paper_title = serializers.CharField(source="question_paper.title", read_only=True)
+    rubric_set_title = serializers.CharField(source="rubric_set.title", read_only=True)
     page_count = serializers.SerializerMethodField()
+    total_score = serializers.FloatField(read_only=True)
+    percentage = serializers.FloatField(read_only=True)
     
     class Meta:
         model = AnswerScript
@@ -227,7 +82,7 @@ class AnswerScriptListSerializer(serializers.ModelSerializer):
             "id",
             "student_name",
             "student_id",
-            "question_paper_title",
+            "rubric_set_title",
             "status",
             "total_score",
             "percentage",
@@ -242,9 +97,11 @@ class AnswerScriptListSerializer(serializers.ModelSerializer):
 
 class AnswerScriptDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer for answer scripts with evaluations."""
-    question_paper = QuestionPaperDetailSerializer(read_only=True)
+    rubric_set = RubricSetSerializer(read_only=True)
     pages = ScriptPageSerializer(many=True, read_only=True)
     question_evaluations = QuestionEvaluationSerializer(many=True, read_only=True)
+    total_score = serializers.FloatField(read_only=True)
+    percentage = serializers.FloatField(read_only=True)
     
     class Meta:
         model = AnswerScript
@@ -252,7 +109,7 @@ class AnswerScriptDetailSerializer(serializers.ModelSerializer):
             "id",
             "student_name",
             "student_id",
-            "question_paper",
+            "rubric_set",
             "status",
             "total_score",
             "percentage",
@@ -277,11 +134,16 @@ class AnswerScriptCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerScript
         fields = [
-            "question_paper",
+            "rubric_set",
             "student_name",
             "student_id",
             "pages",
         ]
+    
+    def validate_rubric_set(self, value):
+        if value is None:
+            raise serializers.ValidationError("Rubric set is required.")
+        return value
     
     def validate_pages(self, value):
         if len(value) > 10:

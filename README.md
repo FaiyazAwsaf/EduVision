@@ -24,8 +24,8 @@ Before you begin, ensure you have the following installed:
 
 - **Python 3.11+** - [Download Python](https://www.python.org/downloads/)
 - **Node.js 20+** - [Download Node.js](https://nodejs.org/)
-- **PostgreSQL 14+** - [Download PostgreSQL](https://www.postgresql.org/download/)
 - **Git** - [Download Git](https://git-scm.com/downloads)
+- **Supabase Account** - [Sign up at Supabase](https://supabase.com/) (for database hosting)
 
 ## Installation
 
@@ -70,29 +70,33 @@ pip install -r requirements.txt
 
 #### Configure Environment Variables
 
-Create a `.env` file in the `backend` directory:
+Create a `.env` file in the `backend` directory (or copy from `.env.example`):
 
 ```env
-DATABASE_URL=postgresql://username:password@localhost:5432/eduvision_db
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
 DB_CONN_MAX_AGE=60
 SECRET_KEY=your-secret-key-here
 DEBUG=True
 ```
 
-**Note:** Replace `username`, `password`, and `eduvision_db` with your PostgreSQL credentials and database name.
+**Get your Supabase Database URL:**
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard)
+2. Select your project
+3. Go to **Settings** → **Database**
+4. Copy the **Connection string** under **Connection pooling** (URI format)
+5. Replace `[YOUR-PASSWORD]` with your database password
 
 #### Setup Database
 
 ```bash
-# Create PostgreSQL database (run in psql or pgAdmin)
-CREATE DATABASE eduvision_db;
-
-# Run migrations
+# Run migrations (Supabase database is already created)
 python manage.py migrate
 
 # Create superuser (optional)
 python manage.py createsuperuser
 ```
+
+**Note:** The database tables will be created automatically in your Supabase project when you run migrations.
 
 #### Run Backend Server
 
@@ -188,9 +192,11 @@ npm run lint     # Run ESLint
 ### Backend Issues
 
 **Database Connection Error:**
-- Verify PostgreSQL is running
-- Check DATABASE_URL in `.env` file
-- Ensure database exists: `CREATE DATABASE eduvision_db;`
+- Verify your Supabase project is active
+- Check DATABASE_URL in `.env` file is correct
+- Ensure you've replaced `[YOUR-PASSWORD]` with your actual database password
+- Verify your IP is allowed in Supabase (Settings → Database → Connection pooling)
+- Use the **Connection Pooling** URI from Supabase, not the direct connection string
 
 **Migration Errors:**
 ```bash

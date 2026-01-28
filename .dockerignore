@@ -1,0 +1,43 @@
+# Root level .dockerignore
+# Prevents sending unnecessary files to Docker build context
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+*.md
+LICENSE
+
+# Environment files (handled separately)
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv
+venv
+env
+
+# Certificates (if sensitive)
+certs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local data
+*.sqlite3
+
+# Node modules (frontend handles its own)
+node_modules
