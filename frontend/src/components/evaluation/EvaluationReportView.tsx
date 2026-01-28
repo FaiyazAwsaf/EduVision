@@ -26,7 +26,12 @@ export default function EvaluationReportView({
     return "bg-red-100 dark:bg-red-900/30";
   };
 
-  const { evaluation_summary, question_paper, question_results, overall_feedback } = report;
+  const {
+    evaluation_summary,
+    question_paper,
+    question_results,
+    overall_feedback,
+  } = report;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -37,8 +42,18 @@ export default function EvaluationReportView({
             onClick={onBack}
             className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
             Back
           </button>
@@ -58,13 +73,24 @@ export default function EvaluationReportView({
               {question_paper.title}
             </h2>
             <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-              <p><span className="font-medium">Subject:</span> {question_paper.subject}</p>
-              <p><span className="font-medium">Class:</span> {question_paper.class_level}</p>
+              <p>
+                <span className="font-medium">Subject:</span>{" "}
+                {question_paper.subject}
+              </p>
+              <p>
+                <span className="font-medium">Class:</span>{" "}
+                {question_paper.class_level}
+              </p>
               {report.student_name && (
-                <p><span className="font-medium">Student:</span> {report.student_name}</p>
+                <p>
+                  <span className="font-medium">Student:</span>{" "}
+                  {report.student_name}
+                </p>
               )}
               {report.student_id && (
-                <p><span className="font-medium">ID:</span> {report.student_id}</p>
+                <p>
+                  <span className="font-medium">ID:</span> {report.student_id}
+                </p>
               )}
               {evaluation_summary.evaluated_at && (
                 <p>
@@ -83,20 +109,21 @@ export default function EvaluationReportView({
               {evaluation_summary.percentage.toFixed(1)}%
             </div>
             <div className="mt-2 text-lg text-gray-600 dark:text-gray-400">
-              {evaluation_summary.total_score.toFixed(1)} / {evaluation_summary.max_score} marks
+              {evaluation_summary.total_score.toFixed(1)} /{" "}
+              {evaluation_summary.max_score} marks
             </div>
             <div
               className={`mt-4 px-4 py-1 rounded-full text-sm font-medium ${getScoreBgColor(
-                evaluation_summary.percentage
+                evaluation_summary.percentage,
               )} ${getScoreColor(evaluation_summary.percentage)}`}
             >
               {evaluation_summary.percentage >= 80
                 ? "Excellent"
                 : evaluation_summary.percentage >= 60
-                ? "Good"
-                : evaluation_summary.percentage >= 40
-                ? "Satisfactory"
-                : "Needs Improvement"}
+                  ? "Good"
+                  : evaluation_summary.percentage >= 40
+                    ? "Satisfactory"
+                    : "Needs Improvement"}
             </div>
           </div>
         </div>
@@ -124,12 +151,16 @@ export default function EvaluationReportView({
                 </h3>
               </div>
               <div className="text-right">
-                <div className={`text-2xl font-bold ${getScoreColor(
-                  (result.marks.total / result.marks.max_total) * 100
-                )}`}>
+                <div
+                  className={`text-2xl font-bold ${getScoreColor(
+                    (result.marks.total / result.marks.max_total) * 100,
+                  )}`}
+                >
                   {result.marks.total.toFixed(1)} / {result.marks.max_total}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">marks</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  marks
+                </div>
               </div>
             </div>
 
@@ -157,7 +188,8 @@ export default function EvaluationReportView({
                     Calculation
                   </span>
                   <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {result.marks.calculation.awarded} / {result.marks.calculation.max}
+                    {result.marks.calculation.awarded} /{" "}
+                    {result.marks.calculation.max}
                   </div>
                 </div>
                 <div className="flex-1 text-sm text-gray-600 dark:text-gray-400">
@@ -181,59 +213,63 @@ export default function EvaluationReportView({
               </div>
 
               {/* Key Points */}
-              {(result.key_points_found?.length || result.key_points_missing?.length) && (
+              {(result.key_points_found?.length ||
+                result.key_points_missing?.length) && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {result.key_points_found && result.key_points_found.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">
-                          ✓ Key Points Covered
-                        </h4>
-                        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                          {result.key_points_found.map((point, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-green-500">•</span>
-                              {point}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {result.key_points_missing && result.key_points_missing.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
-                          ✗ Key Points Missing
-                        </h4>
-                        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                          {result.key_points_missing.map((point, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-red-500">•</span>
-                              {point}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {result.key_points_found &&
+                      result.key_points_found.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">
+                            ✓ Key Points Covered
+                          </h4>
+                          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                            {result.key_points_found.map((point, i) => (
+                              <li key={i} className="flex items-start gap-2">
+                                <span className="text-green-500">•</span>
+                                {point}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    {result.key_points_missing &&
+                      result.key_points_missing.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
+                            ✗ Key Points Missing
+                          </h4>
+                          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                            {result.key_points_missing.map((point, i) => (
+                              <li key={i} className="flex items-start gap-2">
+                                <span className="text-red-500">•</span>
+                                {point}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                   </div>
                 </div>
               )}
 
               {/* Mistakes */}
-              {result.mistakes_identified && result.mistakes_identified.length > 0 && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h4 className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-2">
-                    ⚠ Mistakes Identified
-                  </h4>
-                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                    {result.mistakes_identified.map((mistake, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-orange-500">•</span>
-                        {mistake}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {result.mistakes_identified &&
+                result.mistakes_identified.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h4 className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-2">
+                      ⚠ Mistakes Identified
+                    </h4>
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                      {result.mistakes_identified.map((mistake, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-orange-500">•</span>
+                          {mistake}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
               {/* Overall Feedback */}
               {result.overall_feedback && (
@@ -271,41 +307,64 @@ export default function EvaluationReportView({
 
         {overall_feedback.summary && (
           <div className="prose dark:prose-invert max-w-none mb-6">
-            <p className="text-gray-600 dark:text-gray-400">{overall_feedback.summary}</p>
+            <p className="text-gray-600 dark:text-gray-400">
+              {overall_feedback.summary}
+            </p>
           </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Strengths */}
-          {overall_feedback.strengths && overall_feedback.strengths.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Strengths
-              </h3>
-              <ul className="space-y-2">
-                {overall_feedback.strengths.map((strength, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+          {overall_feedback.strengths &&
+            overall_feedback.strengths.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <span className="text-green-500 mt-1">✓</span>
-                    {strength}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Strengths
+                </h3>
+                <ul className="space-y-2">
+                  {overall_feedback.strengths.map((strength, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                    >
+                      <span className="text-green-500 mt-1">✓</span>
+                      {strength}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
           {/* Areas for Improvement */}
           {overall_feedback.areas_for_improvement &&
             overall_feedback.areas_for_improvement.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                    />
                   </svg>
                   Areas for Improvement
                 </h3>
@@ -331,8 +390,18 @@ export default function EvaluationReportView({
           onClick={() => window.print()}
           className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+            />
           </svg>
           Print Report
         </button>
