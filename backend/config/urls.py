@@ -47,6 +47,7 @@ def api_root(request):
             'tutoring': '/api/tutoring/',
             'evaluation': '/api/evaluation/',
             'rubrics': '/api/rubrics/',
+            'whiteboard': '/api/whiteboard/',
             'admin': '/admin/',
         }
     })
@@ -69,18 +70,22 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # API endpoints
+
+    # content generator endpoint
     path('api/content-requests/', include('apps.content_requests.api.urls')),
     
-    # Study plan endpoints (Phase 5)
+    # Study plan endpoints 
     path('api/', include(router.urls)),
     
-    # Intelligence & Adaptive Optimization endpoints (Phase 6)
+    # intelligence & adaptive optimization endpoints 
     path('api/intelligence/', include('apps.intelligence.api.urls', namespace='intelligence')),
     
-    # Module 5: Tutoring endpoints
+    # tutoring endpoint
     path('api/tutoring/', include('apps.tutoring.api.urls', namespace='tutoring')),
-    
-    # Add other module APIs here as they are implemented
+
+    # whiteboard endpoint
+    path('api/whiteboard/', include('apps.whiteboard.urls', namespace='whiteboard')),
+
     # path('api/evaluation/', include('apps.evaluation.api.urls')),
     path('api/evaluation/', include('apps.evaluation.urls')),
     path('api/', include('apps.rubrics.urls')),

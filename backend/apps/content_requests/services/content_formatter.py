@@ -21,7 +21,7 @@ import re
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted, HRFlowable
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER
 from reportlab.lib.colors import HexColor
 
@@ -253,7 +253,9 @@ class ContentFormatter:
             lines = content_text.split('\n')
             i = 0
             in_code_block = False
+            in_math_block = False
             code_buffer = []
+            math_buffer = []
             
             while i < len(lines):
                 line = lines[i]
@@ -279,6 +281,58 @@ class ContentFormatter:
                     i += 1
                     continue
                 
+                # Handle math blocks ($$...$$)
+                if line.strip() == '$$' or line.strip().startswith('$$'):
+                    if in_math_block:
+                        # End of math block
+                        if math_buffer:
+                            math_text = ' '.join(math_buffer)
+                            # Render math as italicized text
+                            math_style = ParagraphStyle(
+                                'MathBlock',
+                                parent=styles['Normal'],
+                                fontSize=11,
+                                alignment=TA_CENTER,
+                                textColor=HexColor('#333333'),
+                                leftIndent=30,
+                                rightIndent=30
+                            )
+                            story.append(Paragraph(f"<i>{self._escape_html(math_text)}</i>", math_style))
+                            story.append(Spacer(1, 10))
+                        math_buffer = []
+                        in_math_block = False
+                    else:
+                        # Start of math block
+                        in_math_block = True
+                        # Check if equation is on same line
+                        if line.strip().startswith('$$') and line.strip().endswith('$$') and len(line.strip()) > 4:
+                            math_text = line.strip()[2:-2].strip()
+                            math_style = ParagraphStyle(
+                                'MathBlock',
+                                parent=styles['Normal'],
+                                fontSize=11,
+                                alignment=TA_CENTER,
+                                textColor=HexColor('#333333')
+                            )
+                            story.append(Paragraph(f"<i>{self._escape_html(math_text)}</i>", math_style))
+                            story.append(Spacer(1, 10))
+                            in_math_block = False
+                    i += 1
+                    continue
+                
+                if in_math_block:
+                    math_buffer.append(line.strip())
+                    i += 1
+                    continue
+                
+                # Handle horizontal rules (---)
+                if line.strip() in ('---', '***', '___'):
+                    story.append(Spacer(1, 10))
+                    story.append(HRFlowable(width="100%", thickness=1, color=HexColor('#cccccc')))
+                    story.append(Spacer(1, 10))
+                    i += 1
+                    continue
+                
                 # Skip empty lines
                 if not line.strip():
                     story.append(Spacer(1, 6))
@@ -288,33 +342,54 @@ class ContentFormatter:
                 # Handle headers
                 if line.startswith('# '):
                     text = line[2:].strip()
-                    story.append(Paragraph(self._escape_html(text), styles['MarkdownH1']))
+                    story.append(Paragraph(self._convert_inline_markdown(text), styles['MarkdownH1']))
                     story.append(Spacer(1, 8))
                 elif line.startswith('## '):
                     text = line[3:].strip()
-                    story.append(Paragraph(self._escape_html(text), styles['MarkdownH2']))
+                    story.append(Paragraph(self._convert_inline_markdown(text), styles['MarkdownH2']))
                     story.append(Spacer(1, 6))
                 elif line.startswith('### '):
                     text = line[4:].strip()
-                    story.append(Paragraph(self._escape_html(text), styles['MarkdownH3']))
+                    story.append(Paragraph(self._convert_inline_markdown(text), styles['MarkdownH3']))
                     story.append(Spacer(1, 4))
                 
-                # Handle lists
+                # Handle lists (including nested)
                 elif line.strip().startswith(('- ', '* ', '+ ')):
                     text = line.strip()[2:].strip()
-                    bullet_text = f"• {self._escape_html(text)}"
-                    story.append(Paragraph(bullet_text, styles['ListItem']))
-                    story.append(Spacer(1, 4))
+                    # Count leading spaces for indentation level
+                    leading_spaces = len(line) - len(line.lstrip())
+                    indent_level = leading_spaces // 2
+                    
+                    # Create custom list style with appropriate indentation
+                    list_style = ParagraphStyle(
+                        f'ListItem_{indent_level}',
+                        parent=styles['BodyText'],
+                        fontSize=11,
+                        leftIndent=20 + (indent_level * 15),
+                        bulletIndent=10 + (indent_level * 15),
+                        spaceAfter=4
+                    )
+                    
+                    # Convert inline markdown in list text
+                    text = self._convert_inline_markdown(text)
+                    bullet_text = f"• {text}"
+                    story.append(Paragraph(bullet_text, list_style))
                 
                 # Handle numbered lists
                 elif re.match(r'^\d+\.\s', line.strip()):
-                    text = re.sub(r'^\d+\.\s', '', line.strip())
-                    story.append(Paragraph(self._escape_html(text), styles['ListItem']))
-                    story.append(Spacer(1, 4))
+                    match = re.match(r'^(\d+)\.\s(.*)$', line.strip())
+                    if match:
+                        number = match.group(1)
+                        text = match.group(2)
+                        # Convert inline markdown in list text
+                        text = self._convert_inline_markdown(text)
+                        numbered_text = f"{number}. {text}"
+                        story.append(Paragraph(numbered_text, styles['ListItem']))
+                        story.append(Spacer(1, 4))
                 
-                # Handle inline code
-                elif '`' in line:
-                    # Convert inline code to monospace
+                # Handle inline code or markdown
+                elif '`' in line or '**' in line or '$' in line:
+                    # Convert inline markdown
                     text = self._convert_inline_markdown(line)
                     story.append(Paragraph(text, styles['Justify']))
                     story.append(Spacer(1, 8))
@@ -362,6 +437,8 @@ class ContentFormatter:
             stripped.startswith('#') or
             stripped.startswith(('- ', '* ', '+ ')) or
             stripped.startswith('```') or
+            stripped in ('---', '***', '___') or
+            stripped.startswith('$$') or
             re.match(r'^\d+\.\s', stripped)
         )
     
@@ -373,15 +450,19 @@ class ContentFormatter:
             .replace('>', '&gt;'))
     
     def _convert_inline_markdown(self, text: str) -> str:
-        """Convert inline Markdown (bold, italic, code) to ReportLab markup"""
+        """Convert inline Markdown (bold, italic, code, math) to ReportLab markup"""
         # Escape HTML first
         text = self._escape_html(text)
+        
+        # Convert inline math $...$ to italic (must be done before bold/italic conversion)
+        # Match $...$ but not $$
+        text = re.sub(r'(?<!\$)\$(?!\$)(.+?)\$(?!\$)', r'<i>\1</i>', text)
         
         # Convert **bold** to <b>bold</b>
         text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
         
-        # Convert *italic* to <i>italic</i>
-        text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
+        # Convert *italic* to <i>italic</i> (but not already converted math)
+        text = re.sub(r'(?<!<i>)\*([^*]+?)\*(?!</i>)', r'<i>\1</i>', text)
         
         # Convert `code` to monospace
         text = re.sub(r'`(.+?)`', r'<font face="Courier">\1</font>', text)

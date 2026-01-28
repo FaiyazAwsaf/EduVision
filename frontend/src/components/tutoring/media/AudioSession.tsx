@@ -10,7 +10,7 @@
 import React from "react";
 import { useSession } from "@/contexts/SessionContext";
 import { useWebRTC } from "@/hooks/useWebRTC";
-import { AudioStatus } from "@/components/AudioStatus";
+import { AudioStatus } from "./AudioStatus";
 
 interface AudioSessionProps {
   /** Session ID */

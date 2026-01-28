@@ -11,8 +11,8 @@
 
 import { useState } from "react";
 import { BookOpen, Home } from "lucide-react";
-import ContentRequestForm from "@/components/ContentRequestForm";
-import RequestStatusComponent from "@/components/RequestStatus";
+import ContentRequestForm from "@/components/content/ContentRequestForm";
+import RequestStatusComponent from "@/components/content/RequestStatus";
 import Link from "next/link";
 
 type ViewState = "form" | "status";
