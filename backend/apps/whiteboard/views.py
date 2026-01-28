@@ -37,7 +37,7 @@ def convert_to_latex(request):
         image_data = data.get("image")
         conversion_type = data.get("type", "math")
 
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
 
         if not image_data:
             return JsonResponse(
