@@ -20,10 +20,10 @@ export default function ScriptListItem({
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      pending: "bg-yellow-500/20 text-yellow-300",
-      processing: "bg-blue-500/20 text-blue-300",
-      evaluated: "bg-emerald-500/20 text-emerald-300",
-      error: "bg-red-500/20 text-red-300",
+      pending: "bg-yellow-100 text-yellow-700",
+      processing: "bg-blue-100 text-blue-700",
+      evaluated: "bg-emerald-100 text-emerald-700",
+      error: "bg-red-100 text-red-700",
     };
     return styles[status as keyof typeof styles] || styles.pending;
   };
@@ -41,11 +41,11 @@ export default function ScriptListItem({
   };
 
   return (
-    <div className=" rounded-xl border border-[#334155] p-6 hover:border-[#48A6A7] transition-all">
+    <div className="bg-white rounded-xl border-2 border-[#9ACBD0] p-6 shadow-md hover:shadow-lg hover:border-[#48A6A7] transition-all">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-lg font-semibold text-[#48A6A7]">
+            <h3 className="text-lg font-semibold text-[#006A71]">
               {script.student_name || script.student_id || "Anonymous Student"}
             </h3>
             <span
@@ -57,13 +57,13 @@ export default function ScriptListItem({
             </span>
           </div>
 
-          <p className="text-sm text-[#9ACBD0] mb-2">
+          <p className="text-sm text-[#48A6A7] mb-2">
             {typeof script.rubric_set === "object"
               ? script.rubric_set.title
               : "Rubric Set"}
           </p>
 
-          <div className="flex items-center gap-4 text-sm text-[#64748b]">
+          <div className="flex items-center gap-4 text-sm text-[#9ACBD0]">
             <span className="flex items-center gap-1">
               <svg
                 className="w-4 h-4"
@@ -99,10 +99,10 @@ export default function ScriptListItem({
           </div>
 
           {script.status === "evaluated" && script.total_score != null && (
-            <div className="mt-3 p-3 bg-white rounded-lg">
+            <div className="mt-3 p-3 bg-[#F2EFE7] rounded-lg border border-[#9ACBD0]">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-black">Score</span>
-                <span className="text-lg font-bold text-emerald-400">
+                <span className="text-sm font-medium text-[#006A71]">Score</span>
+                <span className="text-lg font-bold text-emerald-600">
                   {typeof script.total_score === "number"
                     ? script.total_score.toFixed(1)
                     : script.total_score}{" "}
@@ -119,7 +119,7 @@ export default function ScriptListItem({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-[#334155]">
+      <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-[#9ACBD0]">
         {script.status === "pending" && (
           <button
             onClick={handleEvaluate}
