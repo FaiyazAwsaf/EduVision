@@ -1,241 +1,378 @@
+/**
+ * Whiteboard Component
+ *
+ * Main orchestrator component that integrates:
+ * - WhiteboardCanvas (Fabric.js drawing)
+ * - WebSocket (real-time collaboration)
+ * - Toolbar (UI controls)
+ * - Session info display
+ */
+
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
+import SelectionTool, { SelectionBounds } from "./SelectionTool";
+import LatexRenderer, { LatexObject } from "./LatexRenderer";
+import { convertHandwritingToLatex } from "@/api/geminiService";
+import Toolbar, { Tool } from "./Toolbar";
+import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
 import * as fabric from "fabric";
-import { PenTool, Eraser, Trash2, Home, Download } from "lucide-react";
-import Link from "next/link";
 
-type Tool = "pen" | "eraser" | "clear";
+/**
+ * props for whiteboard component
+ */
+export type WhiteboardProps = {
+  sessionId: string;
+  userId: string;
+  role: "teacher" | "student";
+};
 
-export default function Whiteboard() {
-  const canvasRef = useRef<fabric.Canvas | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [tool, setTool] = useState<Tool>("pen");
-  const [penSize, setPenSize] = useState(2);
-  const [penColor, setPenColor] = useState("#006A71");
+/**
+ * path object from fabric.js canvas
+ * represents a drawn stroke with all its properties
+ */
+type CanvasPath = fabric.Path;
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+/**
+ * main whiteboard component
+ * coordinates drawing canvas, toolbar controls, and real-time collaboration
+ */
+export default function Whiteboard({
+  sessionId,
+  userId,
+  role,
+}: WhiteboardProps) {
+  // ============================================================
+  // state management
+  // ============================================================
 
-    const canvas = new fabric.Canvas("whiteboard-canvas", {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-      backgroundColor: "#ffffff",
-    });
+  // canvas state
+  const canvasRef = useRef<WhiteboardCanvasHandle>(null);
+  const [currentTool, setCurrentTool] = useState<Tool>("pen");
+  const [penColor, setPenColor] = useState("#000000");
+  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [eraserWidth, setEraserWidth] = useState(20);
+  const [isDrawingLocked, setIsDrawingLocked] = useState(false);
+  const [latexObjects, setLatexObjects] = useState<LatexObject[]>([]);
+  const [isConverting, setIsConverting] = useState(false);
 
-    // Create the brush
-    const brush = new fabric.PencilBrush(canvas);
-    brush.width = penSize;
-    brush.color = penColor;
+  // ============================================================
+  // websocket handlers
+  // ============================================================
 
-    canvas.freeDrawingBrush = brush;
-    canvas.isDrawingMode = true;
+  /**
+   * handle incoming websocket messages
+   * routes different message types to appropriate handlers
+   */
+  const handleWebSocketMessage = useCallback(
+    (message: WebSocketMessage) => {
+      console.log("[Whiteboard] Received message:", message.type);
 
-    canvasRef.current = canvas;
+      switch (message.type) {
+        case "canvas_event":
+          // handle remote drawing events
+          if (message.data?.pathData) {
+            console.log(
+              "[Whiteboard] received canvas_event with pathData:",
+              message.data.pathData,
+            );
+            canvasRef.current?.addPath(message.data.pathData);
+          } else {
+            console.warn(
+              "[Whiteboard] received canvas_event but no pathData in message:",
+              message,
+            );
+          }
+          break;
 
-    // Handle window resize
-    const handleResize = () => {
-      if (containerRef.current && canvas) {
-        canvas.setDimensions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-        canvas.renderAll();
+        case "clear_canvas":
+          // remote clear event
+          console.log("[Whiteboard] Remote clear canvas");
+          canvasRef.current?.clearCanvas();
+          break;
+
+        case "lock_state":
+          // update drawing lock state for students
+          if (role === "student") {
+            setIsDrawingLocked(message.data?.isLocked || false);
+            console.log(
+              "[Whiteboard] Drawing lock state:",
+              message.data?.isLocked,
+            );
+          }
+          break;
+
+        case "user_joined":
+          console.log("[Whiteboard] User joined:", message.data?.userId);
+          break;
+
+        case "user_left":
+          console.log("[Whiteboard] User left:", message.data?.userId);
+          break;
+
+        case "latex_added":
+          if (message.data?.latexObject) {
+            setLatexObjects((prev) => [...prev, message.data.latexObject]);
+            console.log("[Whiteboard] Remote LaTeX object added");
+          }
+          break;
+
+        default:
+          console.warn("[Whiteboard] Unknown message type:", message.type);
       }
-    };
+    },
+    [role],
+  );
 
-    window.addEventListener("resize", handleResize);
+  /**
+   * initialize websocket connection with callbacks
+   */
+  const websocket = useWebSocket({
+    sessionId,
+    userId,
+    role,
+    onMessage: handleWebSocketMessage,
+    onConnected: () => {
+      console.log("[Whiteboard] WebSocket connected");
+    },
+    onDisconnected: () => {
+      console.log("[Whiteboard] WebSocket disconnected");
+    },
+  });
 
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      canvas.dispose();
-    };
-  }, []);
+  // ============================================================
+  // computed state
+  // ============================================================
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !canvas.freeDrawingBrush) return;
+  const canDraw = role === "teacher" || !isDrawingLocked;
 
-    if (tool === "pen") {
-      canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = penColor;
-      canvas.freeDrawingBrush.width = penSize;
+  // ============================================================
+  // canvas event handlers
+  // ============================================================
+
+  /**
+   * handle selection tool
+   */
+
+  const handleSelectionComplete = useCallback(
+    async (imageData: string, bounds: SelectionBounds) => {
+      console.log("[Whiteboard] Selection complete, converting to LaTeX...");
+      setIsConverting(true);
+
+      try {
+        // call gemini
+        const result = await convertHandwritingToLatex(imageData, "math");
+
+        if (result.success && result.latex) {
+          // clear the hand-drawn content in the selected region
+          canvasRef.current?.clearRegion(bounds);
+
+          // create new Latex object positioned at the selection
+          const newLatexObject: LatexObject = {
+            id: `latex-${Date.now()}`,
+            latex: result.latex,
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
+          };
+
+          // add to state
+          setLatexObjects((prev) => [...prev, newLatexObject]);
+
+          // broadcast to other users
+          if (websocket.isConnected) {
+            websocket.sendMessage({
+              type: "latex_added",
+              data: { latexObject: newLatexObject },
+            });
+          }
+
+          console.log(
+            "[Whiteboard] LaTeX conversion successful:",
+            result.latex,
+          );
+        } else {
+          console.error("[Whiteboard] LaTeX conversion failed:", result.error);
+          alert(`Conversion failed: ${result.error}`);
+        }
+      } catch (error) {
+        console.error("[Whiteboard] Error during conversion:", error);
+        alert("An error occurred during conversion");
+      } finally {
+        setIsConverting(false);
+        setCurrentTool("pen");
+      }
+    },
+    [websocket],
+  );
+
+  /**
+   * handle local drawing events
+   * broadcasts path data to all connected peers
+   */
+  const handlePathCreated = useCallback(
+    (path: CanvasPath) => {
+      const pathData = path.toObject();
+
+      if (!websocket.isConnected) {
+        console.log("[Whiteboard] Cannot broadcast: websocket not connected");
+        return;
+      }
+
+      if (!canDraw) {
+        console.log("[Whiteboard] Cannot broadcast: drawing is locked");
+        return;
+      }
+
+      websocket.sendMessage({
+        type: "canvas_event",
+        data: { pathData },
+      });
+
+      console.log("[Whiteboard] Broadcasted path to peers");
+    },
+    [websocket, canDraw],
+  );
+
+  /**
+   * handle canvas clear (teacher only)
+   * broadcasts clear event to all students
+   */
+  const handleClear = useCallback(() => {
+    if (role !== "teacher") return;
+
+    canvasRef.current?.clearCanvas();
+
+    if (!websocket.isConnected) {
+      return;
     }
 
-    if (tool === "eraser") {
-      canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = "#ffffff";
-      canvas.freeDrawingBrush.width = 20;
-    }
-
-    if (tool === "clear") {
-      canvas.clear();
-      canvas.backgroundColor = "#ffffff";
-      canvas.renderAll();
-      setTool("pen");
-    }
-  }, [tool, penColor, penSize]);
-
-  const handleClear = () => {
-    if (confirm("Are you sure you want to clear the whiteboard?")) {
-      setTool("clear");
-    }
-  };
-
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
-    const dataURL = canvasRef.current.toDataURL({
-      format: "png",
-      quality: 1,
-      multiplier: 2,
+    websocket.sendMessage({
+      type: "clear_canvas",
+      data: {},
     });
-    const link = document.createElement("a");
-    link.download = `whiteboard-${Date.now()}.png`;
-    link.href = dataURL;
-    link.click();
-  };
+
+    console.log("[Whiteboard] Cleared canvas");
+  }, [role, websocket]);
+
+  /**
+   * export canvas to json file
+   * allows saving whiteboard state for future reference
+   */
+  const handleExport = useCallback(() => {
+    const state = canvasRef.current?.exportToJSON();
+    if (state) {
+      const dataStr = JSON.stringify(state, null, 2);
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(dataBlob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `whiteboard-${sessionId}-${Date.now()}.json`;
+      link.click();
+
+      URL.revokeObjectURL(url);
+      console.log("[Whiteboard] Exported canvas");
+    }
+  }, [sessionId]);
+
+  /**
+   * toggle drawing lock for students (teacher only)
+   * broadcasts lock state to all connected students
+   */
+  const handleToggleLock = useCallback(() => {
+    if (role !== "teacher") return;
+
+    setIsDrawingLocked((prevLocked) => {
+      const newLockState = !prevLocked;
+
+      if (websocket.isConnected) {
+        websocket.sendMessage({
+          type: "lock_state",
+          data: { isLocked: newLockState },
+        });
+      }
+
+      console.log("[Whiteboard] Drawing lock:", newLockState);
+      return newLockState;
+    });
+  }, [role, websocket]);
+
+  // ============================================================
+  // Render
+  // ============================================================
 
   return (
-    <div className="min-h-screen bg-[#F2EFE7] flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <PenTool className="w-6 h-6 text-[#006A71]" />
-              <h1 className="text-xl font-bold text-[#006A71]">
-                Interactive Whiteboard
-              </h1>
-            </div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#48A6A7] hover:text-[#006A71] transition-colors"
-            >
-              <Home className="w-4 h-4" />
-              Home
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="w-screen h-screen bg-[#1a1a1a] relative overflow-hidden">
+      {/* toolbar */}
+      <Toolbar
+        role={role}
+        currentTool={currentTool}
+        penColor={penColor}
+        strokeWidth={strokeWidth}
+        eraserWidth={eraserWidth}
+        isDrawingLocked={isDrawingLocked}
+        isConnected={websocket.isConnected}
+        onToolChange={setCurrentTool}
+        onColorChange={setPenColor}
+        onStrokeWidthChange={setStrokeWidth}
+        onEraserWidthChange={setEraserWidth}
+        onClear={handleClear}
+        onExport={handleExport}
+        onToggleLock={role === "teacher" ? handleToggleLock : undefined}
+      />
 
-      {/* Toolbar */}
-      <div className="bg-white border-b border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Tool Selection */}
-            <div className="flex items-center gap-2 border-r border-[#9ACBD0] pr-4">
-              <button
-                onClick={() => setTool("pen")}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tool === "pen"
-                    ? "bg-[#48A6A7] text-white"
-                    : "bg-white border border-[#9ACBD0] text-[#48A6A7] hover:border-[#48A6A7]"
-                }`}
-              >
-                <PenTool className="w-4 h-4" />
-                Pen
-              </button>
-              <button
-                onClick={() => setTool("eraser")}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tool === "eraser"
-                    ? "bg-[#48A6A7] text-white"
-                    : "bg-white border border-[#9ACBD0] text-[#48A6A7] hover:border-[#48A6A7]"
-                }`}
-              >
-                <Eraser className="w-4 h-4" />
-                Eraser
-              </button>
-            </div>
-
-            {/* Pen Settings */}
-            {tool === "pen" && (
-              <div className="flex items-center gap-3 border-r border-[#9ACBD0] pr-4">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-[#006A71]">
-                    Size:
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={penSize}
-                    onChange={(e) => setPenSize(Number(e.target.value))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-[#48A6A7] w-8">
-                    {penSize}px
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-[#006A71]">
-                    Color:
-                  </label>
-                  <div className="flex gap-1">
-                    {[
-                      "#006A71",
-                      "#48A6A7",
-                      "#000000",
-                      "#DC2626",
-                      "#EA580C",
-                      "#16A34A",
-                      "#2563EB",
-                      "#9333EA",
-                    ].map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setPenColor(color)}
-                        className={`w-7 h-7 rounded border-2 transition-all ${
-                          penColor === color
-                            ? "border-[#006A71] scale-110"
-                            : "border-[#9ACBD0] hover:border-[#48A6A7]"
-                        }`}
-                        style={{ backgroundColor: color }}
-                        aria-label={`Select color ${color}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                onClick={handleDownload}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm font-medium text-[#48A6A7] hover:border-[#48A6A7] hover:text-[#006A71] transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-              <button
-                onClick={handleClear}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#9ACBD0] rounded-lg text-sm font-medium text-red-500 hover:border-red-500 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Clear
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* canvas */}
+      <div className="w-full h-full absolute top-0 left-0">
+        <WhiteboardCanvas
+          ref={canvasRef}
+          isDrawingEnabled={canDraw}
+          penColor={penColor}
+          strokeWidth={strokeWidth}
+          eraserWidth={eraserWidth}
+          tool={currentTool}
+          onPathCreated={handlePathCreated}
+        />
       </div>
 
-      {/* Canvas Container */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative bg-white m-4 rounded-xl border-2 border-[#9ACBD0] shadow-lg overflow-hidden"
-      >
-        <canvas id="whiteboard-canvas" />
-      </div>
+      {/* latex overlay */}
+      <LatexRenderer
+        objects={latexObjects}
+        onObjectClick={(id) => {
+          console.log("[Whiteboard] LaTeX object clicked:", id);
+          // Optional: implement editing/deletion
+        }}
+      />
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-[#48A6A7]">
-            Use the tools above to draw, erase, or clear the whiteboard
-          </p>
+      {/* selection tool */}
+      {currentTool === "select" && (
+        <SelectionTool
+          canvas={canvasRef.current?.getCanvas() || null}
+          isActive={currentTool === "select"}
+          onSelectionComplete={handleSelectionComplete}
+          onCancel={() => setCurrentTool("pen")}
+        />
+      )}
+
+      {/* loading indicator */}
+      {isConverting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
+          <div className="bg-white p-6 rounded-lg shadow-xl">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#48A6A7] mx-auto mb-4" />
+            <p className="text-[#006A71] font-bold">Converting to LaTeX...</p>
+          </div>
         </div>
-      </footer>
+      )}
+
+      {/* session info */}
+      <div className="fixed top-2.5 right-2.5 bg-slate-700 bg-opacity-90 text-slate-100 px-3 py-2 rounded text-xs z-[900] flex flex-col gap-1">
+        <div>Session: {sessionId}</div>
+        <div>Role: {role}</div>
+        <div>Status: {websocket.connectionState}</div>
+      </div>
     </div>
   );
 }

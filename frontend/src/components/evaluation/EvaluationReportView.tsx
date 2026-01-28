@@ -26,8 +26,12 @@ export default function EvaluationReportView({
     return "bg-red-500/10";
   };
 
-  const { evaluation_summary, rubric_set, question_results, overall_feedback } =
-    report;
+  const {
+    evaluation_summary,
+    question_paper,
+    question_results,
+    overall_feedback,
+  } = report;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -66,14 +70,14 @@ export default function EvaluationReportView({
             <h2 className="text-lg font-semibold text-[#006A71] mb-4">
               {rubric_set.title}
             </h2>
-            <div className="space-y-2 text-sm text-[#006A71]">
+            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
               <p>
                 <span className="font-medium">Subject:</span>{" "}
-                {rubric_set.subject}
+                {question_paper.subject}
               </p>
               <p>
-                <span className="font-medium">Total Marks:</span>{" "}
-                {rubric_set.total_marks}
+                <span className="font-medium">Class:</span>{" "}
+                {question_paper.class_level}
               </p>
               {report.student_name && (
                 <p>
@@ -102,7 +106,7 @@ export default function EvaluationReportView({
             >
               {evaluation_summary.percentage.toFixed(1)}%
             </div>
-            <div className="mt-2 text-lg text-[#48A6A7]">
+            <div className="mt-2 text-lg text-gray-600 dark:text-gray-400">
               {evaluation_summary.total_score.toFixed(1)} /{" "}
               {evaluation_summary.max_score} marks
             </div>
@@ -152,7 +156,9 @@ export default function EvaluationReportView({
                 >
                   {result.marks.total.toFixed(1)} / {result.marks.max_total}
                 </div>
-                <div className="text-xs text-[#48A6A7] font-medium">marks</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  marks
+                </div>
               </div>
             </div>
 
@@ -179,7 +185,7 @@ export default function EvaluationReportView({
                   <span className="text-sm font-medium text-[#006A71]">
                     Calculation
                   </span>
-                  <div className="text-lg font-semibold text-[#48A6A7]">
+                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
                     {result.marks.calculation.awarded} /{" "}
                     {result.marks.calculation.max}
                   </div>
@@ -207,18 +213,18 @@ export default function EvaluationReportView({
               {/* Key Points */}
               {(result.key_points_found?.length ||
                 result.key_points_missing?.length) && (
-                <div className="border-t border-[#9ACBD0] pt-4">
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {result.key_points_found &&
                       result.key_points_found.length > 0 && (
-                        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                          <h4 className="text-sm font-medium text-emerald-700 mb-2">
+                        <div>
+                          <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">
                             ✓ Key Points Covered
                           </h4>
-                          <ul className="text-sm text-emerald-800 space-y-1">
+                          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                             {result.key_points_found.map((point, i) => (
                               <li key={i} className="flex items-start gap-2">
-                                <span className="text-emerald-500">•</span>
+                                <span className="text-green-500">•</span>
                                 {point}
                               </li>
                             ))}
@@ -227,11 +233,11 @@ export default function EvaluationReportView({
                       )}
                     {result.key_points_missing &&
                       result.key_points_missing.length > 0 && (
-                        <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                          <h4 className="text-sm font-medium text-red-700 mb-2">
+                        <div>
+                          <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
                             ✗ Key Points Missing
                           </h4>
-                          <ul className="text-sm text-red-800 space-y-1">
+                          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                             {result.key_points_missing.map((point, i) => (
                               <li key={i} className="flex items-start gap-2">
                                 <span className="text-red-500">•</span>
@@ -248,20 +254,18 @@ export default function EvaluationReportView({
               {/* Mistakes */}
               {result.mistakes_identified &&
                 result.mistakes_identified.length > 0 && (
-                  <div className="border-t border-[#9ACBD0] pt-4">
-                    <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                      <h4 className="text-sm font-medium text-orange-700 mb-2">
-                        ⚠ Mistakes Identified
-                      </h4>
-                      <ul className="text-sm text-orange-800 space-y-1">
-                        {result.mistakes_identified.map((mistake, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="text-orange-500">•</span>
-                            {mistake}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h4 className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-2">
+                      ⚠ Mistakes Identified
+                    </h4>
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                      {result.mistakes_identified.map((mistake, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-orange-500">•</span>
+                          {mistake}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
@@ -302,8 +306,10 @@ export default function EvaluationReportView({
         </h2>
 
         {overall_feedback.summary && (
-          <div className="prose max-w-none mb-6">
-            <p className="text-[#006A71]">{overall_feedback.summary}</p>
+          <div className="prose dark:prose-invert max-w-none mb-6">
+            <p className="text-gray-600 dark:text-gray-400">
+              {overall_feedback.summary}
+            </p>
           </div>
         )}
 
@@ -311,8 +317,8 @@ export default function EvaluationReportView({
           {/* Strengths */}
           {overall_feedback.strengths &&
             overall_feedback.strengths.length > 0 && (
-              <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                <h3 className="text-sm font-medium text-emerald-700 mb-3 flex items-center gap-2">
+              <div>
+                <h3 className="text-sm font-medium text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -332,9 +338,9 @@ export default function EvaluationReportView({
                   {overall_feedback.strengths.map((strength, i) => (
                     <li
                       key={i}
-                      className="flex items-start gap-2 text-sm text-emerald-800"
+                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
                     >
-                      <span className="text-emerald-500 mt-1">✓</span>
+                      <span className="text-green-500 mt-1">✓</span>
                       {strength}
                     </li>
                   ))}
@@ -345,8 +351,8 @@ export default function EvaluationReportView({
           {/* Areas for Improvement */}
           {overall_feedback.areas_for_improvement &&
             overall_feedback.areas_for_improvement.length > 0 && (
-              <div className="p-4 bg-[#48A6A7]/10 rounded-lg border border-[#9ACBD0]">
-                <h3 className="text-sm font-medium text-[#006A71] mb-3 flex items-center gap-2">
+              <div>
+                <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
                   <svg
                     className="w-5 h-5"
                     fill="none"

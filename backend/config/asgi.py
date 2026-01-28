@@ -25,7 +25,11 @@ django_asgi_app = get_asgi_application()
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from apps.tutoring.websocket_middleware import TokenAuthMiddleware
-from apps.tutoring.routing import websocket_urlpatterns
+from apps.tutoring.routing import websocket_urlpatterns as tutoring_ws_patterns
+from apps.whiteboard.routing import websocket_urlpatterns as whiteboard_ws_patterns
+
+# Combine websocket url patterns from apps that expose WebSocket endpoints.
+websocket_urlpatterns = tutoring_ws_patterns + whiteboard_ws_patterns
 
 application = ProtocolTypeRouter({
     # HTTP requests are handled by Django

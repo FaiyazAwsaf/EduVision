@@ -23,9 +23,9 @@ import SessionStatusBadge from "@/components/tutoring/SessionStatus";
 import {
   ConnectionStatusBadge,
   ParticipantStatus,
-} from "@/components/ConnectionStatus";
+} from "@/components/tutoring/ConnectionStatus";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
-import { MediaSession } from "@/components/MediaSession";
+import { MediaSession } from "@/components/tutoring/media/MediaSession";
 import {
   TutoringUser,
   SessionJoinResponse,
