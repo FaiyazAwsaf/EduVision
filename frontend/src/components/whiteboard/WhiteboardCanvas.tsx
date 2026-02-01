@@ -40,7 +40,8 @@ export type WhiteboardCanvasProps = {
   isDrawingEnabled?: boolean;
   penColor?: string;
   strokeWidth?: number;
-  tool?: "pen" | "eraser";
+  eraserWidth?: number;
+  tool?: "pen" | "eraser" | "select";
   onCanvasReady?: (canvas: fabric.Canvas) => void;
   onPathCreated?: (path: fabric.Path) => void;
 };
@@ -52,6 +53,12 @@ export type WhiteboardCanvasProps = {
 export type WhiteboardCanvasHandle = {
   getCanvas: () => fabric.Canvas | null;
   clearCanvas: () => void;
+  clearRegion: (bounds: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }) => void;
   exportToJSON: () => CanvasState;
   loadFromJSON: (state: CanvasState) => Promise<void>;
   addPath: (pathData: PathOptions) => void;
@@ -74,6 +81,7 @@ const WhiteboardCanvas = forwardRef<
     isDrawingEnabled = true,
     penColor = "#000000",
     strokeWidth = 2,
+    eraserWidth = 20,
     tool = "pen",
     onCanvasReady,
     onPathCreated,
@@ -86,6 +94,13 @@ const WhiteboardCanvas = forwardRef<
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isRemoteUpdateRef = useRef(false);
+  // store callback in ref to avoid canvas recreation when callback changes
+  const onPathCreatedRef = useRef(onPathCreated);
+
+  // keep the ref in sync with the prop
+  useEffect(() => {
+    onPathCreatedRef.current = onPathCreated;
+  }, [onPathCreated]);
 
   // ============================================================
   // canvas initialization
@@ -125,16 +140,20 @@ const WhiteboardCanvas = forwardRef<
     canvas.on("path:created", (event) => {
       const obj = event.path;
 
-      if(!obj){
+      if (!obj) {
         console.log("[Canvas] path:created event has no path object");
         return;
       }
 
-      if(obj instanceof fabric.Path){
+      if (obj instanceof fabric.Path) {
         console.log("[Canvas] path created event fired, calling onPathCreated");
-        onPathCreated?.(obj);
+        // use ref to call the latest callback without causing re-render dependencies
+        onPathCreatedRef.current?.(obj);
       } else {
-        console.warn("[Canvas] path:created event object is not a fabric.Path", obj);
+        console.warn(
+          "[Canvas] path:created event object is not a fabric.Path",
+          obj,
+        );
       }
     });
 
@@ -146,7 +165,8 @@ const WhiteboardCanvas = forwardRef<
       canvas.dispose();
       canvasRef.current = null;
     };
-  }, [onPathCreated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ============================================================
   // window resize handler
@@ -196,23 +216,40 @@ const WhiteboardCanvas = forwardRef<
 
   /**
    * update brush settings based on tool prop
-   * switches between pen and eraser modes
+   * switches between pen, eraser, and select modes
    */
   useEffect(() => {
-    if (canvasRef.current && canvasRef.current.freeDrawingBrush) {
-      if (tool === "pen") {
-        canvasRef.current.freeDrawingBrush.color = penColor;
-        canvasRef.current.freeDrawingBrush.width = strokeWidth;
-      } else if (tool === "eraser") {
-        // eraser is implemented as white brush
-        canvasRef.current.freeDrawingBrush.color = "#ffffff";
-        canvasRef.current.freeDrawingBrush.width = 20;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (tool === "pen") {
+      // pen mode - enable drawing with colored brush
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = penColor;
+        canvas.freeDrawingBrush.width = strokeWidth;
       }
       console.log(
-        `[Canvas] tool: ${tool}, color: ${canvasRef.current.freeDrawingBrush.color}, width: ${canvasRef.current.freeDrawingBrush.width}`
+        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth}`,
       );
+    } else if (tool === "eraser") {
+      // eraser mode - use white brush to simulate erasing
+      // this draws white strokes over existing content
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = "#ffffff";
+        canvas.freeDrawingBrush.width = eraserWidth;
+      }
+      console.log(`[Canvas] tool: eraser (white brush), width: ${eraserWidth}`);
+    } else if (tool === "select") {
+      // select mode - disable drawing, handled by SelectionTool component
+      canvas.isDrawingMode = false;
+      canvas.selection = false;
+      console.log("[Canvas] tool: select (drawing disabled)");
     }
-  }, [tool, penColor, strokeWidth]);
+  }, [tool, penColor, strokeWidth, eraserWidth]);
 
   // ============================================================
   // imperative handle methods
@@ -232,6 +269,46 @@ const WhiteboardCanvas = forwardRef<
         canvasRef.current.renderAll();
         console.log("[Canvas] canvas cleared");
       }
+    },
+
+    clearRegion: (bounds: {
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    }) => {
+      if (!canvasRef.current) return;
+
+      const canvas = canvasRef.current;
+      const objects = canvas.getObjects();
+      const objectsToRemove: fabric.FabricObject[] = [];
+
+      // find objects that intersect with the bounds
+      objects.forEach((obj) => {
+        const objBounds = obj.getBoundingRect();
+
+        // check if object intersects with selection bounds
+        const intersects = !(
+          objBounds.left > bounds.left + bounds.width ||
+          objBounds.left + objBounds.width < bounds.left ||
+          objBounds.top > bounds.top + bounds.height ||
+          objBounds.top + objBounds.height < bounds.top
+        );
+
+        if (intersects) {
+          objectsToRemove.push(obj);
+        }
+      });
+
+      // remove intersecting objects
+      objectsToRemove.forEach((obj) => {
+        canvas.remove(obj);
+      });
+
+      canvas.renderAll();
+      console.log(
+        `[Canvas] cleared ${objectsToRemove.length} objects in region`,
+      );
     },
 
     exportToJSON: () => {
@@ -269,21 +346,29 @@ const WhiteboardCanvas = forwardRef<
         isRemoteUpdateRef.current = true;
         try {
           console.log("[Canvas] attempting to add remote path:", pathData);
-          console.log("[Canvas] current canvas object count before add:", canvasRef.current.getObjects().length);
+          console.log(
+            "[Canvas] current canvas object count before add:",
+            canvasRef.current.getObjects().length,
+          );
 
           // create path from received data
-          fabric.Path.fromObject(pathData).then((path: fabric.Path) => {
-            if (canvasRef.current) {
-              canvasRef.current.add(path);
-              canvasRef.current.renderAll();
-              console.log("[Canvas] added remote path successfully");
-              console.log("[Canvas] current canvas object count after add:", canvasRef.current.getObjects().length);
-            }
-            isRemoteUpdateRef.current = false;
-          }).catch((error) => {
-            console.error("[Canvas] error creating path from object:", error);
-            isRemoteUpdateRef.current = false;
-          });
+          fabric.Path.fromObject(pathData)
+            .then((path: fabric.Path) => {
+              if (canvasRef.current) {
+                canvasRef.current.add(path);
+                canvasRef.current.renderAll();
+                console.log("[Canvas] added remote path successfully");
+                console.log(
+                  "[Canvas] current canvas object count after add:",
+                  canvasRef.current.getObjects().length,
+                );
+              }
+              isRemoteUpdateRef.current = false;
+            })
+            .catch((error) => {
+              console.error("[Canvas] error creating path from object:", error);
+              isRemoteUpdateRef.current = false;
+            });
         } catch (error) {
           console.error("[Canvas] error adding path:", error);
           isRemoteUpdateRef.current = false;

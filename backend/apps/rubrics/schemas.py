@@ -92,7 +92,7 @@ class FeedbackMessages(BaseModel):
 
 class KeywordRuleConfig(BaseModel):
     """Configuration for keyword-based evaluation rules."""
-    required_keywords: List[str] = Field(..., min_length=1, description="List of required keywords")
+    required_keywords: List[str] = Field(default_factory=list, description="List of required keywords")
     scoring_mode: ScoringMode = Field(
         default=ScoringMode.PROPORTIONAL,
         description="How to score keyword matches"
@@ -102,15 +102,15 @@ class KeywordRuleConfig(BaseModel):
     @classmethod
     def validate_keywords(cls, v: List[str]) -> List[str]:
         """Ensure keywords are non-empty strings."""
+        if not v:
+            return []
         cleaned = [kw.strip() for kw in v if kw.strip()]
-        if not cleaned:
-            raise ValueError("At least one non-empty keyword is required")
         return cleaned
 
 
 class NumericRuleConfig(BaseModel):
     """Configuration for numeric evaluation rules."""
-    expected_value: float = Field(..., description="The expected numeric answer")
+    expected_value: float = Field(default=0.0, description="The expected numeric answer")
     tolerance: float = Field(
         default=0.0,
         ge=0,
@@ -129,13 +129,11 @@ class NumericRuleConfig(BaseModel):
 class StepwiseRuleConfig(BaseModel):
     """Configuration for stepwise evaluation rules."""
     step_description: str = Field(
-        ...,
-        min_length=1,
+        default="",
         description="Description of the step being evaluated"
     )
     expected_patterns: List[str] = Field(
-        ...,
-        min_length=1,
+        default_factory=list,
         description="List of regex patterns to match in the step"
     )
     allow_partial_credit: bool = Field(
@@ -150,7 +148,7 @@ class StepwiseRuleConfig(BaseModel):
         import re
         
         if not v:
-            raise ValueError("At least one pattern is required")
+            return []
         
         cleaned = []
         for pattern in v:
@@ -162,9 +160,6 @@ class StepwiseRuleConfig(BaseModel):
                 cleaned.append(pattern)
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern '{pattern}': {str(e)}")
-        
-        if not cleaned:
-            raise ValueError("At least one valid pattern is required")
         
         return cleaned
 
