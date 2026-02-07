@@ -1,12 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User
+from .models import CustomUser
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     def create(self, payload):
-        user = User.objects.create_user(
+        user = CustomUser.objects.create_user(
             username = payload["username"],
             email = payload["email"],
             password = payload["password"],
@@ -14,7 +14,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
     class Meta:
-        model = User
+        model = CustomUser
         fields = ["username", "email", "password"]
 
 class LoginSerializer(serializers.ModelSerializer):
@@ -23,7 +23,7 @@ class LoginSerializer(serializers.ModelSerializer):
 
     def validate(self, payload):
         user = authenticate(
-            email = payload["email"],
+            username = payload["username"],
             password = payload["password"],
         )
 

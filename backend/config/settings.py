@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "channels",  # Django Channels for WebSocket support
     
     # Project apps
+    "apps.authentication.apps.AuthenticationConfig",
     "apps.content_requests.apps.ContentRequestsConfig",
     "apps.intelligence.apps.IntelligenceConfig",  # Phase 6: Intelligence & Adaptive Optimization
     "apps.tutoring.apps.TutoringConfig", 
@@ -134,6 +135,13 @@ else:
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+AUTH_USER_MODEL = "authentication.CustomUser"
+
+AUTHENTICATION_BACKENDS = [
+    "apps.authentication.backends.EmailBackend",
+]
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
