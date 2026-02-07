@@ -14,7 +14,8 @@ class RegisterView(APIView):
             user_serialized.is_valid(raise_exception=True)
             user = user_serialized.save()
 
-            response = Response({
+            response = Response(
+                {
                 "message" : "User successfully created",
                 "payload" : user_serialized,
             }, 
@@ -36,11 +37,12 @@ class LoginView(APIView):
             refresh = RefreshToken.for_user(user)
 
             response = Response(
-                {"message": "Successfully logged in",
-                 "payload": {
-                     "access_token": str(refresh.access_token),
-                     "refresh_token": str(refresh),
-                 }
+                {
+                    "message": "Successfully logged in",
+                    "payload": {
+                        "access_token": str(refresh.access_token),
+                        "refresh_token": str(refresh),
+                    }
                 },
                 status=status.HTTP_200_OK
             )
@@ -49,3 +51,34 @@ class LoginView(APIView):
 
         except Exception as e:
             raise Exception(str(e))
+        
+class RefreshView(APIView):
+
+    def post(self, request):
+        
+        refresh_token = request.data.get("refresh_token")
+
+        if not refresh_token:
+            return Response(
+                {
+                    "message" : "Refresh token required"
+                },
+                status = status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+            access = str(token.access_token)
+        
+            response = Response(
+                {
+                    "message" : "Successfully returned new access token",
+                    "payload" : access
+                },
+                status=status.HTTP_200_OK
+            )
+            
+            return response
+        except Exception as e :
+            raise Exception(str(e))
+
