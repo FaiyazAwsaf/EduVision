@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import dj_database_url
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -41,7 +42,7 @@ INSTALLED_APPS = [
     "channels",  # Django Channels for WebSocket support
     
     # Project apps
-    "apps.user.apps.UserConfig",
+    "apps.authentication.apps.AuthenticationConfig",
     "apps.content_requests.apps.ContentRequestsConfig",
     "apps.intelligence.apps.IntelligenceConfig",  # Phase 6: Intelligence & Adaptive Optimization
     "apps.tutoring.apps.TutoringConfig", 
@@ -139,6 +140,11 @@ else:
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
+AUTHENTICATION_BACKENDS = [
+    "apps.authentication.backends.EmailBackend",
+]
+
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -192,6 +198,9 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    'DEFAULT_AUTHENTIATION_CLASSES': [
+        'rest_framework.simplejwt.authentication.JWTAuthentication',
+    ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
         'rest_framework.parsers.FormParser',
@@ -210,6 +219,15 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
 }
 
+# ============================================================================
+# JWT CONFIGURATION
+# ============================================================================
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME" : timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME" : timedelta(days=7),
+    "AUTH_HEADER_TYPES" : ('Bearer', ),
+    "ROTATE_REFRESH_TOKENS" : True,
+}
 
 # ============================================================================
 # CORS CONFIGURATION
