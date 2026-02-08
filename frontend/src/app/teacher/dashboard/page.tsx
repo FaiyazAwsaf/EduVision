@@ -2,13 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-  Plus,
-  Bell,
-  Eye,
-  Pencil,
-  ArrowRight,
-} from "lucide-react";
+import { Plus, Bell, Eye, Pencil, ArrowRight } from "lucide-react";
 
 /* ─── Dummy data ─────────────────────────────────────────────────────────── */
 
@@ -262,15 +256,11 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Assignment */}
-                <span className="text-sm text-[#6B7280]">
-                  {sub.assignment}
-                </span>
+                <span className="text-sm text-[#6B7280]">{sub.assignment}</span>
 
                 {/* Status */}
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2 h-2 rounded-full ${sub.statusDot}`}
-                  />
+                  <span className={`w-2 h-2 rounded-full ${sub.statusDot}`} />
                   <span
                     className={`text-xs font-semibold tracking-wide ${sub.statusColor}`}
                   >

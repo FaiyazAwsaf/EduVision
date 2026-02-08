@@ -64,7 +64,7 @@ const recentFeedback = [
     status: "REVIEW REQUIRED",
     statusColor: "bg-amber-100 text-amber-700",
     excerpt:
-      '"…Handwriting detected in margin: \'Review alcohol dehydration mechanism\'. 3 key diagrams identified and digitized…"',
+      "\"…Handwriting detected in margin: 'Review alcohol dehydration mechanism'. 3 key diagrams identified and digitized…\"",
   },
 ];
 

@@ -42,12 +42,23 @@ class TutoringUser(models.Model):
     Implements role-based authority:
     - TEACHER: Can create and control sessions
     - STUDENT: Can only join existing sessions
+    
+    Linked to authentication.CustomUser via a OneToOneField
+    so tutoring profiles map back to real auth accounts.
     """
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
         help_text="Unique identifier for the user"
+    )
+    account = models.OneToOneField(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tutoring_profile',
+        help_text="Link to the authentication account (nullable for legacy/test users)"
     )
     email = models.EmailField(
         unique=True,
