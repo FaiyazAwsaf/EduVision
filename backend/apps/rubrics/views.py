@@ -2,16 +2,19 @@
 ViewSet for RubricSet with CRUD operations and custom actions.
 """
 
+import os
+import tempfile
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import RubricSet, QuestionRubric
 from .serializers import (
     RubricSetSerializer, RubricSetListSerializer,
     RubricSetVersionSerializer, RubricSetPublishSerializer,
     QuestionRubricSerializer
 )
-from .services import evaluate_rubric_set
+from .pdf_parser import parse_rubric_document
 
 
 class RubricSetViewSet(viewsets.ModelViewSet):
@@ -22,14 +25,15 @@ class RubricSetViewSet(viewsets.ModelViewSet):
     - POST /api/rubric-sets/ → create draft rubric set
     - GET /api/rubric-sets/ → list rubric sets
     - GET /api/rubric-sets/{id}/ → retrieve rubric set
-    - PUT /api/rubric-sets/{id}/ → update rubric set (only if state=draft)
-    - PATCH /api/rubric-sets/{id}/ → partial update rubric set (only if state=draft)
+    - PUT /api/rubric-sets/{id}/ → update rubric set
+    - PATCH /api/rubric-sets/{id}/ → partial update rubric set
     - DELETE /api/rubric-sets/{id}/ → delete rubric set (only if state=draft)
     - POST /api/rubric-sets/{id}/publish/ → publish rubric set
     - POST /api/rubric-sets/{id}/archive/ → archive rubric set
     - GET /api/rubric-sets/{id}/versions/ → get version history
-    - POST /api/rubric-sets/test/ → test rubric set without saving
+    - POST /api/rubric-sets/parse_document/ → parse rubric from uploaded PDF
     """
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
     
     def get_queryset(self):
         """Return all rubric sets with prefetched questions."""
@@ -48,16 +52,9 @@ class RubricSetViewSet(viewsets.ModelViewSet):
         serializer.save()
     
     def update(self, request, *args, **kwargs):
-        """Update a rubric set. Only draft rubric sets can be updated."""
+        """Update a rubric set. All rubric sets can be updated."""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        
-        # Check if rubric set is editable
-        if instance.state != RubricSet.STATE_DRAFT:
-            return Response(
-                {"detail": f"Cannot edit {instance.state} rubric sets. Only draft rubric sets can be modified."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -140,6 +137,38 @@ class RubricSetViewSet(viewsets.ModelViewSet):
         serializer = RubricSetSerializer(instance)
         return Response(serializer.data)
     
+    @action(detail=True, methods=['post'])
+    def create_draft_copy(self, request, pk=None):
+        """
+        Create a draft copy of an existing rubric set for editing.
+        This allows editing of published rubrics by creating a new draft version.
+        """
+        original = self.get_object()
+        
+        # Create a new draft rubric set based on the original
+        draft_data = {
+            'title': f"{original.title} (Copy)",
+            'subject': original.subject,
+            'total_marks': original.total_marks,
+            'metadata': original.metadata or {},
+        }
+        
+        # Create the new draft rubric set
+        draft_rubric = RubricSet.objects.create(**draft_data)
+        
+        # Copy all questions with their evaluation rules
+        for question in original.questions.all():
+            QuestionRubric.objects.create(
+                rubric_set=draft_rubric,
+                question_number=question.question_number,
+                question_text=question.question_text,
+                max_marks=question.max_marks,
+                evaluation_rules=question.evaluation_rules
+            )
+        
+        serializer = RubricSetSerializer(draft_rubric)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     @action(detail=True, methods=['get'])
     def versions(self, request, pk=None):
         """Get all versions of a rubric set."""
@@ -148,72 +177,79 @@ class RubricSetViewSet(viewsets.ModelViewSet):
         serializer = RubricSetVersionSerializer(versions, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['post'])
-    def test(self, request):
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def parse_document(self, request):
         """
-        Test a rubric set against sample answers without saving.
+        Parse a rubric document (PDF) to extract questions and marking schemes.
         
-        Request body:
-        {
-            "rubric_set": {
-                "questions": [
-                    {
-                        "question_number": 1,
-                        "question_text": "...",
-                        "max_marks": 5.0,
-                        "evaluation_rules": [...]
-                    },
-                    ...
-                ]
-            },
-            "answers": {
-                "1": "answer for question 1",
-                "2": "answer for question 2",
-                ...
-            }
-        }
+        Request:
+        - file: PDF file containing rubric/marking scheme
         
         Response:
         {
-            "total_score": 15.5,
-            "max_score": 20.0,
-            "percentage": 77.5,
-            "question_results": [...],
-            "feedback": "..."
+            "title": "Document title",
+            "subject": "Subject area",
+            "total_marks": 100,
+            "questions": [
+                {
+                    "question_number": 1,
+                    "question_text": "...",
+                    "max_marks": 10,
+                    "evaluation_rules": [...]
+                },
+                ...
+            ]
         }
         """
-        rubric_set_data = request.data.get('rubric_set')
-        answers_data = request.data.get('answers', {})
-        
-        if not rubric_set_data:
+        if 'file' not in request.FILES:
             return Response(
-                {"detail": "'rubric_set' is required"},
+                {"detail": "No file uploaded. Please provide a PDF file."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if not rubric_set_data.get('questions'):
+        uploaded_file = request.FILES['file']
+        
+        # Validate file type
+        if not uploaded_file.name.endswith('.pdf'):
             return Response(
-                {"detail": "Rubric set must contain at least one question"},
+                {"detail": "Only PDF files are supported."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Convert string keys to integers
-        answers = {}
-        for key, value in answers_data.items():
-            try:
-                answers[int(key)] = value
-            except (ValueError, TypeError):
-                return Response(
-                    {"detail": f"Invalid question number in answers: {key}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
+        # Save file temporarily
         try:
-            # Apply the rubric set evaluation
-            result = evaluate_rubric_set(rubric_set_data, answers)
-            return Response(result, status=status.HTTP_200_OK)
-        except Exception as e:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                for chunk in uploaded_file.chunks():
+                    temp_file.write(chunk)
+                temp_path = temp_file.name
+            
+            # Parse the document
+            rubric_data = parse_rubric_document(temp_path)
+            
+            # Clean up temp file
+            os.unlink(temp_path)
+            
+            return Response(rubric_data, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            # Clean up temp file if it exists
+            if 'temp_path' in locals():
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
             return Response(
-                {"detail": f"Error evaluating answers: {str(e)}"},
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            # Clean up temp file if it exists
+            if 'temp_path' in locals():
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+            return Response(
+                {"detail": f"Error processing document: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
