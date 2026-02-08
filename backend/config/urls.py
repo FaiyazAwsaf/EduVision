@@ -86,6 +86,9 @@ urlpatterns = [
     # whiteboard endpoint
     path('api/whiteboard/', include('apps.whiteboard.urls', namespace='whiteboard')),
 
+    # authentication endpoint
+    path('api/', include('apps.authentication.urls', namespace='authentication')),
+
     # path('api/evaluation/', include('apps.evaluation.api.urls')),
     path('api/evaluation/', include('apps.evaluation.urls')),
     path('api/', include('apps.rubrics.urls')),
