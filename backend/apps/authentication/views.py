@@ -52,7 +52,7 @@ class LoginView(APIView):
                 httponly=True,
                 secure=False,
                 samesite="Strict",
-                path="auth/refresh/"
+                path="/"
             )
 
             return response
