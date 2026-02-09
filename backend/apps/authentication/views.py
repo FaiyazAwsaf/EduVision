@@ -41,18 +41,11 @@ class LoginView(APIView):
                     "message": "Successfully logged in",
                     "payload": {
                         "access_token": str(refresh.access_token),
+                        "refresh_token": str(refresh),
+                        "user": UserSerializer(user).data
                     }
                 },
                 status=status.HTTP_200_OK
-            )
-
-            response.set_cookie(
-                key="refresh_token",
-                value=str(refresh),
-                httponly=True,
-                secure=False,
-                samesite="Strict",
-                path="/"
             )
 
             return response
@@ -64,7 +57,7 @@ class RefreshView(APIView):
 
     def post(self, request):
         
-        refresh_token = request.COOKIES.get("refresh_token")
+        refresh_token = request.data.get("refresh_token")
 
         if not refresh_token:
             return Response(

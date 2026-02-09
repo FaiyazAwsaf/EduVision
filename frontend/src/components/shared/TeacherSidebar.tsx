@@ -31,7 +31,15 @@ const navItems = [
 
 export default function TeacherSidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+
+  // Get user initials
+  const initials = user
+    ? `${user.first_name[0] || ""}${user.last_name[0] || ""}`
+    : "U";
+  const fullName = user
+    ? `${user.first_name} ${user.last_name}`
+    : "User";
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-[#9ACBD0]/40 flex flex-col z-30">
@@ -96,13 +104,13 @@ export default function TeacherSidebar() {
         {/* User pill */}
         <div className="mt-3 flex items-center gap-3 bg-[#F2EFE7] rounded-xl px-3 py-3">
           <div className="w-9 h-9 rounded-full bg-[#006A71] flex items-center justify-center text-white font-semibold text-sm shadow-sm">
-            SM
+            {initials}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#006A71] truncate">
-              Dr. Sarah Miller
+              {fullName}
             </p>
-            <p className="text-[11px] text-[#48A6A7]">Senior Educator</p>
+            <p className="text-[11px] text-[#48A6A7]">Teacher</p>
           </div>
         </div>
       </div>

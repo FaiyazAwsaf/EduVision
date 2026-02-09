@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("authentication", "0001_add_account_link_to_tutoring_user"),
+        ("authentication", "0001_initial"),
         ("tutoring", "0005_remove_tutoringsession_active_screen_sharer"),
     ]
 

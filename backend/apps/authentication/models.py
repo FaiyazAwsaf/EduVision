@@ -14,7 +14,7 @@ class CustomUser(models.Model):
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     password_hash = models.CharField(max_length=255, null=True)
-    is_active = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     role = models.CharField(max_length=10, choices=UserRole.choices, default=UserRole.STUDENT, db_index=True)
     date_joined = models.DateField(auto_now_add=True)
 

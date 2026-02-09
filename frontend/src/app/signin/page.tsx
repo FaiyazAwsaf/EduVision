@@ -16,7 +16,7 @@ import Link from "next/link";
 
 export default function SignInPage() {
   const router = useRouter();
-  const { isReady, isAuthenticated, login } = useAuth();
+  const { isReady, isAuthenticated, user, login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,12 +24,18 @@ export default function SignInPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If already authenticated, redirect to homepage
+  // If already authenticated, redirect based on role
   useEffect(() => {
-    if (isReady && isAuthenticated) {
-      router.replace("/");
+    if (isReady && isAuthenticated && user) {
+      if (user.role === "teacher") {
+        router.replace("/teacher/dashboard");
+      } else if (user.role === "student") {
+        router.replace("/student/dashboard");
+      } else {
+        router.replace("/");
+      }
     }
-  }, [isReady, isAuthenticated, router]);
+  }, [isReady, isAuthenticated, user, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,8 +48,17 @@ export default function SignInPage() {
 
     setLoading(true);
     try {
-      await login({ email: email.trim(), password });
-      router.replace("/");
+      const user = await login({ email: email.trim(), password });
+
+      // Redirect based on user role
+      if (user.role === "teacher") {
+        router.replace("/teacher/dashboard");
+      } else if (user.role === "student") {
+        router.replace("/student/dashboard");
+      } else {
+        // Fallback to homepage if role is unexpected
+        router.replace("/");
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";

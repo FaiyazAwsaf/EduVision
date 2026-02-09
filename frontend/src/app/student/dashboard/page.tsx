@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Upload,
   MessageSquare,
@@ -11,7 +12,9 @@ import {
   ArrowRight,
   Bell,
   Calendar,
+  Loader2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ─── Quick-action card data ─────────────────────────────────────────────── */
 
@@ -71,11 +74,30 @@ const recentFeedback = [
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function StudentDashboard() {
+  const router = useRouter();
+  const { isReady, isAuthenticated, user } = useAuth();
+
+  // Authorization check - redirect to signin if not authenticated
+  useEffect(() => {
+    if (isReady && !isAuthenticated) {
+      router.replace("/signin");
+    }
+  }, [isReady, isAuthenticated, router]);
+
   const today = new Date().toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+
+  // Show loading state while checking authentication
+  if (!isReady || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F2EFE7]">
+        <Loader2 className="w-8 h-8 text-[#48A6A7] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -85,7 +107,7 @@ export default function StudentDashboard() {
           <div>
             <h1 className="text-2xl font-bold text-[#006A71]">Dashboard</h1>
             <p className="text-sm text-[#48A6A7]">
-              Welcome back, Nuren. Ready for today&apos;s goals?
+              Welcome back, {user.first_name}. Ready for today&apos;s goals?
             </p>
           </div>
 

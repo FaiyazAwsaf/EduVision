@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
-import { Plus, Bell, Eye, Pencil, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Bell, Eye, Pencil, ArrowRight, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ─── Dummy data ─────────────────────────────────────────────────────────── */
 
@@ -72,6 +74,25 @@ const recentSubmissions: {
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function TeacherDashboard() {
+  const router = useRouter();
+  const { isReady, isAuthenticated, user } = useAuth();
+
+  // Authorization check - redirect to signin if not authenticated
+  useEffect(() => {
+    if (isReady && !isAuthenticated) {
+      router.replace("/signin");
+    }
+  }, [isReady, isAuthenticated, router]);
+
+  // Show loading state while checking authentication
+  if (!isReady || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F2EFE7]">
+        <Loader2 className="w-8 h-8 text-[#48A6A7] animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}

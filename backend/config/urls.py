@@ -71,7 +71,7 @@ urlpatterns = [
     
     # API endpoints
 
-    # authentication
+    # authentication (both root and /api/ for compatibility)
     path('', include('apps.authentication.urls')),
 
     # content generator endpoint
@@ -89,8 +89,8 @@ urlpatterns = [
     # whiteboard endpoint
     path('api/whiteboard/', include('apps.whiteboard.urls', namespace='whiteboard')),
 
-    # authentication endpoint
-    path('api/', include('apps.authentication.urls', namespace='authentication')),
+    # authentication endpoint (also available at root /auth/)
+    path('api/', include('apps.authentication.urls')),
 
     # path('api/evaluation/', include('apps.evaluation.api.urls')),
     path('api/evaluation/', include('apps.evaluation.urls')),
