@@ -2,33 +2,53 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import CustomUser
 
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=20)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=30)
+    last_name = serializers.CharField(max_length=30)
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True, min_length=8)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError({"passsword": "Passwords do not match"})
+        return attrs
 
     def create(self, payload):
-        user = CustomUser.objects.create_user(
-            username = payload["username"],
-            email = payload["email"],
-            password = payload["password"],
-        )
+
+        payload.pop("password_confirm")
+        password = payload.pop("password")
+        user = CustomUser(**payload)
+        user.set_password(password)
+        user.save()
+
         return user
 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("Invalid email or password")
+        
+        if not user.verify_password(password):
+            raise serializers.ValidationError("Invalid email or password")
+        
+        if not user.is_active:
+            raise serializers.ValidationError("User account is not active")
+        
+        attrs["user"] = user
+        return attrs
+    
+class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ["username", "email", "password"]
-
-class LoginSerializer(serializers.ModelSerializer):
-    email = serializers.CharField()
-    password = serializers.CharField()
-
-    def validate(self, payload):
-        user = authenticate(
-            username = payload["username"],
-            password = payload["password"],
-        )
-
-        if not user:
-            raise serializers.ValidationError("Invalid credentials")
-        
-        payload["user"] = user
-        return payload
+        fields = ["id", "username", "email", "first_name", "last_name", "is_active", "role", "date_joined"]
+        read_only_fields = ["id", "date_joined"]

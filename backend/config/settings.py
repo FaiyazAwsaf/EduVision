@@ -136,10 +136,6 @@ else:
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
-AUTHENTICATION_BACKENDS = [
-    "apps.authentication.backends.EmailBackend",
-]
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
