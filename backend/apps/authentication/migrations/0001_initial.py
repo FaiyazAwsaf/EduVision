@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
     ]
-
     operations = [
         migrations.CreateModel(
             name='CustomUser',
@@ -20,6 +19,7 @@ class Migration(migrations.Migration):
                 ('username', models.CharField(max_length=20, unique=True)),
                 ('first_name', models.CharField(max_length=30)),
                 ('last_name', models.CharField(max_length=30)),
+                ('password_hash', models.CharField(max_length=255, null=True)),
                 ('is_active', models.BooleanField(default=False)),
                 ('role', models.CharField(choices=[('teacher', 'Teacher'), ('student', 'Student')], db_index=True, default='student', max_length=10)),
                 ('date_joined', models.DateField(auto_now_add=True)),

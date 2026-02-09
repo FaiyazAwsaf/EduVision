@@ -71,6 +71,9 @@ urlpatterns = [
     
     # API endpoints
 
+    # authentication
+    path('', include('apps.authentication.urls')),
+
     # content generator endpoint
     path('api/content-requests/', include('apps.content_requests.api.urls')),
     
