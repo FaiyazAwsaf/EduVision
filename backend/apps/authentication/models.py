@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
 from uuid import uuid4
 
 # Create your models here.
@@ -12,12 +13,20 @@ class CustomUser(models.Model):
     username = models.CharField(max_length=20, unique=True)
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
+    password_hash = models.CharField(max_length=255)
     is_active = models.BooleanField(default=False)
     role = models.CharField(max_length=10, choices=UserRole.choices, default=UserRole.STUDENT, db_index=True)
     date_joined = models.DateField(auto_now_add=True)
 
     def __str__(self):
         return self.username
+    
+    def set_password(self, password_raw):
+        self.password_hash = make_password(password_raw)
+    
+    def verify_password(self, password_raw):
+        hashed = check_password(password_raw, self.password_hash)
+        return hashed
     
     class Meta:
         db_table = "authentication_user"
