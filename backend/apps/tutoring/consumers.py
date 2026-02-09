@@ -58,8 +58,8 @@ class TutoringConsumer(AsyncWebsocketConsumer):
         self.user = self.scope.get('user')
         self.role = None
         
-        # Check authentication - TutoringUser has full_name, AnonymousUser doesn't
-        if not self.user or not hasattr(self.user, 'full_name'):
+        # Check authentication - CustomUser has first_name, AnonymousUser doesn't
+        if not self.user or not hasattr(self.user, 'first_name'):
             logger.warning(
                 f"WebSocket connection rejected: No authenticated user for session {self.session_id}"
             )
@@ -107,14 +107,14 @@ class TutoringConsumer(AsyncWebsocketConsumer):
             _connected_users[self.session_id][str(self.user.id)] = {
                 'role': self.role,
                 'channel_name': self.channel_name,
-                'user_name': self.user.full_name
+                'user_name': f"{self.user.first_name} {self.user.last_name}"
             }
         
         # Accept the connection
         await self.accept()
         
         logger.info(
-            f"WebSocket connected: {self.user.full_name} ({self.role}) "
+            f"WebSocket connected: {self.user.first_name} {self.user.last_name} ({self.role}) "
             f"joined session {self.session_id}"
         )
         
@@ -128,7 +128,7 @@ class TutoringConsumer(AsyncWebsocketConsumer):
                 'type': 'participant_joined',
                 'user_id': str(self.user.id),
                 'role': self.role,
-                'user_name': self.user.full_name,
+                'user_name': f"{self.user.first_name} {self.user.last_name}",
                 'timestamp': datetime.now().isoformat()
             }
         )
@@ -157,7 +157,7 @@ class TutoringConsumer(AsyncWebsocketConsumer):
                     'type': 'participant_left',
                     'user_id': str(self.user.id),
                     'role': self.role,
-                    'user_name': self.user.full_name,
+                    'user_name': f"{self.user.first_name} {self.user.last_name}",
                     'timestamp': datetime.now().isoformat()
                 }
             )
@@ -169,7 +169,7 @@ class TutoringConsumer(AsyncWebsocketConsumer):
             )
             
             logger.info(
-                f"WebSocket disconnected: {self.user.full_name} ({self.role}) "
+                f"WebSocket disconnected: {self.user.first_name} {self.user.last_name} ({self.role}) "
                 f"left session {self.session_id} (code: {close_code})"
             )
     
@@ -383,7 +383,7 @@ class TutoringConsumer(AsyncWebsocketConsumer):
         teacher_connected = str(session.teacher_id) in connected
         teacher_info = {
             'id': str(session.teacher_id),
-            'name': session.teacher.full_name,
+            'name': f"{session.teacher.first_name} {session.teacher.last_name}",
             'connected': teacher_connected
         }
         
@@ -392,7 +392,7 @@ class TutoringConsumer(AsyncWebsocketConsumer):
             student_connected = str(session.student_id) in connected
             student_info = {
                 'id': str(session.student_id),
-                'name': session.student.full_name,
+                'name': f"{session.student.first_name} {session.student.last_name}",
                 'connected': student_connected
             }
         

@@ -2,19 +2,12 @@
 Tutoring Session Models
 
 Implements the core models for Module 5: One-on-One Live Tutoring Room.
-Includes User model with role-based authority and TutoringSession model
-for managing tutoring room lifecycle.
+Uses authentication.CustomUser for user management.
 """
 
 import uuid
 from django.db import models
 from django.utils import timezone
-
-
-class UserRole(models.TextChoices):
-    """User role enumeration for role-based access control."""
-    TEACHER = 'TEACHER', 'Teacher'
-    STUDENT = 'STUDENT', 'Student'
 
 
 class SessionStatus(models.TextChoices):
@@ -35,69 +28,6 @@ class SessionStatus(models.TextChoices):
     ENDED = 'ENDED', 'Session ended'
 
 
-class TutoringUser(models.Model):
-    """
-    User model for tutoring system.
-    
-    Implements role-based authority:
-    - TEACHER: Can create and control sessions
-    - STUDENT: Can only join existing sessions
-    
-    Linked to authentication.CustomUser via a OneToOneField
-    so tutoring profiles map back to real auth accounts.
-    """
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        help_text="Unique identifier for the user"
-    )
-    account = models.OneToOneField(
-        'authentication.CustomUser',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='tutoring_profile',
-        help_text="Link to the authentication account (nullable for legacy/test users)"
-    )
-    email = models.EmailField(
-        unique=True,
-        help_text="User's email address (unique identifier)"
-    )
-    full_name = models.CharField(
-        max_length=255,
-        help_text="User's full display name"
-    )
-    role = models.CharField(
-        max_length=10,
-        choices=UserRole.choices,
-        help_text="User's role determining their permissions"
-    )
-    created_at = models.DateTimeField(
-        default=timezone.now,
-        help_text="When the user was created"
-    )
-
-    class Meta:
-        db_table = 'tutoring_users'
-        verbose_name = 'Tutoring User'
-        verbose_name_plural = 'Tutoring Users'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.full_name} ({self.role})"
-
-    @property
-    def is_teacher(self) -> bool:
-        """Check if user has teacher role."""
-        return self.role == UserRole.TEACHER
-
-    @property
-    def is_student(self) -> bool:
-        """Check if user has student role."""
-        return self.role == UserRole.STUDENT
-
-
 class TutoringSession(models.Model):
     """
     Tutoring session model.
@@ -107,6 +37,8 @@ class TutoringSession(models.Model):
     - Every session can have ZERO or ONE student
     - Teachers control session lifecycle
     - Students are participants, not controllers
+    
+    Uses authentication.CustomUser for both teacher and student.
     """
     id = models.UUIDField(
         primary_key=True,
@@ -120,13 +52,13 @@ class TutoringSession(models.Model):
         help_text="LiveKit room identifier (format: tutoring_{uuid})"
     )
     teacher = models.ForeignKey(
-        TutoringUser,
+        'authentication.CustomUser',
         on_delete=models.CASCADE,
         related_name='teacher_sessions',
         help_text="Teacher who owns this session"
     )
     student = models.ForeignKey(
-        TutoringUser,
+        'authentication.CustomUser',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -210,12 +142,12 @@ class TutoringSession(models.Model):
         """
         return not self.is_ended and not self.has_student
 
-    def activate(self, student: TutoringUser, token: str) -> None:
+    def activate(self, student, token: str) -> None:
         """
         Activate session when a student joins.
         
         Args:
-            student: The student joining the session
+            student: The student joining the session (CustomUser)
             token: LiveKit access token for the student
         """
         self.student = student
@@ -229,12 +161,12 @@ class TutoringSession(models.Model):
         self.ended_at = timezone.now()
         self.save()
 
-    def is_participant(self, user: TutoringUser) -> bool:
+    def is_participant(self, user) -> bool:
         """
         Check if user is a participant (teacher or student) of this session.
         
         Args:
-            user: The user to check
+            user: The user to check (CustomUser)
             
         Returns:
             True if user is the teacher or student of this session

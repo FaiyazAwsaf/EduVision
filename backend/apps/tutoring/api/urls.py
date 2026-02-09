@@ -6,7 +6,6 @@ URL patterns for tutoring session management.
 
 from django.urls import path
 from apps.tutoring.api.views import (
-    UserListCreateView,
     SessionCreateView,
     SessionJoinView,
     SessionStatusView,
@@ -17,9 +16,6 @@ from apps.tutoring.api.views import (
 app_name = 'tutoring'
 
 urlpatterns = [
-    # User management (for testing)
-    path('users/', UserListCreateView.as_view(), name='user-list-create'),
-    
     # Session management
     path('sessions/', SessionListView.as_view(), name='session-list'),
     path('sessions/create/', SessionCreateView.as_view(), name='session-create'),

@@ -5,32 +5,7 @@ Serializers for the tutoring API endpoints.
 """
 
 from rest_framework import serializers
-from apps.tutoring.models import TutoringUser, TutoringSession, UserRole, SessionStatus
-
-
-class TutoringUserSerializer(serializers.ModelSerializer):
-    """Serializer for TutoringUser model."""
-    
-    class Meta:
-        model = TutoringUser
-        fields = ['id', 'email', 'full_name', 'role', 'created_at']
-        read_only_fields = ['id', 'created_at']
-
-
-class TutoringUserCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating a TutoringUser."""
-    
-    role = serializers.ChoiceField(choices=UserRole.choices)
-    
-    class Meta:
-        model = TutoringUser
-        fields = ['email', 'full_name', 'role']
-    
-    def validate_email(self, value):
-        """Validate email is unique."""
-        if TutoringUser.objects.filter(email=value).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
-        return value
+from apps.tutoring.models import TutoringSession, SessionStatus
 
 
 class SessionCreateSerializer(serializers.Serializer):
@@ -74,13 +49,9 @@ class SessionStatusSerializer(serializers.ModelSerializer):
     """Serializer for session status."""
     
     teacher_id = serializers.UUIDField(source='teacher.id')
-    teacher_name = serializers.CharField(source='teacher.full_name')
+    teacher_name = serializers.SerializerMethodField()
     student_id = serializers.UUIDField(source='student.id', allow_null=True)
-    student_name = serializers.CharField(
-        source='student.full_name', 
-        allow_null=True,
-        default=None
-    )
+    student_name = serializers.SerializerMethodField()
     
     class Meta:
         model = TutoringSession
@@ -95,17 +66,25 @@ class SessionStatusSerializer(serializers.ModelSerializer):
             'created_at',
             'ended_at',
         ]
+    
+    def get_teacher_name(self, obj):
+        """Get teacher's full name from first_name and last_name."""
+        return f"{obj.teacher.first_name} {obj.teacher.last_name}"
+    
+    def get_student_name(self, obj):
+        """Get student's full name from first_name and last_name."""
+        if obj.student:
+            return f"{obj.student.first_name} {obj.student.last_name}"
+        return None
 
 
 class SessionListSerializer(serializers.ModelSerializer):
     """Serializer for listing sessions."""
     
-    teacher_name = serializers.CharField(source='teacher.full_name')
-    student_name = serializers.CharField(
-        source='student.full_name',
-        allow_null=True,
-        default=None
-    )
+    teacher_name = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    teacher_id = serializers.UUIDField(source='teacher.id')
+    student_id = serializers.UUIDField(source='student.id', allow_null=True)
     
     class Meta:
         model = TutoringSession
@@ -113,10 +92,23 @@ class SessionListSerializer(serializers.ModelSerializer):
             'id',
             'room_id',
             'status',
+            'teacher_id',
             'teacher_name',
+            'student_id',
             'student_name',
             'created_at',
+            'ended_at',
         ]
+    
+    def get_teacher_name(self, obj):
+        """Get teacher's full name from first_name and last_name."""
+        return f"{obj.teacher.first_name} {obj.teacher.last_name}"
+    
+    def get_student_name(self, obj):
+        """Get student's full name from first_name and last_name."""
+        if obj.student:
+            return f"{obj.student.first_name} {obj.student.last_name}"
+        return None
 
 
 class ErrorResponseSerializer(serializers.Serializer):

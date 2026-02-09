@@ -37,9 +37,7 @@ export default function TeacherSidebar() {
   const initials = user
     ? `${user.first_name[0] || ""}${user.last_name[0] || ""}`
     : "U";
-  const fullName = user
-    ? `${user.first_name} ${user.last_name}`
-    : "User";
+  const fullName = user ? `${user.first_name} ${user.last_name}` : "User";
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-[#9ACBD0]/40 flex flex-col z-30">

@@ -9,16 +9,16 @@
  */
 
 import React, { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Clock,
   Square,
-  User,
   GraduationCap,
   Check,
   Circle,
+  ArrowLeft,
 } from "lucide-react";
-import UserSelector from "@/components/tutoring/UserSelector";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
 import {
   ConnectionStatusBadge,
@@ -29,7 +29,6 @@ import { MediaSession } from "@/components/tutoring/media/MediaSession";
 import {
   TutoringUser,
   SessionCreateResponse,
-  createSession,
   endSession,
   getErrorMessage,
   ApiError,
@@ -39,6 +38,7 @@ import {
   StatusChangeEvent,
   SessionEndedEvent,
 } from "@/lib/websocket";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Inner component that uses WebSocket context
 function SessionView({
@@ -290,11 +290,11 @@ function saveTeacherSession(
   user: TutoringUser,
 ) {
   if (typeof window !== "undefined") {
-    localStorage.setItem(
+    sessionStorage.setItem(
       STORAGE_KEY_TEACHER_SESSION,
       JSON.stringify(sessionData),
     );
-    localStorage.setItem(STORAGE_KEY_TEACHER_USER, JSON.stringify(user));
+    sessionStorage.setItem(STORAGE_KEY_TEACHER_USER, JSON.stringify(user));
   }
 }
 
@@ -306,8 +306,8 @@ function loadTeacherSession(): {
     return { sessionData: null, user: null };
   }
   try {
-    const sessionStr = localStorage.getItem(STORAGE_KEY_TEACHER_SESSION);
-    const userStr = localStorage.getItem(STORAGE_KEY_TEACHER_USER);
+    const sessionStr = sessionStorage.getItem(STORAGE_KEY_TEACHER_SESSION);
+    const userStr = sessionStorage.getItem(STORAGE_KEY_TEACHER_USER);
     return {
       sessionData: sessionStr ? JSON.parse(sessionStr) : null,
       user: userStr ? JSON.parse(userStr) : null,
@@ -319,13 +319,15 @@ function loadTeacherSession(): {
 
 function clearTeacherSession() {
   if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY_TEACHER_SESSION);
-    localStorage.removeItem(STORAGE_KEY_TEACHER_USER);
+    sessionStorage.removeItem(STORAGE_KEY_TEACHER_SESSION);
+    sessionStorage.removeItem(STORAGE_KEY_TEACHER_USER);
   }
 }
 
 // Main page component
 export default function TeacherDashboardPage() {
+  const router = useRouter();
+  const { user: authUser } = useAuth();
   const [user, setUser] = useState<TutoringUser | null>(null);
   const [sessionData, setSessionData] = useState<SessionCreateResponse | null>(
     null,
@@ -334,15 +336,20 @@ export default function TeacherDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
 
-  // Restore session from localStorage on mount
+  // Restore session from sessionStorage on mount.
+  // If no session data exists, redirect back to dashboard — this page
+  // should only be reached via the "+New Class" button.
   useEffect(() => {
     const { sessionData: savedSession, user: savedUser } = loadTeacherSession();
     if (savedSession && savedUser) {
       setSessionData(savedSession);
       setUser(savedUser);
+      setIsRestoring(false);
+    } else {
+      // No session to restore — redirect to dashboard
+      router.replace("/teacher/dashboard");
     }
-    setIsRestoring(false);
-  }, []);
+  }, [router]);
 
   // Save session to localStorage when it changes
   useEffect(() => {
@@ -350,47 +357,6 @@ export default function TeacherDashboardPage() {
       saveTeacherSession(sessionData, user);
     }
   }, [sessionData, user]);
-
-  const handleUserChange = useCallback((selectedUser: TutoringUser | null) => {
-    setUser(selectedUser);
-    // Reset session state when user changes (but don't clear storage yet)
-    setSessionData(null);
-    setError(null);
-  }, []);
-
-  const handleCreateSession = async () => {
-    if (!user) {
-      setError("Please select a teacher user first");
-      return;
-    }
-
-    if (user.role !== "TEACHER") {
-      setError("Only teachers can create tutoring sessions");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response: SessionCreateResponse = await createSession();
-      console.log("[TeacherDashboard] Session created:", response);
-      console.log(
-        "[TeacherDashboard] LiveKit WS URL:",
-        response.livekit_ws_url,
-      );
-      console.log(
-        "[TeacherDashboard] Token:",
-        response.token ? "present" : "null",
-      );
-      setSessionData(response);
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(getErrorMessage(apiError));
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleEndSession = async () => {
     if (!sessionData?.session_id) return;
@@ -401,7 +367,9 @@ export default function TeacherDashboardPage() {
     try {
       // Pass the teacher_id from session creation to ensure authorization
       await endSession(sessionData.session_id, sessionData.teacher_id);
-      // Session ended - WebSocket will receive the event
+      // Clear storage and go back to dashboard
+      clearTeacherSession();
+      router.push("/teacher/dashboard");
     } catch (err) {
       const apiError = err as ApiError;
       setError(getErrorMessage(apiError));
@@ -412,8 +380,12 @@ export default function TeacherDashboardPage() {
 
   const handleNewSession = () => {
     clearTeacherSession();
-    setSessionData(null);
-    setError(null);
+    router.push("/teacher/dashboard");
+  };
+
+  const handleBack = () => {
+    // Keep session alive but go back to dashboard
+    router.push("/teacher/dashboard");
   };
 
   // Event handlers for WebSocket events
@@ -432,12 +404,15 @@ export default function TeacherDashboardPage() {
     // Could add toast notification here
   }, []);
 
-  const handleSessionEnded = useCallback((event: SessionEndedEvent) => {
-    console.log("Session ended:", event);
-    // Clear session storage when session ends
-    clearTeacherSession();
-    // Could add toast notification here
-  }, []);
+  const handleSessionEnded = useCallback(
+    (event: SessionEndedEvent) => {
+      console.log("Session ended:", event);
+      // Clear session storage and redirect to dashboard
+      clearTeacherSession();
+      router.push("/teacher/dashboard");
+    },
+    [router],
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -445,18 +420,29 @@ export default function TeacherDashboardPage() {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Teacher Dashboard
-              </h1>
-              <p className="text-gray-500 mt-1">
-                Create and manage tutoring sessions (Real-time)
-              </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                title="Back to dashboard"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Live Session
+                </h1>
+                <p className="text-gray-500 mt-1">
+                  Tutoring session in progress
+                </p>
+              </div>
             </div>
-            <UserSelector
-              filterRole="TEACHER"
-              onUserChange={handleUserChange}
-            />
+            {user && (
+              <div className="text-sm text-gray-600">
+                Logged in as{" "}
+                <span className="font-semibold">{user.full_name}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -476,58 +462,7 @@ export default function TeacherDashboardPage() {
             <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-500">Loading session...</p>
           </div>
-        ) : /* Main Content */
-        !user ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Select a Teacher
-            </h2>
-            <p className="text-gray-500">
-              Choose a teacher account from the dropdown above to get started.
-            </p>
-          </div>
-        ) : !sessionData ? (
-          /* Create Session View */
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Start a New Tutoring Session
-            </h2>
-            <p className="text-gray-500 mb-6">
-              Create a new session and share the link with your student.
-            </p>
-            <button
-              onClick={handleCreateSession}
-              disabled={isLoading}
-              className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Creating Session...
-                </span>
-              ) : (
-                "Start New Tutoring Session"
-              )}
-            </button>
-          </div>
-        ) : (
+        ) : sessionData ? (
           /* Session View with WebSocket */
           <SessionProvider
             sessionId={sessionData.session_id}
@@ -545,7 +480,7 @@ export default function TeacherDashboardPage() {
               isLoading={isLoading}
             />
           </SessionProvider>
-        )}
+        ) : null}
       </div>
     </div>
   );

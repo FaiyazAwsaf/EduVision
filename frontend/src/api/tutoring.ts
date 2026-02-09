@@ -3,9 +3,11 @@
  *
  * API client for tutoring session management.
  * Handles session creation, joining, and status checking.
+ * Supports JWT Bearer auth (primary) and X-User-Id header (fallback).
  */
 
 import { API_BASE_URL } from "@/config/api";
+import { authenticatedFetch } from "@/lib/api/auth";
 
 // Types
 export interface TutoringUser {
@@ -78,18 +80,11 @@ export function clearCurrentUserId(): void {
   }
 }
 
-// Headers helper
-function getHeaders(): HeadersInit {
-  const headers: HeadersInit = {
+// Headers helper - Content-Type only; auth is handled by authenticatedFetch
+function getContentHeaders(): HeadersInit {
+  return {
     "Content-Type": "application/json",
   };
-
-  const userId = getCurrentUserId();
-  if (userId) {
-    headers["X-User-Id"] = userId;
-  }
-
-  return headers;
 }
 
 // Error handler
@@ -109,9 +104,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * Get all tutoring users (for testing/development)
  */
 export async function getUsers(): Promise<TutoringUser[]> {
-  const response = await fetch(`${TUTORING_API_URL}/users/`, {
+  const response = await authenticatedFetch(`${TUTORING_API_URL}/users/`, {
     method: "GET",
-    headers: getHeaders(),
+    headers: getContentHeaders(),
   });
   return handleResponse<TutoringUser[]>(response);
 }
@@ -122,11 +117,11 @@ export async function getUsers(): Promise<TutoringUser[]> {
 export async function createUser(
   email: string,
   fullName: string,
-  role: "TEACHER" | "STUDENT"
+  role: "TEACHER" | "STUDENT",
 ): Promise<TutoringUser> {
-  const response = await fetch(`${TUTORING_API_URL}/users/`, {
+  const response = await authenticatedFetch(`${TUTORING_API_URL}/users/`, {
     method: "POST",
-    headers: getHeaders(),
+    headers: getContentHeaders(),
     body: JSON.stringify({
       email,
       full_name: fullName,
@@ -140,10 +135,13 @@ export async function createUser(
  * Create a new tutoring session (Teacher only)
  */
 export async function createSession(): Promise<SessionCreateResponse> {
-  const response = await fetch(`${TUTORING_API_URL}/sessions/create/`, {
-    method: "POST",
-    headers: getHeaders(),
-  });
+  const response = await authenticatedFetch(
+    `${TUTORING_API_URL}/sessions/create/`,
+    {
+      method: "POST",
+      headers: getContentHeaders(),
+    },
+  );
   return handleResponse<SessionCreateResponse>(response);
 }
 
@@ -151,13 +149,16 @@ export async function createSession(): Promise<SessionCreateResponse> {
  * Join an existing tutoring session (Student only)
  */
 export async function joinSession(
-  roomId: string
+  roomId: string,
 ): Promise<SessionJoinResponse> {
-  const response = await fetch(`${TUTORING_API_URL}/sessions/join/`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({ room_id: roomId }),
-  });
+  const response = await authenticatedFetch(
+    `${TUTORING_API_URL}/sessions/join/`,
+    {
+      method: "POST",
+      headers: getContentHeaders(),
+      body: JSON.stringify({ room_id: roomId }),
+    },
+  );
   return handleResponse<SessionJoinResponse>(response);
 }
 
@@ -165,14 +166,14 @@ export async function joinSession(
  * Get session status
  */
 export async function getSessionStatus(
-  sessionId: string
+  sessionId: string,
 ): Promise<SessionStatus> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${TUTORING_API_URL}/sessions/${sessionId}/status/`,
     {
       method: "GET",
-      headers: getHeaders(),
-    }
+      headers: getContentHeaders(),
+    },
   );
   return handleResponse<SessionStatus>(response);
 }
@@ -184,24 +185,14 @@ export async function getSessionStatus(
  */
 export async function endSession(
   sessionId: string,
-  teacherId?: string
+  teacherId?: string,
 ): Promise<SessionStatus> {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  };
-
-  // Use provided teacherId or fall back to localStorage
-  const userId = teacherId || getCurrentUserId();
-  if (userId) {
-    headers["X-User-Id"] = userId;
-  }
-
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${TUTORING_API_URL}/sessions/${sessionId}/end/`,
     {
       method: "POST",
-      headers,
-    }
+      headers: getContentHeaders(),
+    },
   );
   return handleResponse<SessionStatus>(response);
 }
@@ -215,9 +206,9 @@ export async function listSessions(status?: string): Promise<SessionStatus[]> {
     url.searchParams.append("status", status);
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await authenticatedFetch(url.toString(), {
     method: "GET",
-    headers: getHeaders(),
+    headers: getContentHeaders(),
   });
   return handleResponse<SessionStatus[]>(response);
 }

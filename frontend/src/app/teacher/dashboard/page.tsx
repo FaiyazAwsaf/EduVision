@@ -1,35 +1,27 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Bell, Eye, Pencil, ArrowRight, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Bell,
+  Eye,
+  Pencil,
+  ArrowRight,
+  Loader2,
+  Users,
+  Clock,
+  Video,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  listSessions,
+  createSession,
+  type SessionStatus,
+} from "@/api/tutoring";
 
-/* ─── Dummy data ─────────────────────────────────────────────────────────── */
-
-const activeClasses = [
-  {
-    id: 1,
-    name: "Advanced Physics 101",
-    room: "Room 402",
-    students: 32,
-    engagement: 92,
-    topic: "Kinematics",
-    topicProgress: 65,
-    avatarColors: ["#9ACBD0", "#48A6A7", "#006A71", "#D4C5A9"],
-  },
-  {
-    id: 2,
-    name: "Organic Chemistry",
-    room: "Room 215",
-    students: 28,
-    engagement: 78,
-    topic: "Alkanes",
-    topicProgress: 40,
-    avatarColors: ["#B39DDB", "#9ACBD0", "#48A6A7", "#F0C987"],
-  },
-];
+/* ─── Dummy data (submissions – keep for now) ────────────────────────────── */
 
 type EngineStatus = "AI SCORED" | "OCR COMPLETE" | "PROCESSING...";
 
@@ -71,18 +63,119 @@ const recentSubmissions: {
   },
 ];
 
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+
+/** Format ISO date to a human-readable relative/absolute string */
+function formatSessionTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return date.toLocaleDateString();
+}
+
+/** Pick a deterministic avatar colour from a name string */
+const AVATAR_COLORS = [
+  "#9ACBD0",
+  "#48A6A7",
+  "#006A71",
+  "#D4C5A9",
+  "#B39DDB",
+  "#F0C987",
+  "#FFD6A5",
+];
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+/** Get initials from a name */
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function TeacherDashboard() {
   const router = useRouter();
   const { isReady, isAuthenticated, user } = useAuth();
+  const [activeSessions, setActiveSessions] = useState<SessionStatus[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [creatingSession, setCreatingSession] = useState(false);
 
-  // Authorization check - redirect to signin if not authenticated
+  // Authorization check
   useEffect(() => {
     if (isReady && !isAuthenticated) {
       router.replace("/signin");
     }
   }, [isReady, isAuthenticated, router]);
+
+  // Fetch active sessions for this teacher
+  const fetchSessions = useCallback(async () => {
+    try {
+      setLoadingSessions(true);
+      // Fetch both WAITING and ACTIVE sessions
+      const [waiting, active] = await Promise.all([
+        listSessions("WAITING"),
+        listSessions("ACTIVE"),
+      ]);
+      setActiveSessions([...active, ...waiting]);
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      fetchSessions();
+      // Poll every 15 seconds for live updates
+      const interval = setInterval(fetchSessions, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isReady, isAuthenticated, fetchSessions]);
+
+  // Create a new session and redirect to the session page
+  const handleNewClass = async () => {
+    if (creatingSession) return;
+    setCreatingSession(true);
+    try {
+      const session = await createSession();
+      // Save session data to sessionStorage so the session page can restore it
+      const tutoringUser = {
+        id: user!.id,
+        email: user!.email,
+        full_name: `${user!.first_name} ${user!.last_name}`,
+        role: user!.role.toUpperCase() as "TEACHER" | "STUDENT",
+        created_at: user!.date_joined,
+      };
+      sessionStorage.setItem(
+        "tutoring_teacher_session",
+        JSON.stringify(session),
+      );
+      sessionStorage.setItem(
+        "tutoring_teacher_user",
+        JSON.stringify(tutoringUser),
+      );
+      router.push("/teacher/dashboard/session");
+    } catch (err) {
+      console.error("Failed to create session:", err);
+      setCreatingSession(false);
+    }
+  };
 
   // Show loading state while checking authentication
   if (!isReady || !user) {
@@ -103,7 +196,9 @@ export default function TeacherDashboard() {
               Classroom Monitoring
             </h1>
             <p className="text-sm text-[#48A6A7]">
-              Monitoring {activeClasses.length} active classes in real-time
+              {loadingSessions
+                ? "Loading sessions…"
+                : `Monitoring ${activeSessions.length} active session${activeSessions.length !== 1 ? "s" : ""} in real-time`}
             </p>
           </div>
 
@@ -124,111 +219,187 @@ export default function TeacherDashboard() {
             </button>
 
             {/* New Class button */}
-            <Link
-              href="/teacher/dashboard/session"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow"
+            <button
+              onClick={handleNewClass}
+              disabled={creatingSession}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Plus className="w-4 h-4" />
-              New Class
-            </Link>
+              {creatingSession ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              {creatingSession ? "Creating…" : "New Class"}
+            </button>
           </div>
         </div>
       </header>
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <main className="px-8 py-6 max-w-6xl">
-        {/* Active Classes */}
+        {/* Active Sessions */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-[#006A71] mb-4">
-            Active Classes
+            Active Sessions
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {activeClasses.map((cls) => (
-              <div
-                key={cls.id}
-                className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-6 shadow-sm hover:shadow-md transition-shadow"
+          {loadingSessions ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-[#48A6A7] animate-spin" />
+            </div>
+          ) : activeSessions.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-10 text-center shadow-sm">
+              <Video className="w-10 h-10 text-[#9ACBD0] mx-auto mb-3" />
+              <p className="text-sm font-medium text-[#006A71] mb-1">
+                No active sessions
+              </p>
+              <p className="text-xs text-[#6B7280] mb-4">
+                Create a new class to start a live tutoring session
+              </p>
+              <button
+                onClick={handleNewClass}
+                disabled={creatingSession}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-5">
-                  <div>
-                    <h3 className="text-base font-semibold text-[#006A71]">
-                      {cls.name}
-                    </h3>
-                    <p className="text-xs text-[#6B7280] mt-0.5">
-                      {cls.room} &bull; {cls.students} Students
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide bg-red-50 text-red-600 px-2.5 py-1 rounded-full">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+                {creatingSession ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {creatingSession ? "Creating…" : "New Class"}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {activeSessions.map((session) => (
+                <div
+                  key={session.id}
+                  onClick={() => router.push("/teacher/dashboard/session")}
+                  className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-5">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-[#006A71] truncate">
+                        Tutoring Session
+                      </h3>
+                      <p className="text-xs text-[#6B7280] mt-0.5 font-mono truncate">
+                        {session.room_id}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-full shrink-0 ml-3 ${
+                        session.status === "ACTIVE"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-amber-50 text-amber-600"
+                      }`}
+                    >
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span
+                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                            session.status === "ACTIVE"
+                              ? "bg-red-400"
+                              : "bg-amber-400"
+                          }`}
+                        />
+                        <span
+                          className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                            session.status === "ACTIVE"
+                              ? "bg-red-500"
+                              : "bg-amber-500"
+                          }`}
+                        />
+                      </span>
+                      {session.status === "ACTIVE" ? "LIVE" : "WAITING"}
                     </span>
-                    LIVE
-                  </span>
-                </div>
+                  </div>
 
-                {/* Engagement */}
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-[#6B7280]">Engagement Level</span>
-                    <span className="font-semibold text-[#006A71]">
-                      {cls.engagement}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-[#F2EFE7] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#48A6A7] rounded-full transition-all"
-                      style={{ width: `${cls.engagement}%` }}
-                    />
-                  </div>
-                </div>
+                  {/* Session Info */}
+                  <div className="space-y-3 mb-5">
+                    {/* Status */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>
+                          {session.status === "ACTIVE"
+                            ? "1 Student connected"
+                            : "Waiting for student…"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>
+                          Started {formatSessionTime(session.created_at)}
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Topic progress */}
-                <div className="mb-5">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-[#6B7280]">
-                      Topic Progress: {cls.topic}
-                    </span>
-                    <span className="font-semibold text-[#006A71]">
-                      {cls.topicProgress}%
-                    </span>
-                  </div>
-                  <div className="h-2 bg-[#F2EFE7] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#006A71] rounded-full transition-all"
-                      style={{ width: `${cls.topicProgress}%` }}
-                    />
-                  </div>
-                </div>
+                    {/* Participant cards */}
+                    <div className="flex flex-col gap-2">
+                      {/* Teacher */}
+                      <div className="flex items-center gap-2.5 bg-[#F2EFE7]/60 rounded-lg px-3 py-2">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
+                          style={{
+                            backgroundColor: avatarColor(session.teacher_name),
+                          }}
+                        >
+                          {initials(session.teacher_name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#006A71] truncate">
+                            {session.teacher_name}
+                          </p>
+                          <p className="text-[10px] text-[#6B7280]">Teacher</p>
+                        </div>
+                      </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between">
-                  {/* Avatars */}
-                  <div className="flex -space-x-2">
-                    {cls.avatarColors.map((c, i) => (
-                      <div
-                        key={i}
-                        className="w-7 h-7 rounded-full border-2 border-white"
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                    <div className="w-7 h-7 rounded-full border-2 border-white bg-[#F2EFE7] flex items-center justify-center text-[10px] font-semibold text-[#006A71]">
-                      +{cls.students - 4}
+                      {/* Student */}
+                      {session.student_name ? (
+                        <div className="flex items-center gap-2.5 bg-[#F2EFE7]/60 rounded-lg px-3 py-2">
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
+                            style={{
+                              backgroundColor: avatarColor(
+                                session.student_name,
+                              ),
+                            }}
+                          >
+                            {initials(session.student_name)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-[#006A71] truncate">
+                              {session.student_name}
+                            </p>
+                            <p className="text-[10px] text-[#6B7280]">
+                              Student
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2.5 border border-dashed border-[#9ACBD0]/40 rounded-lg px-3 py-2">
+                          <div className="w-7 h-7 rounded-full bg-[#F2EFE7] flex items-center justify-center">
+                            <Users className="w-3.5 h-3.5 text-[#9ACBD0]" />
+                          </div>
+                          <p className="text-xs text-[#9ACBD0] italic">
+                            No student has joined yet
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <Link
-                    href="/teacher/dashboard/session"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#48A6A7] hover:text-[#006A71] transition-colors"
-                  >
-                    MONITOR FEED
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  {/* Footer */}
+                  <div className="flex items-center justify-end pt-3 border-t border-[#9ACBD0]/20">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
+                      GO TO SESSION
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recent Script Submissions */}

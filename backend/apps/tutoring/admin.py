@@ -1,22 +1,11 @@
 """
 Tutoring Admin Configuration
 
-Admin interface for managing tutoring users and sessions.
+Admin interface for managing tutoring sessions.
 """
 
 from django.contrib import admin
-from apps.tutoring.models import TutoringUser, TutoringSession
-
-
-@admin.register(TutoringUser)
-class TutoringUserAdmin(admin.ModelAdmin):
-    """Admin for TutoringUser model."""
-    
-    list_display = ['full_name', 'email', 'role', 'created_at']
-    list_filter = ['role', 'created_at']
-    search_fields = ['full_name', 'email']
-    readonly_fields = ['id', 'created_at']
-    ordering = ['-created_at']
+from apps.tutoring.models import TutoringSession
 
 
 @admin.register(TutoringSession)
@@ -32,7 +21,13 @@ class TutoringSessionAdmin(admin.ModelAdmin):
         'ended_at'
     ]
     list_filter = ['status', 'created_at']
-    search_fields = ['room_id', 'teacher__full_name', 'student__full_name']
+    search_fields = [
+        'room_id', 
+        'teacher__first_name', 
+        'teacher__last_name', 
+        'student__first_name', 
+        'student__last_name'
+    ]
     readonly_fields = ['id', 'created_at']
     raw_id_fields = ['teacher', 'student']
     ordering = ['-created_at']
@@ -52,3 +47,4 @@ class TutoringSessionAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'ended_at', 'grace_expires_at')
         }),
     )
+

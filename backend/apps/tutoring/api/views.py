@@ -19,14 +19,10 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 
 from apps.tutoring.models import (
-    TutoringUser, 
     TutoringSession, 
-    UserRole, 
     SessionStatus
 )
 from apps.tutoring.api.serializers import (
-    TutoringUserSerializer,
-    TutoringUserCreateSerializer,
     SessionCreateSerializer,
     SessionCreateResponseSerializer,
     SessionJoinSerializer,
@@ -49,32 +45,6 @@ def get_base_url(request):
     """Get the base URL for constructing join links."""
     # Use frontend URL for join links
     return "http://localhost:3000"
-
-
-class UserListCreateView(APIView):
-    """
-    API endpoint for listing and creating test users.
-    
-    GET: List all users
-    POST: Create a new user
-    
-    Note: This endpoint is exempt from authentication for testing purposes.
-    """
-    
-    def get(self, request):
-        """List all users."""
-        users = TutoringUser.objects.all()
-        serializer = TutoringUserSerializer(users, many=True)
-        return Response(serializer.data)
-    
-    def post(self, request):
-        """Create a new user."""
-        serializer = TutoringUserCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            user = TutoringUser.objects.create(**serializer.validated_data)
-            response_serializer = TutoringUserSerializer(user)
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class SessionCreateView(APIView):
@@ -106,7 +76,7 @@ class SessionCreateView(APIView):
             )
         
         # Verify user is a teacher
-        if not user.is_teacher:
+        if user.role != 'teacher':
             logger.warning(
                 f"Non-teacher user {user.id} attempted to create session"
             )
@@ -127,7 +97,7 @@ class SessionCreateView(APIView):
             token = generate_livekit_token(
                 room_id=room_id,
                 user_id=str(user.id),
-                user_name=user.full_name,
+                user_name=f"{user.first_name} {user.last_name}",
                 role='TEACHER'
             )
         except Exception as e:
@@ -206,7 +176,7 @@ class SessionJoinView(APIView):
             )
         
         # Verify user is a student
-        if not user.is_student:
+        if user.role != 'student':
             logger.warning(
                 f"Non-student user {user.id} attempted to join session"
             )
@@ -271,7 +241,7 @@ class SessionJoinView(APIView):
                         'session_id': str(session.id),
                         'token': session.livekit_token_student,
                         'status': session.status,
-                        'teacher_name': session.teacher.full_name,
+                        'teacher_name': f"{session.teacher.first_name} {session.teacher.last_name}",
                         'room_id': room_id,
                         'livekit_ws_url': get_livekit_ws_url(),
                     },
@@ -315,7 +285,7 @@ class SessionJoinView(APIView):
             token = generate_livekit_token(
                 room_id=room_id,
                 user_id=str(user.id),
-                user_name=user.full_name,
+                user_name=f"{user.first_name} {user.last_name}",
                 role='STUDENT'
             )
         except Exception as e:
@@ -344,7 +314,7 @@ class SessionJoinView(APIView):
                 previous_status=SessionStatus.WAITING,
                 metadata={
                     'student_id': str(user.id),
-                    'student_name': user.full_name,
+                    'student_name': f"{user.first_name} {user.last_name}",
                     'event': 'student_joined'
                 }
             )
@@ -352,7 +322,7 @@ class SessionJoinView(APIView):
                 session_id=str(session.id),
                 user_id=str(user.id),
                 role='student',
-                user_name=user.full_name,
+                user_name=f"{user.first_name} {user.last_name}",
                 event_type='participant_joined'
             )
         except Exception as e:
@@ -364,7 +334,7 @@ class SessionJoinView(APIView):
                 'session_id': str(session.id),
                 'token': token,
                 'status': session.status,
-                'teacher_name': session.teacher.full_name,
+                'teacher_name': f"{session.teacher.first_name} {session.teacher.last_name}",
                 'room_id': room_id,
                 'livekit_ws_url': get_livekit_ws_url(),
             },
@@ -550,7 +520,7 @@ class SessionListView(APIView):
             )
         
         # Filter sessions based on role
-        if user.is_teacher:
+        if user.role == 'teacher':
             sessions = TutoringSession.objects.filter(teacher=user)
         else:
             sessions = TutoringSession.objects.filter(student=user)

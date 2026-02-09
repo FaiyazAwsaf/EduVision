@@ -50,11 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = getUserData();
 
       if (access && userData) {
-        // We have an access token and user data — assume valid
+        // We have an access token — set user, then proactively refresh
+        // so the token is fresh for upcoming API calls
         setIsAuthenticated(true);
         setUser(userData);
+
+        if (refresh) {
+          // Fire-and-forget refresh to ensure fresh token
+          refreshAccessToken().catch(() => {});
+        }
       } else if (refresh) {
-        // Try to get a new access token with the refresh token
+        // No access token but have a refresh token — try to get a new one
         const newAccess = await refreshAccessToken();
         if (newAccess && userData) {
           setIsAuthenticated(true);

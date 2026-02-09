@@ -51,17 +51,17 @@ const USER_DATA_KEY = "eduvision_user";
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export function getRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function getUserData(): User | null {
   if (typeof window === "undefined") return null;
-  const data = localStorage.getItem(USER_DATA_KEY);
+  const data = sessionStorage.getItem(USER_DATA_KEY);
   if (!data) return null;
   try {
     return JSON.parse(data);
@@ -71,15 +71,15 @@ export function getUserData(): User | null {
 }
 
 export function setTokens(access: string, refresh: string, user: User): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, access);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
-  localStorage.setItem(USER_DATA_KEY, JSON.stringify(user));
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, access);
+  sessionStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+  sessionStorage.setItem(USER_DATA_KEY, JSON.stringify(user));
 }
 
 export function clearTokens(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(USER_DATA_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(USER_DATA_KEY);
 }
 
 // ─── API calls ───────────────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ export async function refreshAccessToken(): Promise<string | null> {
 
     const data: RefreshResponse = await res.json();
     const newAccess = data.payload;
-    localStorage.setItem(ACCESS_TOKEN_KEY, newAccess);
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, newAccess);
     return newAccess;
   } catch {
     clearTokens();
@@ -147,4 +147,48 @@ export function logout(): void {
 export function authHeaders(): Record<string, string> {
   const token = getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// ─── Authenticated fetch with auto-refresh ───────────────────────────────────
+
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * A fetch wrapper that automatically refreshes the JWT access token on 401.
+ * - Attaches the current access token as a Bearer header.
+ * - On 401, refreshes the token once and retries the original request.
+ * - Deduplicates concurrent refresh attempts so only one runs at a time.
+ */
+export async function authenticatedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const doFetch = (token: string | null) => {
+    const headers = new Headers(init?.headers);
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    return fetch(input, { ...init, headers });
+  };
+
+  // First attempt with current token
+  let token = getAccessToken();
+  let response = await doFetch(token);
+
+  if (response.status === 401) {
+    // Try to refresh – deduplicate concurrent refreshes
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken().finally(() => {
+        refreshPromise = null;
+      });
+    }
+    const newToken = await refreshPromise;
+
+    if (newToken) {
+      // Retry with the fresh token
+      response = await doFetch(newToken);
+    }
+  }
+
+  return response;
 }
