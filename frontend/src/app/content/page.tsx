@@ -32,29 +32,29 @@ export default function ContentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2EFE7]">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b border-[#9ACBD0]">
+      <header className="bg-white border-b border-secondary">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-[#006A71]">
+              <h1 className="text-3xl font-bold text-primary-dark">
                 AI Content Generator
               </h1>
-              <p className="mt-1 text-sm text-[#48A6A7]">
+              <p className="mt-1 text-sm text-primary">
                 Generate educational content powered by AI
               </p>
             </div>
             <div className="flex items-center gap-3">
               <Link
                 href="/teacher/dashboard"
-                className="text-[#48A6A7] hover:text-[#006A71] transition-colors text-sm font-medium flex items-center gap-2"
+                className="text-primary hover:text-primary-dark transition-colors text-sm font-medium flex items-center gap-2"
               >
                 <Home className="w-4 h-4" /> Dashboard
               </Link>
               <Link
                 href="/study-plans"
-                className="bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] transition-colors text-sm font-medium flex items-center gap-2"
+                className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors text-sm font-medium flex items-center gap-2"
               >
                 <BookOpen className="w-4 h-4" /> Study Plans
               </Link>
@@ -65,14 +65,14 @@ export default function ContentPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg border border-[#9ACBD0] p-6">
+        <div className="bg-white rounded-lg border border-secondary p-6">
           {viewState === "form" ? (
             <div>
               <div className="mb-6">
-                <h2 className="text-xl font-semibold text-[#006A71]">
+                <h2 className="text-xl font-semibold text-primary-dark">
                   Create Content Request
                 </h2>
-                <p className="mt-1 text-sm text-[#48A6A7]">
+                <p className="mt-1 text-sm text-primary">
                   Fill in the details below to generate AI-powered educational
                   content.
                 </p>
@@ -91,9 +91,9 @@ export default function ContentPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-[#9ACBD0] bg-white">
+      <footer className="mt-auto border-t border-secondary bg-white">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-[#48A6A7]">
+          <p className="text-center text-sm text-primary">
             EduVision Platform - AI-Assisted Content Request System
           </p>
         </div>

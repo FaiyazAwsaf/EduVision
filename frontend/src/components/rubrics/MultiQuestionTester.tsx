@@ -1,30 +1,30 @@
 "use client";
 
 import React, { useState } from "react";
-import { QuestionRubric, testRubricSet, QuestionResult } from "@/lib/api/rubrics";
+import { QuestionRubric, testRubricSet, QuestionResult } from "@/api/rubrics";
 
 interface MultiQuestionTesterProps {
   questions: QuestionRubric[];
 }
 
 export default function MultiQuestionTester({ questions }: MultiQuestionTesterProps) {
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<string | number, string>>({});
   const [testResults, setTestResults] = useState<QuestionResult[] | null>(null);
   const [overallScore, setOverallScore] = useState<{ score: number; max: number; percentage: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-[#006A71]";
-    if (percentage >= 60) return "text-[#48A6A7]";
-    if (percentage >= 40) return "text-[#9ACBD0]";
+    if (percentage >= 80) return "text-primary-dark";
+    if (percentage >= 60) return "text-primary";
+    if (percentage >= 40) return "text-secondary";
     return "text-red-600";
   };
 
   const getScoreBgColor = (percentage: number) => {
-    if (percentage >= 80) return "bg-[#006A71]/10";
-    if (percentage >= 60) return "bg-[#48A6A7]/10";
-    if (percentage >= 40) return "bg-[#9ACBD0]/20";
+    if (percentage >= 80) return "bg-primary-dark/10";
+    if (percentage >= 60) return "bg-primary/10";
+    if (percentage >= 40) return "bg-secondary/20";
     return "bg-red-100";
   };
 
@@ -65,31 +65,31 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
   return (
     <div className="space-y-6">
       {/* Answer Input Section */}
-      <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-        <h2 className="text-xl font-semibold text-[#006A71] mb-4">
+      <div className="bg-white rounded-xl border border-secondary p-6">
+        <h2 className="text-xl font-semibold text-primary-dark mb-4">
           Test Sample Answers
         </h2>
-        <p className="text-sm text-[#48A6A7] mb-6">
+        <p className="text-sm text-primary mb-6">
           Enter sample answers for each question to see how your rubric set would evaluate them.
         </p>
 
         {questions.length === 0 ? (
-          <p className="text-center text-[#9ACBD0] py-8">
+          <p className="text-center text-secondary py-8">
             Add questions to the rubric set to enable testing
           </p>
         ) : (
           <div className="space-y-6">
             {questions.map((question) => (
-              <div key={question.question_number} className="border border-[#9ACBD0] rounded-lg p-4">
+              <div key={question.question_number} className="border border-secondary rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-[#006A71]">
+                    <h3 className="font-semibold text-primary-dark">
                       Question {question.question_number}
                     </h3>
-                    <p className="text-sm text-[#48A6A7] mt-1">
+                    <p className="text-sm text-primary mt-1">
                       {question.question_text || "No question text"}
                     </p>
-                    <p className="text-xs text-[#9ACBD0] mt-1">
+                    <p className="text-xs text-secondary mt-1">
                       Max marks: {question.max_marks}
                     </p>
                   </div>
@@ -102,7 +102,7 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
                       [question.question_number]: e.target.value,
                     }))
                   }
-                  className="w-full mt-3 px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm resize-none"
+                  className="w-full mt-3 px-3 py-2 border border-secondary rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white text-primary-dark text-sm resize-none"
                   rows={4}
                   placeholder={`Enter sample answer for Question ${question.question_number}...`}
                 />
@@ -113,14 +113,14 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
               <button
                 onClick={handleTestAnswers}
                 disabled={isLoading}
-                className="px-6 py-2.5 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+                className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
               >
                 {isLoading ? "Testing..." : "Test Answers"}
               </button>
               <button
                 onClick={handleClear}
                 disabled={isLoading}
-                className="px-6 py-2.5 bg-[#F2EFE7] text-[#006A71] border border-[#9ACBD0] rounded-lg hover:bg-[#9ACBD0]/30 transition-colors disabled:opacity-50 text-sm font-medium"
+                className="px-6 py-2.5 bg-background text-primary-dark border border-secondary rounded-lg hover:bg-secondary/30 transition-colors disabled:opacity-50 text-sm font-medium"
               >
                 Clear All
               </button>
@@ -138,8 +138,8 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
 
       {/* Overall Score */}
       {overallScore && (
-        <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-          <h2 className="text-xl font-semibold text-[#006A71] mb-4">
+        <div className="bg-white rounded-xl border border-secondary p-6">
+          <h2 className="text-xl font-semibold text-primary-dark mb-4">
             Overall Results
           </h2>
           <div
@@ -157,8 +157,8 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
 
       {/* Question Results */}
       {testResults && testResults.length > 0 && (
-        <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-          <h2 className="text-xl font-semibold text-[#006A71] mb-4">
+        <div className="bg-white rounded-xl border border-secondary p-6">
+          <h2 className="text-xl font-semibold text-primary-dark mb-4">
             Question Breakdown
           </h2>
 
@@ -168,10 +168,10 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
               return (
                 <div
                   key={result.question_number}
-                  className="border border-[#9ACBD0] rounded-lg p-4"
+                  className="border border-secondary rounded-lg p-4"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-[#006A71]">
+                    <h3 className="font-semibold text-primary-dark">
                       Question {result.question_number}
                     </h3>
                     <div className="flex items-center gap-2">
@@ -189,17 +189,17 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
                       {result.rule_results.map((ruleResult: any, index: number) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between text-sm bg-[#F2EFE7] rounded px-3 py-2"
+                          className="flex items-center justify-between text-sm bg-background rounded px-3 py-2"
                         >
                           <div className="flex items-center gap-2">
                             <span className={ruleResult.matched ? "text-green-600" : "text-orange-600"}>
                               {ruleResult.matched ? "✓" : "○"}
                             </span>
-                            <span className="text-[#006A71] font-medium">
+                            <span className="text-primary-dark font-medium">
                               Rule {index + 1} ({ruleResult.rule_type})
                             </span>
                           </div>
-                          <span className="text-[#48A6A7] font-semibold">
+                          <span className="text-primary font-semibold">
                             {ruleResult.score_awarded.toFixed(2)} / {ruleResult.max_marks}
                           </span>
                         </div>
@@ -207,9 +207,9 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
                     </div>
                   )}
 
-                  <div className="bg-[#F2EFE7] rounded-lg p-3">
-                    <p className="text-xs font-semibold text-[#006A71] mb-1">Feedback:</p>
-                    <p className="text-sm text-[#48A6A7] whitespace-pre-wrap">
+                  <div className="bg-background rounded-lg p-3">
+                    <p className="text-xs font-semibold text-primary-dark mb-1">Feedback:</p>
+                    <p className="text-sm text-primary whitespace-pre-wrap">
                       {result.feedback}
                     </p>
                   </div>

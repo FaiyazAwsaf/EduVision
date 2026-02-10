@@ -7,7 +7,7 @@
  *   POST /api/auth/refresh/  → { refresh_token }     → { message, payload: <access_token> }
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+import { API_BASE_URL, parseApiError } from "@/api/client";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -85,19 +85,14 @@ export function clearTokens(): void {
 // ─── API calls ───────────────────────────────────────────────────────────────
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  const res = await fetch(`${API_URL}/auth/login/`, {
+  const res = await fetch(`${API_BASE_URL}/auth/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    const message =
-      body?.non_field_errors?.[0] ??
-      body?.detail ??
-      body?.message ??
-      "Login failed";
+    const message = await parseApiError(res, "Login failed");
     throw new Error(message);
   }
 
@@ -115,7 +110,7 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!refresh) return null;
 
   try {
-    const res = await fetch(`${API_URL}/auth/refresh/`, {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refresh }),

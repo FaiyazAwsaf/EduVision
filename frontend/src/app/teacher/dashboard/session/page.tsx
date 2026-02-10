@@ -466,7 +466,7 @@ export default function TeacherDashboardPage() {
           /* Session View with WebSocket */
           <SessionProvider
             sessionId={sessionData.session_id}
-            userId={user.id}
+            userId={user!.id}
             onParticipantJoined={handleParticipantJoined}
             onParticipantLeft={handleParticipantLeft}
             onStatusChanged={handleStatusChanged}
@@ -474,7 +474,7 @@ export default function TeacherDashboardPage() {
           >
             <SessionView
               sessionData={sessionData}
-              user={user}
+              user={user!}
               onEndSession={handleEndSession}
               onNewSession={handleNewSession}
               isLoading={isLoading}

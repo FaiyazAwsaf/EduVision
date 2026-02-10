@@ -85,11 +85,11 @@ function SessionView({
   const isEnded = effectiveStatus === "ENDED";
 
   return (
-    <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
       {/* Session Header */}
-      <div className="p-6 border-b border-[#9ACBD0]/20">
+      <div className="p-6 border-b border-secondary/20">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#006A71]">
+          <h2 className="text-lg font-semibold text-primary-dark">
             Connected to Session
           </h2>
           <div className="flex items-center gap-3">
@@ -142,7 +142,7 @@ function SessionView({
 
         {/* Participants */}
         <div>
-          <label className="block text-sm font-medium text-[#006A71] mb-3">
+          <label className="block text-sm font-medium text-primary-dark mb-3">
             Participants
           </label>
           <div className="space-y-2">
@@ -160,15 +160,15 @@ function SessionView({
         </div>
 
         {/* Teacher Info */}
-        <div className="flex items-center gap-4 p-4 bg-[#F2EFE7]/60 rounded-lg">
-          <div className="w-12 h-12 bg-[#48A6A7] rounded-full flex items-center justify-center text-white text-xl font-semibold">
+        <div className="flex items-center gap-4 p-4 bg-background/60 rounded-lg">
+          <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white text-xl font-semibold">
             {joinData.teacher_name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-[#006A71]">
+            <p className="font-medium text-primary-dark">
               {joinData.teacher_name}
             </p>
-            <p className="text-sm text-[#6B7280]">Your Teacher</p>
+            <p className="text-sm text-muted">Your Teacher</p>
           </div>
         </div>
 
@@ -184,7 +184,7 @@ function SessionView({
       </div>
 
       {/* Actions */}
-      <div className="p-6 border-t border-[#9ACBD0]/20 bg-[#F2EFE7]/30">
+      <div className="p-6 border-t border-secondary/20 bg-background/30">
         <div className="flex justify-end">
           <button
             onClick={onLeaveSession}
@@ -242,29 +242,29 @@ export default function StudentSessionPage() {
   return (
     <div className="min-h-screen">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#9ACBD0]/30">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
         <div className="flex items-center justify-between px-8 py-4">
           <div className="flex items-center gap-3">
             <button
               onClick={handleBack}
-              className="p-2 rounded-lg text-[#6B7280] hover:text-[#006A71] hover:bg-[#F2EFE7] transition-colors"
+              className="p-2 rounded-lg text-muted hover:text-primary-dark hover:bg-background transition-colors"
               title="Back to dashboard"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-[#006A71]">
+              <h1 className="text-2xl font-bold text-primary-dark">
                 Live Session
               </h1>
-              <p className="text-sm text-[#48A6A7]">
+              <p className="text-sm text-primary">
                 Tutoring session in progress
               </p>
             </div>
           </div>
           {user && (
-            <div className="text-sm text-[#6B7280]">
+            <div className="text-sm text-muted">
               Joined as{" "}
-              <span className="font-semibold text-[#006A71]">
+              <span className="font-semibold text-primary-dark">
                 {user.full_name}
               </span>
             </div>
@@ -286,9 +286,9 @@ export default function StudentSessionPage() {
 
         {/* Loading */}
         {isRestoring ? (
-          <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-8 text-center shadow-sm">
-            <div className="animate-spin h-8 w-8 border-4 border-[#48A6A7] border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-[#6B7280]">Loading session…</p>
+          <div className="bg-white rounded-2xl border border-secondary/30 p-8 text-center shadow-sm">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted">Loading session…</p>
           </div>
         ) : joinData && user ? (
           <SessionProvider

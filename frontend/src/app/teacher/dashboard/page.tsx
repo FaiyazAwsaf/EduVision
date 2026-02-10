@@ -40,8 +40,8 @@ const recentSubmissions: {
     avatarColor: "#9ACBD0",
     assignment: "Lab Report #3",
     status: "AI SCORED",
-    statusColor: "text-[#006A71]",
-    statusDot: "bg-[#48A6A7]",
+    statusColor: "text-primary-dark",
+    statusDot: "bg-primary",
   },
   {
     id: 2,
@@ -49,8 +49,8 @@ const recentSubmissions: {
     avatarColor: "#F0C987",
     assignment: "Midterm Essay",
     status: "OCR COMPLETE",
-    statusColor: "text-[#006A71]",
-    statusDot: "bg-[#48A6A7]",
+    statusColor: "text-primary-dark",
+    statusDot: "bg-primary",
   },
   {
     id: 3,
@@ -180,8 +180,8 @@ export default function TeacherDashboard() {
   // Show loading state while checking authentication
   if (!isReady || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F2EFE7]">
-        <Loader2 className="w-8 h-8 text-[#48A6A7] animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -189,13 +189,13 @@ export default function TeacherDashboard() {
   return (
     <div className="min-h-screen">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#9ACBD0]/30">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
         <div className="flex items-center justify-between px-8 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#006A71]">
+            <h1 className="text-2xl font-bold text-primary-dark">
               Classroom Monitoring
             </h1>
-            <p className="text-sm text-[#48A6A7]">
+            <p className="text-sm text-primary">
               {loadingSessions
                 ? "Loading sessions…"
                 : `Monitoring ${activeSessions.length} active session${activeSessions.length !== 1 ? "s" : ""} in real-time`}
@@ -204,7 +204,7 @@ export default function TeacherDashboard() {
 
           <div className="flex items-center gap-4">
             {/* Live badge */}
-            <div className="flex items-center gap-2 text-sm font-medium text-[#006A71]">
+            <div className="flex items-center gap-2 text-sm font-medium text-primary-dark">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
@@ -213,8 +213,8 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Notification bell */}
-            <button className="relative p-2 rounded-lg hover:bg-[#F2EFE7] transition">
-              <Bell className="w-5 h-5 text-[#006A71]" />
+            <button className="relative p-2 rounded-lg hover:bg-background transition">
+              <Bell className="w-5 h-5 text-primary-dark" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
             </button>
 
@@ -222,7 +222,7 @@ export default function TeacherDashboard() {
             <button
               onClick={handleNewClass}
               disabled={creatingSession}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {creatingSession ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -239,27 +239,27 @@ export default function TeacherDashboard() {
       <main className="px-8 py-6 max-w-6xl">
         {/* Active Sessions */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-[#006A71] mb-4">
+          <h2 className="text-lg font-semibold text-primary-dark mb-4">
             Active Sessions
           </h2>
 
           {loadingSessions ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 text-[#48A6A7] animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
             </div>
           ) : activeSessions.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-10 text-center shadow-sm">
-              <Video className="w-10 h-10 text-[#9ACBD0] mx-auto mb-3" />
-              <p className="text-sm font-medium text-[#006A71] mb-1">
+            <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
+              <Video className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
                 No active sessions
               </p>
-              <p className="text-xs text-[#6B7280] mb-4">
+              <p className="text-xs text-muted mb-4">
                 Create a new class to start a live tutoring session
               </p>
               <button
                 onClick={handleNewClass}
                 disabled={creatingSession}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {creatingSession ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -275,15 +275,15 @@ export default function TeacherDashboard() {
                 <div
                   key={session.id}
                   onClick={() => router.push("/teacher/dashboard/session")}
-                  className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
+                  className="bg-white rounded-2xl border border-secondary/30 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-5">
                     <div className="min-w-0">
-                      <h3 className="text-base font-semibold text-[#006A71] truncate">
+                      <h3 className="text-base font-semibold text-primary-dark truncate">
                         Tutoring Session
                       </h3>
-                      <p className="text-xs text-[#6B7280] mt-0.5 font-mono truncate">
+                      <p className="text-xs text-muted mt-0.5 font-mono truncate">
                         {session.room_id}
                       </p>
                     </div>
@@ -318,7 +318,7 @@ export default function TeacherDashboard() {
                   <div className="space-y-3 mb-5">
                     {/* Status */}
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+                      <div className="flex items-center gap-2 text-xs text-muted">
                         <Users className="w-3.5 h-3.5" />
                         <span>
                           {session.status === "ACTIVE"
@@ -326,7 +326,7 @@ export default function TeacherDashboard() {
                             : "Waiting for student…"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+                      <div className="flex items-center gap-2 text-xs text-muted">
                         <Clock className="w-3.5 h-3.5" />
                         <span>
                           Started {formatSessionTime(session.created_at)}
@@ -337,7 +337,7 @@ export default function TeacherDashboard() {
                     {/* Participant cards */}
                     <div className="flex flex-col gap-2">
                       {/* Teacher */}
-                      <div className="flex items-center gap-2.5 bg-[#F2EFE7]/60 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
                         <div
                           className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
                           style={{
@@ -347,16 +347,16 @@ export default function TeacherDashboard() {
                           {initials(session.teacher_name)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-[#006A71] truncate">
+                          <p className="text-xs font-medium text-primary-dark truncate">
                             {session.teacher_name}
                           </p>
-                          <p className="text-[10px] text-[#6B7280]">Teacher</p>
+                          <p className="text-[10px] text-muted">Teacher</p>
                         </div>
                       </div>
 
                       {/* Student */}
                       {session.student_name ? (
-                        <div className="flex items-center gap-2.5 bg-[#F2EFE7]/60 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
                           <div
                             className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
                             style={{
@@ -368,20 +368,20 @@ export default function TeacherDashboard() {
                             {initials(session.student_name)}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-medium text-[#006A71] truncate">
+                            <p className="text-xs font-medium text-primary-dark truncate">
                               {session.student_name}
                             </p>
-                            <p className="text-[10px] text-[#6B7280]">
+                            <p className="text-[10px] text-muted">
                               Student
                             </p>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2.5 border border-dashed border-[#9ACBD0]/40 rounded-lg px-3 py-2">
-                          <div className="w-7 h-7 rounded-full bg-[#F2EFE7] flex items-center justify-center">
-                            <Users className="w-3.5 h-3.5 text-[#9ACBD0]" />
+                        <div className="flex items-center gap-2.5 border border-dashed border-secondary/40 rounded-lg px-3 py-2">
+                          <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center">
+                            <Users className="w-3.5 h-3.5 text-secondary" />
                           </div>
-                          <p className="text-xs text-[#9ACBD0] italic">
+                          <p className="text-xs text-secondary italic">
                             No student has joined yet
                           </p>
                         </div>
@@ -390,8 +390,8 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-end pt-3 border-t border-[#9ACBD0]/20">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#48A6A7] group-hover:text-[#006A71] transition-colors">
+                  <div className="flex items-center justify-end pt-3 border-t border-secondary/20">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:text-primary-dark transition-colors">
                       GO TO SESSION
                       <ArrowRight className="w-3.5 h-3.5" />
                     </span>
@@ -405,20 +405,20 @@ export default function TeacherDashboard() {
         {/* Recent Script Submissions */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[#006A71]">
+            <h2 className="text-lg font-semibold text-primary-dark">
               Recent Script Submissions
             </h2>
             <Link
               href="/evaluation"
-              className="text-sm font-medium text-[#48A6A7] hover:text-[#006A71] transition-colors"
+              className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
             >
               View Engine Queue
             </Link>
           </div>
 
-          <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
             {/* Table header */}
-            <div className="grid grid-cols-4 gap-4 px-6 py-3 bg-[#F2EFE7]/50 border-b border-[#9ACBD0]/20 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">
+            <div className="grid grid-cols-4 gap-4 px-6 py-3 bg-background/50 border-b border-secondary/20 text-xs font-semibold text-muted uppercase tracking-wide">
               <span>Student</span>
               <span>Assignment</span>
               <span>Engine Status</span>
@@ -429,7 +429,7 @@ export default function TeacherDashboard() {
             {recentSubmissions.map((sub) => (
               <div
                 key={sub.id}
-                className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-[#9ACBD0]/10 last:border-b-0 items-center hover:bg-[#F2EFE7]/30 transition-colors"
+                className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-secondary/10 last:border-b-0 items-center hover:bg-background/30 transition-colors"
               >
                 {/* Student */}
                 <div className="flex items-center gap-3">
@@ -442,13 +442,13 @@ export default function TeacherDashboard() {
                       .map((n) => n[0])
                       .join("")}
                   </div>
-                  <span className="text-sm font-medium text-[#006A71]">
+                  <span className="text-sm font-medium text-primary-dark">
                     {sub.student}
                   </span>
                 </div>
 
                 {/* Assignment */}
-                <span className="text-sm text-[#6B7280]">{sub.assignment}</span>
+                <span className="text-sm text-muted">{sub.assignment}</span>
 
                 {/* Status */}
                 <div className="flex items-center gap-2">
@@ -463,18 +463,18 @@ export default function TeacherDashboard() {
                 {/* Actions */}
                 <div className="flex items-center gap-2">
                   {sub.status === "AI SCORED" && (
-                    <button className="p-1.5 rounded-lg hover:bg-[#E8F4F5] transition text-[#48A6A7]">
+                    <button className="p-1.5 rounded-lg hover:bg-[#E8F4F5] transition text-primary">
                       <Eye className="w-4 h-4" />
                     </button>
                   )}
                   {sub.status === "OCR COMPLETE" && (
-                    <button className="p-1.5 rounded-lg hover:bg-[#E8F4F5] transition text-[#48A6A7]">
+                    <button className="p-1.5 rounded-lg hover:bg-[#E8F4F5] transition text-primary">
                       <Pencil className="w-4 h-4" />
                     </button>
                   )}
                   {sub.status === "PROCESSING..." && (
                     <button
-                      className="p-1.5 rounded-lg text-[#9ACBD0] cursor-not-allowed"
+                      className="p-1.5 rounded-lg text-secondary cursor-not-allowed"
                       disabled
                     >
                       <Eye className="w-4 h-4" />

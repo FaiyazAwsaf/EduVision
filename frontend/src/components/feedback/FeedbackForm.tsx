@@ -72,15 +72,15 @@ export default function FeedbackForm({
   const isFormDisabled = disabled || isSubmitting;
 
   return (
-    <div className="rounded-lg border border-[#9ACBD0] bg-[#F2EFE7] p-6">
-      <h3 className="text-lg font-semibold text-[#006A71] mb-4 flex items-center gap-2">
+    <div className="rounded-lg border border-secondary bg-background p-6">
+      <h3 className="text-lg font-semibold text-primary-dark mb-4 flex items-center gap-2">
         <MessageSquare className="w-5 h-5" /> Share Your Feedback
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Usefulness Rating */}
         <div>
-          <label className="block text-sm font-medium text-[#006A71] mb-2">
+          <label className="block text-sm font-medium text-primary-dark mb-2">
             How useful was this content? <span className="text-red-500">*</span>
           </label>
           <div className="flex gap-2">
@@ -99,7 +99,7 @@ export default function FeedbackForm({
                 } ${
                   star <= (hoveredStar || usefulnessRating)
                     ? "text-amber-500"
-                    : "text-[#9ACBD0]"
+                    : "text-secondary"
                 }`}
                 aria-label={`${star} star${star > 1 ? "s" : ""}`}
               >
@@ -107,7 +107,7 @@ export default function FeedbackForm({
               </button>
             ))}
             {usefulnessRating > 0 && (
-              <span className="ml-2 text-sm text-[#48A6A7] self-center">
+              <span className="ml-2 text-sm text-primary self-center">
                 ({usefulnessRating}/5)
               </span>
             )}
@@ -116,7 +116,7 @@ export default function FeedbackForm({
 
         {/* Difficulty Rating */}
         <div>
-          <label className="block text-sm font-medium text-[#006A71] mb-2">
+          <label className="block text-sm font-medium text-primary-dark mb-2">
             Was the difficulty level appropriate?{" "}
             <span className="text-red-500">*</span>
           </label>
@@ -131,9 +131,9 @@ export default function FeedbackForm({
                   setDifficultyRating(e.target.value as DifficultyRating)
                 }
                 disabled={isFormDisabled}
-                className="mr-2 accent-[#48A6A7]"
+                className="mr-2 accent-primary"
               />
-              <span className="text-sm text-[#006A71]">Too Easy</span>
+              <span className="text-sm text-primary-dark">Too Easy</span>
             </label>
             <label className="flex items-center">
               <input
@@ -145,9 +145,9 @@ export default function FeedbackForm({
                   setDifficultyRating(e.target.value as DifficultyRating)
                 }
                 disabled={isFormDisabled}
-                className="mr-2 accent-[#48A6A7]"
+                className="mr-2 accent-primary"
               />
-              <span className="text-sm text-[#006A71]">Appropriate</span>
+              <span className="text-sm text-primary-dark">Appropriate</span>
             </label>
             <label className="flex items-center">
               <input
@@ -159,9 +159,9 @@ export default function FeedbackForm({
                   setDifficultyRating(e.target.value as DifficultyRating)
                 }
                 disabled={isFormDisabled}
-                className="mr-2 accent-[#48A6A7]"
+                className="mr-2 accent-primary"
               />
-              <span className="text-sm text-[#006A71]">Too Hard</span>
+              <span className="text-sm text-primary-dark">Too Hard</span>
             </label>
           </div>
         </div>
@@ -174,9 +174,9 @@ export default function FeedbackForm({
               checked={correctnessFlag}
               onChange={(e) => setCorrectnessFlag(e.target.checked)}
               disabled={isFormDisabled}
-              className="mt-1 mr-2 accent-[#48A6A7]"
+              className="mt-1 mr-2 accent-primary"
             />
-            <span className="text-sm text-[#006A71]">
+            <span className="text-sm text-primary-dark">
               The content was factually correct{" "}
               <span className="text-red-500">*</span>
             </span>
@@ -185,7 +185,7 @@ export default function FeedbackForm({
 
         {/* Missing Topics (Optional) */}
         <div>
-          <label className="block text-sm font-medium text-[#006A71] mb-2">
+          <label className="block text-sm font-medium text-primary-dark mb-2">
             Missing topics or concepts (optional)
           </label>
           <textarea
@@ -195,16 +195,16 @@ export default function FeedbackForm({
             rows={2}
             maxLength={2000}
             placeholder="e.g., Could have included more examples on..."
-            className="w-full rounded-md border border-[#9ACBD0] px-3 py-2 text-[#006A71] placeholder-[#9ACBD0] focus:border-[#48A6A7] focus:ring-[#48A6A7] disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-full rounded-md border border-secondary px-3 py-2 text-primary-dark placeholder-secondary focus:border-primary focus:ring-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
-          <p className="text-xs text-[#48A6A7] mt-1">
+          <p className="text-xs text-primary mt-1">
             {missingTopics.length}/2000 characters
           </p>
         </div>
 
         {/* Freeform Comment (Optional) */}
         <div>
-          <label className="block text-sm font-medium text-[#006A71] mb-2">
+          <label className="block text-sm font-medium text-primary-dark mb-2">
             Additional comments (optional)
           </label>
           <textarea
@@ -214,9 +214,9 @@ export default function FeedbackForm({
             rows={3}
             maxLength={5000}
             placeholder="Any other feedback or suggestions..."
-            className="w-full rounded-md border border-[#9ACBD0] px-3 py-2 text-[#006A71] placeholder-[#9ACBD0] focus:border-[#48A6A7] focus:ring-[#48A6A7] disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="w-full rounded-md border border-secondary px-3 py-2 text-primary-dark placeholder-secondary focus:border-primary focus:ring-primary disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
-          <p className="text-xs text-[#48A6A7] mt-1">
+          <p className="text-xs text-primary mt-1">
             {freeformComment.length}/5000 characters
           </p>
         </div>
@@ -229,7 +229,7 @@ export default function FeedbackForm({
             className={`w-full rounded-md px-4 py-2 text-sm font-semibold text-white transition-colors ${
               isFormDisabled
                 ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#48A6A7] hover:bg-[#006A71]"
+                : "bg-primary hover:bg-primary-dark"
             }`}
           >
             {isSubmitting ? "Submitting..." : "Submit Feedback"}

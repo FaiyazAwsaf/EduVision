@@ -77,7 +77,7 @@ export function ScreenShareRenderer({
     return (
       <div
         className="w-full h-full rounded-xl flex items-center justify-center"
-        style={{ backgroundColor: "#006A71" }}
+        style={{ backgroundColor: "var(--primary-dark)" }}
       >
         <div className="text-center">
           <Monitor className="w-16 h-16 text-white/40 mx-auto mb-3" />
@@ -113,7 +113,7 @@ export function ScreenShareRenderer({
       </div>
 
       {/* Sharing indicator badge */}
-      <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5" style={{ backgroundColor: "#48A6A7" }}>
+      <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5" style={{ backgroundColor: "var(--primary)" }}>
         <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
         <span className="text-white text-xs font-medium">Live</span>
       </div>

@@ -71,16 +71,16 @@ export default function SignInPage() {
   // Don't flash the form if we're still checking auth state
   if (!isReady) {
     return (
-      <div className="min-h-screen bg-[#F2EFE7] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#48A6A7] animate-spin" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F2EFE7] to-[#E8F4F5] flex">
+    <div className="min-h-screen bg-gradient-to-br from-background to-[#E8F4F5] flex">
       {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#48A6A7] to-[#006A71] relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-primary-dark relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl"></div>
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
@@ -105,7 +105,7 @@ export default function SignInPage() {
           {/* Back button */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[#48A6A7] hover:text-[#006A71] mb-8 transition-colors group"
+            className="inline-flex items-center gap-2 text-primary hover:text-primary-dark mb-8 transition-colors group"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="text-sm font-medium">Back</span>
@@ -113,15 +113,15 @@ export default function SignInPage() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex justify-center mb-6">
-            <div className="w-16 h-16 bg-[#48A6A7] rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg">
               <BookOpen className="w-8 h-8 text-white" />
             </div>
           </div>
 
           {/* Heading */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-[#006A71] mb-2">Sign In</h2>
-            <p className="text-[#48A6A7] font-light">
+            <h2 className="text-3xl font-bold text-primary-dark mb-2">Sign In</h2>
+            <p className="text-primary font-light">
               Welcome back to your learning journey
             </p>
           </div>
@@ -140,7 +140,7 @@ export default function SignInPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-[#006A71] mb-2"
+                className="block text-sm font-medium text-primary-dark mb-2"
               >
                 Email Address
               </label>
@@ -153,9 +153,9 @@ export default function SignInPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@university.edu"
-                  className="w-full rounded-xl border border-[#9ACBD0] bg-white px-4 py-3 pr-11 text-[#006A71] placeholder:text-[#9ACBD0] focus:outline-none focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent transition shadow-sm"
+                  className="w-full rounded-xl border border-secondary bg-white px-4 py-3 pr-11 text-primary-dark placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition shadow-sm"
                 />
-                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#48A6A7]" />
+                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export default function SignInPage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-[#006A71] mb-2"
+                className="block text-sm font-medium text-primary-dark mb-2"
               >
                 Password
               </label>
@@ -176,12 +176,12 @@ export default function SignInPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full rounded-xl border border-[#9ACBD0] bg-white px-4 py-3 pr-11 text-[#006A71] placeholder:text-[#9ACBD0] focus:outline-none focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent transition shadow-sm"
+                  className="w-full rounded-xl border border-secondary bg-white px-4 py-3 pr-11 text-primary-dark placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition shadow-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#48A6A7] hover:text-[#006A71] transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-primary hover:text-primary-dark transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -194,7 +194,7 @@ export default function SignInPage() {
               <div className="mt-2 text-right">
                 <Link
                   href="/forgot-password"
-                  className="text-sm text-[#48A6A7] hover:text-[#006A71] font-medium transition-colors"
+                  className="text-sm text-primary hover:text-primary-dark font-medium transition-colors"
                 >
                   Forgot Password?
                 </Link>
@@ -205,7 +205,7 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#48A6A7] px-4 py-3 text-base font-semibold text-white hover:bg-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7] focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-base font-semibold text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
             >
               {loading ? (
                 <>
@@ -220,10 +220,10 @@ export default function SignInPage() {
             {/* Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#9ACBD0]"></div>
+                <div className="w-full border-t border-secondary"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-gradient-to-br from-[#F2EFE7] to-[#E8F4F5] px-4 text-[#9ACBD0] font-medium">
+                <span className="bg-gradient-to-br from-background to-[#E8F4F5] px-4 text-secondary font-medium">
                   Or continue with
                 </span>
               </div>
@@ -232,7 +232,7 @@ export default function SignInPage() {
             {/* Google Sign In */}
             <button
               type="button"
-              className="w-full flex items-center justify-center gap-3 rounded-xl border-2 border-[#9ACBD0] bg-white px-4 py-3 text-base font-medium text-[#006A71] hover:bg-[#F2EFE7] focus:outline-none focus:ring-2 focus:ring-[#48A6A7] focus:ring-offset-2 transition-all shadow-sm hover:shadow"
+              className="w-full flex items-center justify-center gap-3 rounded-xl border-2 border-secondary bg-white px-4 py-3 text-base font-medium text-primary-dark hover:bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all shadow-sm hover:shadow"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -257,11 +257,11 @@ export default function SignInPage() {
           </form>
 
           {/* Sign up link */}
-          <p className="mt-8 text-center text-sm text-[#006A71]">
+          <p className="mt-8 text-center text-sm text-primary-dark">
             Don't have an account?{" "}
             <Link
               href="/signup"
-              className="font-semibold text-[#48A6A7] hover:text-[#006A71] transition-colors"
+              className="font-semibold text-primary hover:text-primary-dark transition-colors"
             >
               Sign Up
             </Link>

@@ -158,7 +158,7 @@ export default function StudentTutoringPage() {
   if (!isReady || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#48A6A7] animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -166,13 +166,13 @@ export default function StudentTutoringPage() {
   return (
     <div className="min-h-screen">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#9ACBD0]/30">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
         <div className="flex items-center justify-between px-8 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#006A71]">
+            <h1 className="text-2xl font-bold text-primary-dark">
               Join Tutoring Session
             </h1>
-            <p className="text-sm text-[#48A6A7]">
+            <p className="text-sm text-primary">
               Paste the session link shared by your teacher to join
             </p>
           </div>
@@ -183,21 +183,21 @@ export default function StudentTutoringPage() {
       <main className="px-8 py-8 max-w-2xl mx-auto">
         {/* Active session — focused view (no join card) */}
         {!checkingSession && hasActiveSession ? (
-          <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-10 shadow-sm flex flex-col items-center text-center">
+          <div className="bg-white rounded-2xl border border-secondary/30 p-10 shadow-sm flex flex-col items-center text-center">
             <div className="relative flex h-5 w-5 mb-4">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-5 w-5 bg-green-500" />
             </div>
-            <h2 className="text-xl font-semibold text-[#006A71] mb-1">
+            <h2 className="text-xl font-semibold text-primary-dark mb-1">
               Session in Progress
             </h2>
-            <p className="text-sm text-[#6B7280] mb-6">
+            <p className="text-sm text-muted mb-6">
               You are currently in an active tutoring session. Return to
               continue.
             </p>
             <button
               onClick={() => router.push("/student/tutoring/session")}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#48A6A7] px-6 py-3 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow"
             >
               Go to Session
               <ArrowRight className="w-4 h-4" />
@@ -205,15 +205,15 @@ export default function StudentTutoringPage() {
           </div>
         ) : (
           /* Join card — only when no active session */
-          <div className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-secondary/30 p-8 shadow-sm">
             <div className="flex flex-col items-center text-center mb-8">
               <div className="w-16 h-16 bg-[#E8F4F5] rounded-2xl flex items-center justify-center mb-4">
-                <Video className="w-8 h-8 text-[#006A71]" />
+                <Video className="w-8 h-8 text-primary-dark" />
               </div>
-              <h2 className="text-xl font-semibold text-[#006A71] mb-1">
+              <h2 className="text-xl font-semibold text-primary-dark mb-1">
                 Enter Session Link
               </h2>
-              <p className="text-sm text-[#6B7280]">
+              <p className="text-sm text-muted">
                 Ask your teacher for the session link and paste it below
               </p>
             </div>
@@ -233,12 +233,12 @@ export default function StudentTutoringPage() {
               <div>
                 <label
                   htmlFor="join-link"
-                  className="block text-sm font-medium text-[#006A71] mb-2"
+                  className="block text-sm font-medium text-primary-dark mb-2"
                 >
                   Session Link or Room ID
                 </label>
                 <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9ACBD0]" />
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
                   <input
                     id="join-link"
                     type="text"
@@ -248,7 +248,7 @@ export default function StudentTutoringPage() {
                       if (e.key === "Enter" && !isJoining) handleJoin();
                     }}
                     placeholder="http://localhost:3000/student/join/room-abc123"
-                    className="w-full pl-11 pr-4 py-3 border border-[#9ACBD0]/40 rounded-xl text-sm text-[#006A71] placeholder:text-[#9ACBD0] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]/40 focus:border-[#48A6A7] transition"
+                    className="w-full pl-11 pr-4 py-3 border border-secondary/40 rounded-xl text-sm text-primary-dark placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
                   />
                 </div>
               </div>
@@ -256,7 +256,7 @@ export default function StudentTutoringPage() {
               <button
                 onClick={handleJoin}
                 disabled={isJoining || !joinLink.trim()}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#48A6A7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isJoining ? (
                   <>

@@ -98,13 +98,13 @@ export default function LearningContextForm({
 
   if (!isEnabled) {
     return (
-      <div className="bg-[#9ACBD0]/10 border border-[#9ACBD0] rounded-md p-4">
+      <div className="bg-secondary/10 border border-secondary rounded-md p-4">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-sm font-medium text-[#006A71]">
+            <h3 className="text-sm font-medium text-primary-dark">
               Personalize Your Content (Optional)
             </h3>
-            <p className="text-xs text-[#48A6A7] mt-1">
+            <p className="text-xs text-primary mt-1">
               Help the AI understand your learning goals and adapt the content
               to your needs.
             </p>
@@ -113,7 +113,7 @@ export default function LearningContextForm({
             type="button"
             onClick={() => setIsEnabled(true)}
             disabled={disabled}
-            className="text-sm font-medium text-[#48A6A7] hover:text-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="text-sm font-medium text-primary hover:text-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Enable
           </button>
@@ -123,9 +123,9 @@ export default function LearningContextForm({
   }
 
   return (
-    <div className="bg-[#9ACBD0]/10 border border-[#9ACBD0] rounded-md p-4 space-y-4">
+    <div className="bg-secondary/10 border border-secondary rounded-md p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-[#006A71]">
+        <h3 className="text-sm font-medium text-primary-dark">
           Learning Context (Optional)
         </h3>
         <button
@@ -140,7 +140,7 @@ export default function LearningContextForm({
             setNotes("");
           }}
           disabled={disabled}
-          className="text-xs text-[#48A6A7] hover:text-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="text-xs text-primary hover:text-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Clear & Disable
         </button>
@@ -150,7 +150,7 @@ export default function LearningContextForm({
       <div>
         <label
           htmlFor="target-goal"
-          className="block text-xs font-medium text-[#006A71] mb-1"
+          className="block text-xs font-medium text-primary-dark mb-1"
         >
           What&apos;s your main goal?
         </label>
@@ -163,7 +163,7 @@ export default function LearningContextForm({
             )
           }
           disabled={disabled}
-          className="w-full px-3 py-2 text-sm border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] disabled:opacity-50 disabled:cursor-not-allowed text-[#006A71]"
+          className="w-full px-3 py-2 text-sm border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed text-primary-dark"
         >
           <option value="">Select a goal (optional)</option>
           <option value={TargetGoalEnum.REVISION}>Quick Revision</option>
@@ -179,7 +179,7 @@ export default function LearningContextForm({
 
       {/* Weaknesses */}
       <div>
-        <label className="block text-xs font-medium text-[#006A71] mb-1">
+        <label className="block text-xs font-medium text-primary-dark mb-1">
           Topics You Find Challenging (Max 10)
         </label>
         <div className="flex gap-2 mb-2">
@@ -190,7 +190,7 @@ export default function LearningContextForm({
             onKeyDown={handleKeyDown}
             placeholder="e.g., quadratic equations"
             disabled={disabled || weaknesses.length >= 10}
-            className="flex-1 px-3 py-2 text-sm border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] disabled:opacity-50 disabled:cursor-not-allowed text-[#006A71] placeholder:text-[#9ACBD0]"
+            className="flex-1 px-3 py-2 text-sm border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed text-primary-dark placeholder:text-secondary"
           />
           <button
             type="button"
@@ -198,7 +198,7 @@ export default function LearningContextForm({
             disabled={
               disabled || !currentWeakness.trim() || weaknesses.length >= 10
             }
-            className="px-4 py-2 text-sm font-medium text-white bg-[#48A6A7] rounded-md hover:bg-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Add
           </button>
@@ -208,7 +208,7 @@ export default function LearningContextForm({
             {weaknesses.map((weakness, index) => (
               <span
                 key={index}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-white border border-[#9ACBD0] rounded-md text-[#006A71]"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-white border border-secondary rounded-md text-primary-dark"
               >
                 {weakness}
                 <button
@@ -234,7 +234,7 @@ export default function LearningContextForm({
       <div>
         <label
           htmlFor="preferred-depth"
-          className="block text-xs font-medium text-[#006A71] mb-1"
+          className="block text-xs font-medium text-primary-dark mb-1"
         >
           How deep should we go?
         </label>
@@ -247,7 +247,7 @@ export default function LearningContextForm({
             )
           }
           disabled={disabled}
-          className="w-full px-3 py-2 text-sm border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] disabled:opacity-50 disabled:cursor-not-allowed text-[#006A71]"
+          className="w-full px-3 py-2 text-sm border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed text-primary-dark"
         >
           <option value="">Normal depth (default)</option>
           <option value={PreferredDepthEnum.SHALLOW}>
@@ -266,7 +266,7 @@ export default function LearningContextForm({
       <div>
         <label
           htmlFor="time-constraint"
-          className="block text-xs font-medium text-[#006A71] mb-1"
+          className="block text-xs font-medium text-primary-dark mb-1"
         >
           How much time do you have?
         </label>
@@ -279,7 +279,7 @@ export default function LearningContextForm({
             )
           }
           disabled={disabled}
-          className="w-full px-3 py-2 text-sm border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] disabled:opacity-50 disabled:cursor-not-allowed text-[#006A71]"
+          className="w-full px-3 py-2 text-sm border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed text-primary-dark"
         >
           <option value="">Normal time (default)</option>
           <option value={TimeConstraintEnum.QUICK}>
@@ -298,7 +298,7 @@ export default function LearningContextForm({
       <div>
         <label
           htmlFor="context-notes"
-          className="block text-xs font-medium text-[#006A71] mb-1"
+          className="block text-xs font-medium text-primary-dark mb-1"
         >
           Additional Notes (Max 1000 chars)
         </label>
@@ -309,15 +309,15 @@ export default function LearningContextForm({
           placeholder="Any other context that might help personalize the content..."
           disabled={disabled}
           rows={3}
-          className="w-full px-3 py-2 text-sm border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] disabled:opacity-50 disabled:cursor-not-allowed resize-none text-[#006A71] placeholder:text-[#9ACBD0]"
+          className="w-full px-3 py-2 text-sm border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed resize-none text-primary-dark placeholder:text-secondary"
         />
-        <p className="text-xs text-[#48A6A7] mt-1">
+        <p className="text-xs text-primary mt-1">
           {notes.length}/1000 characters
         </p>
       </div>
 
-      <div className="pt-2 border-t border-[#9ACBD0]">
-        <p className="text-xs text-[#48A6A7] flex items-center gap-1">
+      <div className="pt-2 border-t border-secondary">
+        <p className="text-xs text-primary flex items-center gap-1">
           <Lightbulb className="w-4 h-4" /> This information helps the AI adapt content to your specific needs,
           but all fields are optional.
         </p>

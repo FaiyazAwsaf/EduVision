@@ -301,14 +301,14 @@ export default function SelectionTool({
     <div style={buttonStyle} className="flex gap-2">
       <button
         onClick={handleConvert}
-        className="px-4 py-2 bg-[#48A6A7] text-white rounded-lg shadow-lg hover:bg-[#006A71] transition-colors font-medium flex items-center gap-2"
+        className="px-4 py-2 bg-primary text-white rounded-lg shadow-lg hover:bg-primary-dark transition-colors font-medium flex items-center gap-2"
       >
         <span>📝</span>
         Convert to Notation
       </button>
       <button
         onClick={handleCancel}
-        className="px-4 py-2 bg-[#9ACBD0] text-[#006A71] rounded-lg shadow-lg hover:bg-[#F2EFE7] transition-colors font-medium"
+        className="px-4 py-2 bg-secondary text-primary-dark rounded-lg shadow-lg hover:bg-background transition-colors font-medium"
       >
         Cancel
       </button>

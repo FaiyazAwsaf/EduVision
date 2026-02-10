@@ -28,7 +28,7 @@ const actions = [
     href: "/evaluation",
     cta: "+ Upload",
     color: "bg-[#E8F4F5]",
-    iconColor: "text-[#006A71]",
+    iconColor: "text-primary-dark",
   },
   {
     title: "Start Tutoring",
@@ -37,7 +37,7 @@ const actions = [
     href: "/student/tutoring",
     cta: "⚡ Launch",
     color: "bg-[#E8F4F5]",
-    iconColor: "text-[#006A71]",
+    iconColor: "text-primary-dark",
   },
   {
     title: "Request Content",
@@ -46,7 +46,7 @@ const actions = [
     href: "/content",
     cta: "+ Create",
     color: "bg-[#E8F4F5]",
-    iconColor: "text-[#006A71]",
+    iconColor: "text-primary-dark",
   },
 ];
 
@@ -58,7 +58,7 @@ const recentFeedback = [
     title: "Calculus Notes: Limits & Continuity",
     meta: "Yesterday • Mathematics",
     status: "PROCESSED",
-    statusColor: "bg-[#48A6A7]/15 text-[#006A71]",
+    statusColor: "bg-primary/15 text-primary-dark",
     excerpt:
       '"…OCR extraction complete. Analysis shows strong understanding of basic limit laws, but suggests review of Squeeze Theorem application…"',
   },
@@ -131,8 +131,8 @@ export default function StudentDashboard() {
   // Show loading state while checking authentication
   if (!isReady || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F2EFE7]">
-        <Loader2 className="w-8 h-8 text-[#48A6A7] animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -140,25 +140,25 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen">
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#9ACBD0]/30">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
         <div className="flex items-center justify-between px-8 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#006A71]">Dashboard</h1>
-            <p className="text-sm text-[#48A6A7]">
+            <h1 className="text-2xl font-bold text-primary-dark">Dashboard</h1>
+            <p className="text-sm text-primary">
               Welcome back, {user.first_name}. Ready for today&apos;s goals?
             </p>
           </div>
 
           <div className="flex items-center gap-4">
             {/* Notification bell */}
-            <button className="relative p-2 rounded-lg hover:bg-[#F2EFE7] transition">
-              <Bell className="w-5 h-5 text-[#006A71]" />
+            <button className="relative p-2 rounded-lg hover:bg-background transition">
+              <Bell className="w-5 h-5 text-primary-dark" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
             </button>
 
             {/* Date badge */}
-            <div className="flex items-center gap-2 bg-white border border-[#9ACBD0]/40 rounded-lg px-3 py-1.5 text-sm text-[#006A71] font-medium shadow-sm">
-              <Calendar className="w-4 h-4 text-[#48A6A7]" />
+            <div className="flex items-center gap-2 bg-white border border-secondary/40 rounded-lg px-3 py-1.5 text-sm text-primary-dark font-medium shadow-sm">
+              <Calendar className="w-4 h-4 text-primary" />
               {today}
             </div>
           </div>
@@ -199,20 +199,20 @@ export default function StudentDashboard() {
           {actions.map((a) => (
             <div
               key={a.title}
-              className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-6 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-secondary/30 p-6 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow"
             >
               <div
                 className={`w-14 h-14 ${a.color} rounded-2xl flex items-center justify-center mb-4`}
               >
                 <a.icon className={`w-6 h-6 ${a.iconColor}`} />
               </div>
-              <h3 className="text-base font-semibold text-[#006A71] mb-1">
+              <h3 className="text-base font-semibold text-primary-dark mb-1">
                 {a.title}
               </h3>
-              <p className="text-xs text-[#6B7280] mb-5">{a.description}</p>
+              <p className="text-xs text-muted mb-5">{a.description}</p>
               <Link
                 href={a.href}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors shadow"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow"
               >
                 {a.cta}
               </Link>
@@ -222,12 +222,12 @@ export default function StudentDashboard() {
 
         {/* Recent Feedback */}
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#006A71]">
+          <h2 className="text-lg font-semibold text-primary-dark">
             Recent Feedback
           </h2>
           <Link
             href="/evaluation"
-            className="text-sm font-medium text-[#48A6A7] hover:text-[#006A71] transition-colors"
+            className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
           >
             View All
           </Link>
@@ -237,19 +237,19 @@ export default function StudentDashboard() {
           {recentFeedback.map((fb) => (
             <div
               key={fb.id}
-              className="bg-white rounded-2xl border border-[#9ACBD0]/30 p-5 shadow-sm"
+              className="bg-white rounded-2xl border border-secondary/30 p-5 shadow-sm"
             >
               {/* Header row */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-[#E8F4F5] rounded-lg flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-[#48A6A7]" />
+                    <BookOpen className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[#006A71]">
+                    <p className="text-sm font-semibold text-primary-dark">
                       {fb.title}
                     </p>
-                    <p className="text-xs text-[#6B7280]">{fb.meta}</p>
+                    <p className="text-xs text-muted">{fb.meta}</p>
                   </div>
                 </div>
                 <span
@@ -260,8 +260,8 @@ export default function StudentDashboard() {
               </div>
 
               {/* Excerpt */}
-              <div className="bg-[#F2EFE7] rounded-lg px-4 py-3 mb-3">
-                <p className="text-xs text-[#6B7280] italic leading-relaxed">
+              <div className="bg-background rounded-lg px-4 py-3 mb-3">
+                <p className="text-xs text-muted italic leading-relaxed">
                   {fb.excerpt}
                 </p>
               </div>
@@ -269,7 +269,7 @@ export default function StudentDashboard() {
               {/* Link */}
               <Link
                 href="/evaluation"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[#48A6A7] hover:text-[#006A71] transition-colors"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-dark transition-colors"
               >
                 VIEW REPORT
                 <ArrowRight className="w-3.5 h-3.5" />

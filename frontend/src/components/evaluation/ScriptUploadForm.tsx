@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { useScriptUpload } from "@/hooks/useScriptUpload";
-import evaluationAPI, { RubricSet } from "@/lib/api/evaluation";
+import { getRubricSets, uploadScript, type RubricSet } from "@/api/evaluation";
 
 interface ScriptUploadFormProps {
   rubricSets: RubricSet[];
@@ -61,7 +61,7 @@ export default function ScriptUploadForm({
     setIsUploading(true);
 
     try {
-      const script = await evaluationAPI.uploadScript({
+      const script = await uploadScript({
         rubric_set: selectedRubricSet,
         student_name: studentName || undefined,
         student_id: studentId || undefined,
@@ -89,7 +89,7 @@ export default function ScriptUploadForm({
       <div>
         <label
           htmlFor="rubricSet"
-          className="block text-sm font-medium text-[#9ACBD0] mb-2"
+          className="block text-sm font-medium text-secondary mb-2"
         >
           Rubric Set (Question Paper) *
         </label>
@@ -97,7 +97,7 @@ export default function ScriptUploadForm({
           id="rubricSet"
           value={selectedRubricSet}
           onChange={(e) => setSelectedRubricSet(e.target.value)}
-          className="w-full px-4 py-3  border border-[#334155] rounded-lg text-white placeholder-[#48A6A7] focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent"
+          className="w-full px-4 py-3  border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
           required
         >
           <option value="">Select a rubric set...</option>
@@ -118,7 +118,7 @@ export default function ScriptUploadForm({
         <div>
           <label
             htmlFor="studentName"
-            className="block text-sm font-medium text-[#9ACBD0] mb-2"
+            className="block text-sm font-medium text-secondary mb-2"
           >
             Student Name (Optional)
           </label>
@@ -128,13 +128,13 @@ export default function ScriptUploadForm({
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
             placeholder="Enter student name"
-            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-[#48A6A7] focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent"
+            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
         <div>
           <label
             htmlFor="studentId"
-            className="block text-sm font-medium text-[#9ACBD0] mb-2"
+            className="block text-sm font-medium text-secondary mb-2"
           >
             Student ID (Optional)
           </label>
@@ -144,14 +144,14 @@ export default function ScriptUploadForm({
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             placeholder="Enter student ID"
-            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-[#48A6A7] focus:ring-2 focus:ring-[#48A6A7] focus:border-transparent"
+            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
       </div>
 
       {/* File Upload Area */}
       <div>
-        <label className="block text-sm font-medium text-[#9ACBD0] mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           Answer Script Pages * ({fileCount}/{maxFiles})
         </label>
         <div
@@ -163,8 +163,8 @@ export default function ScriptUploadForm({
             border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
             ${
               isDragging
-                ? "border-[#48A6A7] bg-[#48A6A7]/10"
-                : "border-[#9ACBD0] hover:border-[#48A6A7]"
+                ? "border-primary bg-primary/10"
+                : "border-secondary hover:border-primary"
             }
             ${!canAddMore ? "opacity-50 cursor-not-allowed" : ""}
           `}
@@ -179,7 +179,7 @@ export default function ScriptUploadForm({
             disabled={!canAddMore}
           />
           <svg
-            className="mx-auto h-12 w-12 text-[#9ACBD0]"
+            className="mx-auto h-12 w-12 text-secondary"
             stroke="currentColor"
             fill="none"
             viewBox="0 0 48 48"
@@ -191,10 +191,10 @@ export default function ScriptUploadForm({
               strokeLinejoin="round"
             />
           </svg>
-          <p className="mt-2 text-sm text-[#48A6A7]">
+          <p className="mt-2 text-sm text-primary">
             {canAddMore ? (
               <>
-                <span className="font-semibold text-[#006A71]">
+                <span className="font-semibold text-primary-dark">
                   Click to upload
                 </span>{" "}
                 or drag and drop
@@ -203,7 +203,7 @@ export default function ScriptUploadForm({
               "Maximum files reached"
             )}
           </p>
-          <p className="mt-1 text-xs text-[#9ACBD0]">
+          <p className="mt-1 text-xs text-secondary">
             PNG, JPG, WEBP up to 10MB each (max 10 pages)
           </p>
         </div>
@@ -217,7 +217,7 @@ export default function ScriptUploadForm({
               <img
                 src={preview}
                 alt={`Page ${index + 1}`}
-                className="w-full h-32 object-cover rounded-lg border border-[#9ACBD0]"
+                className="w-full h-32 object-cover rounded-lg border border-secondary"
               />
               <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-2 py-1 rounded">
                 Page {index + 1}
@@ -265,7 +265,7 @@ export default function ScriptUploadForm({
         <button
           type="button"
           onClick={clearFiles}
-          className="px-6 py-2 border border-[#9ACBD0] rounded-lg text-[#48A6A7] hover:bg-[#9ACBD0]/10 transition-colors"
+          className="px-6 py-2 border border-secondary rounded-lg text-primary hover:bg-secondary/10 transition-colors"
           disabled={isUploading || files.length === 0}
         >
           Clear All
@@ -273,7 +273,7 @@ export default function ScriptUploadForm({
         <button
           type="submit"
           disabled={isUploading || files.length === 0 || !selectedRubricSet}
-          className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {isUploading ? (
             <>

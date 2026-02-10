@@ -145,12 +145,12 @@ export function MediaSession({
     return (
       <div
         className="h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#F2EFE7" }}
+        style={{ backgroundColor: "var(--background)" }}
       >
-        <div className="text-center" style={{ color: "#006A71" }}>
+        <div className="text-center" style={{ color: "var(--primary-dark)" }}>
           <div
             className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
-            style={{ borderColor: "#48A6A7" }}
+            style={{ borderColor: "var(--primary)" }}
           ></div>
           <p className="text-lg font-medium">Waiting for session...</p>
           {/* Debug info */}
@@ -166,21 +166,21 @@ export function MediaSession({
   return (
     <div
       className="h-screen flex flex-col"
-      style={{ backgroundColor: "#F2EFE7" }}
+      style={{ backgroundColor: "var(--background)" }}
     >
       {/* Header Bar */}
       <div
         className="flex items-center justify-between px-6 py-3 border-b"
-        style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}
+        style={{ backgroundColor: "#FFFFFF", borderColor: "var(--secondary)" }}
       >
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold" style={{ color: "#006A71" }}>
+          <h1 className="text-lg font-semibold" style={{ color: "var(--primary-dark)" }}>
             EduVision Tutoring
           </h1>
           {sessionId && (
             <span
               className="text-sm px-3 py-1 rounded-full"
-              style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}
+              style={{ backgroundColor: "var(--secondary)", color: "var(--primary-dark)" }}
             >
               {role === "teacher" ? "Teacher" : "Student"}
             </span>
@@ -192,7 +192,7 @@ export function MediaSession({
               isConnected ? "bg-green-500" : "bg-gray-400"
             }`}
           />
-          <span className="text-sm" style={{ color: "#006A71" }}>
+          <span className="text-sm" style={{ color: "var(--primary-dark)" }}>
             {getConnectionStatusText(connectionState)}
           </span>
         </div>
@@ -242,7 +242,7 @@ export function MediaSession({
       <div
         ref={videoContainerRef}
         className="flex-1 relative overflow-hidden"
-        style={isFullscreen ? { backgroundColor: "#F2EFE7" } : undefined}
+        style={isFullscreen ? { backgroundColor: "var(--background)" } : undefined}
       >
         {isAnyScreenSharing ? (
           /* Screen Share Layout: Full screen with minimized videos at top */
@@ -252,7 +252,7 @@ export function MediaSession({
               {hasRemoteVideo && (
                 <div
                   className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2"
-                  style={{ borderColor: "#48A6A7" }}
+                  style={{ borderColor: "var(--primary)" }}
                 >
                   <VideoRenderer
                     localTracks={localTracks}
@@ -270,7 +270,7 @@ export function MediaSession({
               {hasLocalVideo && (
                 <div
                   className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2"
-                  style={{ borderColor: "#9ACBD0" }}
+                  style={{ borderColor: "var(--secondary)" }}
                 >
                   <VideoRenderer
                     localTracks={localTracks}
@@ -333,7 +333,7 @@ export function MediaSession({
             {/* Small Local Video (bottom-right corner) */}
             <div
               className="absolute bottom-6 right-6 w-64 h-48 rounded-lg overflow-hidden shadow-2xl border-3 z-10"
-              style={{ borderColor: "#48A6A7" }}
+              style={{ borderColor: "var(--primary)" }}
             >
               <VideoRenderer
                 localTracks={localTracks}
@@ -354,11 +354,11 @@ export function MediaSession({
       {/* Bottom Control Bar */}
       <div
         className="px-6 py-4 border-t"
-        style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}
+        style={{ backgroundColor: "#FFFFFF", borderColor: "var(--secondary)" }}
       >
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           {/* Peer Status */}
-          <div className="text-sm" style={{ color: "#006A71" }}>
+          <div className="text-sm" style={{ color: "var(--primary-dark)" }}>
             {isPeerConnected ? (
               <span className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -367,7 +367,7 @@ export function MediaSession({
             ) : (
               <span
                 className="flex items-center gap-2"
-                style={{ color: "#9ACBD0" }}
+                style={{ color: "var(--secondary)" }}
               >
                 <div className="w-2 h-2 rounded-full bg-gray-400"></div>
                 Waiting for {role === "teacher" ? "student" : "teacher"}...
@@ -393,7 +393,7 @@ export function MediaSession({
                   ? "#e5e7eb"
                   : isAudioMuted
                     ? "#ef4444"
-                    : "#48A6A7",
+                    : "var(--primary)",
                 color: isAudioMuted || !isConnected ? "#fff" : "#fff",
               }}
               title={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
@@ -422,7 +422,7 @@ export function MediaSession({
                     ? "#e5e7eb"
                     : isVideoOff
                       ? "#ef4444"
-                      : "#48A6A7",
+                      : "var(--primary)",
                 color:
                   isVideoOff || !isConnected || !hasLocalVideo
                     ? "#fff"
@@ -453,7 +453,7 @@ export function MediaSession({
                   ? "#e5e7eb"
                   : isScreenSharing
                     ? "#ef4444"
-                    : "#48A6A7",
+                    : "var(--primary)",
                 color: isScreenSharing || !isConnected ? "#fff" : "#fff",
               }}
               title={isScreenSharing ? "Stop sharing" : "Share screen"}
@@ -470,7 +470,7 @@ export function MediaSession({
               onClick={toggleFullscreen}
               className="p-4 rounded-full transition-all duration-200 hover:bg-gray-100"
               style={{
-                backgroundColor: "#48A6A7",
+                backgroundColor: "var(--primary)",
                 color: "#fff",
               }}
               title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}

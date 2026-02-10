@@ -16,7 +16,7 @@ import {
   refreshAccessToken,
   type LoginPayload,
   type User,
-} from "@/lib/api/auth";
+} from "@/api/auth";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

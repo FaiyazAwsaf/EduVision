@@ -7,7 +7,7 @@
  */
 
 import { API_BASE_URL } from "@/config/api";
-import { authenticatedFetch } from "@/lib/api/auth";
+import { authenticatedFetch } from "@/api/auth";
 
 // Types
 export interface TutoringUser {

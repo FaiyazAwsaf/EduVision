@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { EvaluationRule } from "./RuleEditor";
-import { testRubric } from "@/lib/api/rubrics";
+import { testRubric } from "@/api/rubrics";
 
 interface RuleResult {
   rule_id: string;
@@ -37,16 +37,16 @@ export default function SampleAnswerTester({
   const [error, setError] = useState<string | null>(null);
 
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-[#006A71]";
-    if (percentage >= 60) return "text-[#48A6A7]";
-    if (percentage >= 40) return "text-[#9ACBD0]";
+    if (percentage >= 80) return "text-primary-dark";
+    if (percentage >= 60) return "text-primary";
+    if (percentage >= 40) return "text-secondary";
     return "text-red-600";
   };
 
   const getScoreBgColor = (percentage: number) => {
-    if (percentage >= 80) return "bg-[#006A71]/10";
-    if (percentage >= 60) return "bg-[#48A6A7]/10";
-    if (percentage >= 40) return "bg-[#9ACBD0]/20";
+    if (percentage >= 80) return "bg-primary-dark/10";
+    if (percentage >= 60) return "bg-primary/10";
+    if (percentage >= 40) return "bg-secondary/20";
     return "bg-red-100";
   };
 
@@ -90,11 +90,11 @@ export default function SampleAnswerTester({
   return (
     <div className="space-y-6">
       {/* Input Section */}
-      <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-        <h2 className="text-xl font-semibold text-[#006A71] mb-4">
+      <div className="bg-white rounded-xl border border-secondary p-6">
+        <h2 className="text-xl font-semibold text-primary-dark mb-4">
           Test Sample Answer
         </h2>
-        <p className="text-sm text-[#48A6A7] mb-4">
+        <p className="text-sm text-primary mb-4">
           Enter a sample student answer to see how your rubric would evaluate
           it.
         </p>
@@ -103,7 +103,7 @@ export default function SampleAnswerTester({
           <div>
             <label
               htmlFor="sampleAnswer"
-              className="block text-sm font-medium text-[#006A71] mb-2"
+              className="block text-sm font-medium text-primary-dark mb-2"
             >
               Sample Answer
             </label>
@@ -111,7 +111,7 @@ export default function SampleAnswerTester({
               id="sampleAnswer"
               value={sampleAnswer}
               onChange={(e) => setSampleAnswer(e.target.value)}
-              className="w-full px-4 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71]"
+              className="w-full px-4 py-2 border border-secondary rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white text-primary-dark"
               rows={8}
               placeholder="Enter the student's answer here..."
             />
@@ -122,7 +122,7 @@ export default function SampleAnswerTester({
               type="button"
               onClick={handleTestAnswer}
               disabled={isLoading || !sampleAnswer.trim()}
-              className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -170,7 +170,7 @@ export default function SampleAnswerTester({
               <button
                 type="button"
                 onClick={handleClear}
-                className="px-6 py-2 border border-[#9ACBD0] text-[#006A71] rounded-lg hover:bg-[#F2EFE7] transition-colors"
+                className="px-6 py-2 border border-secondary text-primary-dark rounded-lg hover:bg-background transition-colors"
               >
                 Clear
               </button>
@@ -190,15 +190,15 @@ export default function SampleAnswerTester({
       {testResult && (
         <div className="space-y-6">
           {/* Score Summary Card */}
-          <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-            <h2 className="text-xl font-semibold text-[#006A71] mb-6">
+          <div className="bg-white rounded-xl border border-secondary p-6">
+            <h2 className="text-xl font-semibold text-primary-dark mb-6">
               Test Results
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left: Info */}
               <div>
-                <div className="space-y-2 text-sm text-[#48A6A7]">
+                <div className="space-y-2 text-sm text-primary">
                   <p>
                     <span className="font-medium">Total Rules:</span>{" "}
                     {testResult.rule_results.length}
@@ -222,7 +222,7 @@ export default function SampleAnswerTester({
                 >
                   {percentage.toFixed(1)}%
                 </div>
-                <div className="mt-2 text-lg text-[#48A6A7]">
+                <div className="mt-2 text-lg text-primary">
                   {testResult.total_score.toFixed(1)} / {testResult.max_score}{" "}
                   marks
                 </div>
@@ -245,22 +245,22 @@ export default function SampleAnswerTester({
 
           {/* Rule-by-Rule Results */}
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-[#006A71]">
+            <h2 className="text-xl font-semibold text-primary-dark">
               Rule-by-Rule Analysis
             </h2>
 
             {testResult.rule_results.map((result, index) => (
               <div
                 key={result.rule_id}
-                className="bg-white rounded-xl border border-[#9ACBD0] overflow-hidden"
+                className="bg-white rounded-xl border border-secondary overflow-hidden"
               >
                 {/* Rule Header */}
-                <div className="bg-[#F2EFE7] px-6 py-4 flex justify-between items-center">
+                <div className="bg-background px-6 py-4 flex justify-between items-center">
                   <div>
-                    <span className="text-sm font-medium text-[#48A6A7]">
+                    <span className="text-sm font-medium text-primary">
                       Rule {index + 1}
                     </span>
-                    <h3 className="text-lg font-medium text-[#006A71] capitalize">
+                    <h3 className="text-lg font-medium text-primary-dark capitalize">
                       {result.rule_type} Evaluation
                     </h3>
                   </div>
@@ -272,7 +272,7 @@ export default function SampleAnswerTester({
                     >
                       {result.score_awarded.toFixed(1)} / {result.max_marks}
                     </div>
-                    <div className="text-xs text-[#48A6A7]">marks</div>
+                    <div className="text-xs text-primary">marks</div>
                   </div>
                 </div>
 
@@ -283,7 +283,7 @@ export default function SampleAnswerTester({
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium ${
                         result.matched
-                          ? "bg-[#006A71]/10 text-[#006A71]"
+                          ? "bg-primary-dark/10 text-primary-dark"
                           : "bg-red-100 text-red-800"
                       }`}
                     >
@@ -294,11 +294,11 @@ export default function SampleAnswerTester({
                   {/* Feedback */}
                   <div className="flex items-start gap-4">
                     <div className="shrink-0 w-20">
-                      <span className="text-sm font-medium text-[#006A71]">
+                      <span className="text-sm font-medium text-primary-dark">
                         Feedback
                       </span>
                     </div>
-                    <div className="flex-1 text-sm text-[#48A6A7]">
+                    <div className="flex-1 text-sm text-primary">
                       {result.feedback_message || "No feedback provided"}
                     </div>
                   </div>
@@ -309,12 +309,12 @@ export default function SampleAnswerTester({
 
           {/* Overall Feedback */}
           {testResult.feedback && (
-            <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-              <h2 className="text-xl font-semibold text-[#006A71] mb-4">
+            <div className="bg-white rounded-xl border border-secondary p-6">
+              <h2 className="text-xl font-semibold text-primary-dark mb-4">
                 Overall Feedback
               </h2>
               <div className="prose max-w-none">
-                <pre className="text-sm text-[#48A6A7] whitespace-pre-wrap font-sans">
+                <pre className="text-sm text-primary whitespace-pre-wrap font-sans">
                   {testResult.feedback}
                 </pre>
               </div>

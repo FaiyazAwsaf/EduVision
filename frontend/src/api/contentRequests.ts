@@ -17,6 +17,15 @@ import type {
   GeneratedContent,
   ApiError,
   OutputFormat,
+  Feedback,
+  FeedbackPayload,
+  LearningContext,
+  LearningContextPayload,
+  StudyPlan,
+  StudyPlanItem,
+  CreateStudyPlanPayload,
+  CreateStudyPlanItemPayload,
+  UpdateStudyPlanItemPayload,
 } from "@/types/content";
 
 /**
@@ -201,8 +210,6 @@ export async function listContentRequests(): Promise<ContentRequest[]> {
 // Phase 3: Feedback API Functions
 // ============================================================================
 
-import type { Feedback, FeedbackPayload } from "@/types/content";
-
 /**
  * Submit feedback for generated content
  *
@@ -268,8 +275,6 @@ export async function getFeedback(contentId: string): Promise<Feedback | null> {
 // ============================================================================
 // Phase 4: Learning Context API Functions
 // ============================================================================
-
-import type { LearningContext, LearningContextPayload } from "@/types/content";
 
 /**
  * Submit learning context for a content request
@@ -341,14 +346,6 @@ export async function getLearningContext(
 // ============================================================================
 // Phase 5: Study Plan API Functions (Manual Mode Only)
 // ============================================================================
-
-import type {
-  StudyPlan,
-  StudyPlanItem,
-  CreateStudyPlanPayload,
-  CreateStudyPlanItemPayload,
-  UpdateStudyPlanItemPayload,
-} from "@/types/content";
 
 /**
  * Create a new study plan

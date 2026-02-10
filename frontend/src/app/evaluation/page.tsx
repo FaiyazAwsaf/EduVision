@@ -15,12 +15,17 @@ import {
   Loader2,
   Plus,
 } from "lucide-react";
-import TeacherSidebar from "@/components/shared/TeacherSidebar";
-import evaluationAPI, {
-  RubricSet,
-  AnswerScript,
-  EvaluationReport,
-} from "@/lib/api/evaluation";
+import Sidebar from "@/components/shared/Sidebar";
+import {
+  getRubricSets,
+  getScripts,
+  getScript,
+  getEvaluationReport,
+  deleteScript,
+  type RubricSet,
+  type AnswerScript,
+  type EvaluationReport,
+} from "@/api/evaluation";
 import ScriptUploadForm from "@/components/evaluation/ScriptUploadForm";
 import EvaluationReportView from "@/components/evaluation/EvaluationReportView";
 import ScriptListItem from "@/components/evaluation/ScriptListItem";
@@ -53,8 +58,8 @@ export default function EvaluationPage() {
     setError(null);
     try {
       const [rubricSetsData, scriptsData] = await Promise.all([
-        evaluationAPI.getRubricSets({ state: "published" }), // Only published rubric sets
-        evaluationAPI.getScripts(),
+        getRubricSets({ state: "published" }), // Only published rubric sets
+        getScripts(),
       ]);
       setRubricSets(rubricSetsData);
       setScripts(scriptsData);
@@ -80,7 +85,7 @@ export default function EvaluationPage() {
 
   const handleViewReport = async (scriptId: string) => {
     try {
-      const report = await evaluationAPI.getEvaluationReport(scriptId);
+      const report = await getEvaluationReport(scriptId);
       setSelectedReport(report);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report");
@@ -90,7 +95,7 @@ export default function EvaluationPage() {
   const handleDeleteScript = async (scriptId: string) => {
     if (confirm("Are you sure you want to delete this script?")) {
       try {
-        await evaluationAPI.deleteScript(scriptId);
+        await deleteScript(scriptId);
         await loadData();
       } catch (err) {
         setError(
@@ -108,8 +113,8 @@ export default function EvaluationPage() {
 
   if (selectedReport) {
     return (
-      <div className="min-h-screen bg-[#F2EFE7]">
-        <TeacherSidebar />
+      <div className="min-h-screen bg-background">
+        <Sidebar role="teacher" />
         <div className="ml-60 py-8 px-8">
           <EvaluationReportView
             report={selectedReport}
@@ -124,29 +129,29 @@ export default function EvaluationPage() {
   if (!isReady || !isAuthenticated || !user || user.role !== "teacher") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#006A71]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-dark"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2EFE7]">
-      <TeacherSidebar />
+    <div className="min-h-screen bg-background">
+      <Sidebar role="teacher" />
       <div className="ml-60 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#9ACBD0]/30">
+        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
           <div className="flex items-center justify-between px-8 py-4">
             <div>
-              <h1 className="text-2xl font-bold text-[#006A71]">
+              <h1 className="text-2xl font-bold text-primary-dark">
                 Script Evaluation
               </h1>
-              <p className="text-sm text-[#48A6A7]">
+              <p className="text-sm text-primary">
                 Evaluate handwritten answer scripts using AI-powered grading
               </p>
             </div>
             <Link
               href="/rubrics"
-              className="bg-[#48A6A7] text-white px-4 py-2 rounded-lg hover:bg-[#006A71] transition-colors text-sm font-medium flex items-center gap-2"
+              className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium flex items-center gap-2"
             >
               <Edit3 className="w-4 h-4" /> Rubrics
             </Link>
@@ -154,7 +159,7 @@ export default function EvaluationPage() {
         </header>
 
         {/* Navigation Tabs */}
-        <div className="bg-white border-b border-[#9ACBD0]/30">
+        <div className="bg-white border-b border-secondary/30">
           <div className="px-8">
             <nav className="flex space-x-1">
               {tabs.map((tab) => {
@@ -165,8 +170,8 @@ export default function EvaluationPage() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`flex items-center gap-2 py-4 px-4 border-b-2 font-medium text-sm transition-colors ${
                       activeTab === tab.id
-                        ? "border-[#48A6A7] text-[#006A71]"
-                        : "border-transparent text-[#9ACBD0] hover:text-[#48A6A7] hover:border-[#9ACBD0]"
+                        ? "border-primary text-primary-dark"
+                        : "border-transparent text-secondary hover:text-primary hover:border-secondary"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -199,7 +204,7 @@ export default function EvaluationPage() {
           {/* Loading State */}
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <div className="flex items-center gap-3 text-[#48A6A7]">
+              <div className="flex items-center gap-3 text-primary">
                 <Loader2 className="w-6 h-6 animate-spin" />
                 <span>Loading...</span>
               </div>
@@ -209,19 +214,19 @@ export default function EvaluationPage() {
               {/* Upload Tab */}
               {activeTab === "upload" && (
                 <div className="max-w-3xl mx-auto">
-                  <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-                    <h2 className="text-xl font-semibold text-[#006A71] mb-6">
+                  <div className="bg-white rounded-xl border border-secondary p-6">
+                    <h2 className="text-xl font-semibold text-primary-dark mb-6">
                       Upload Answer Script
                     </h2>
                     {rubricSets.length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed border-[#9ACBD0] rounded-xl">
-                        <FileUp className="w-12 h-12 mx-auto text-[#9ACBD0] mb-4" />
-                        <p className="text-[#48A6A7] mb-4">
+                      <div className="text-center py-12 border-2 border-dashed border-secondary rounded-xl">
+                        <FileUp className="w-12 h-12 mx-auto text-secondary mb-4" />
+                        <p className="text-primary mb-4">
                           No published rubric sets available. Create one first.
                         </p>
                         <Link
                           href="/rubrics"
-                          className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors inline-block"
+                          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors inline-block"
                         >
                           Create Rubric Set
                         </Link>
@@ -240,12 +245,12 @@ export default function EvaluationPage() {
               {activeTab === "scripts" && (
                 <div>
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-[#006A71]">
+                    <h2 className="text-xl font-semibold text-primary-dark">
                       Answer Scripts ({scripts.length})
                     </h2>
                     <button
                       onClick={() => setActiveTab("upload")}
-                      className="px-4 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors flex items-center gap-2"
+                      className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
                     >
                       <Plus className="w-4 h-4" />
                       Upload New
@@ -253,17 +258,17 @@ export default function EvaluationPage() {
                   </div>
 
                   {scripts.length === 0 ? (
-                    <div className="bg-white rounded-xl border border-[#9ACBD0] p-12 text-center">
-                      <FileText className="w-12 h-12 mx-auto text-[#9ACBD0] mb-4" />
-                      <h3 className="text-lg font-medium text-[#006A71] mb-2">
+                    <div className="bg-white rounded-xl border border-secondary p-12 text-center">
+                      <FileText className="w-12 h-12 mx-auto text-secondary mb-4" />
+                      <h3 className="text-lg font-medium text-primary-dark mb-2">
                         No scripts uploaded yet
                       </h3>
-                      <p className="text-[#48A6A7] text-sm mb-4">
+                      <p className="text-primary text-sm mb-4">
                         Upload your first answer script to start evaluating
                       </p>
                       <button
                         onClick={() => setActiveTab("upload")}
-                        className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors"
+                        className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
                       >
                         Upload Script
                       </button>
@@ -288,14 +293,14 @@ export default function EvaluationPage() {
               {activeTab === "rubrics" && (
                 <div>
                   <div className="mb-6">
-                    <h2 className="text-xl font-semibold text-[#006A71] mb-2">
+                    <h2 className="text-xl font-semibold text-primary-dark mb-2">
                       Rubrics Library
                     </h2>
-                    <p className="text-sm text-[#48A6A7]">
+                    <p className="text-sm text-primary">
                       View published rubric sets. Create new rubrics in the{" "}
                       <Link
                         href="/rubrics"
-                        className="text-[#006A71] hover:underline font-medium"
+                        className="text-primary-dark hover:underline font-medium"
                       >
                         Rubrics page
                       </Link>
