@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 import {
-  Home,
   FileText,
   Save,
   Upload,
@@ -17,6 +17,7 @@ import {
   Loader2,
   FileUp,
 } from "lucide-react";
+import TeacherSidebar from "@/components/shared/TeacherSidebar";
 import { RuleEditor, MultiQuestionTester } from "@/components/rubrics";
 import type { EvaluationRule } from "@/components/rubrics";
 import {
@@ -51,8 +52,18 @@ export default function RubricSetBuilderPage() {
 }
 
 function RubricSetBuilderContent() {
+  const router = useRouter();
+  const { isReady, isAuthenticated, user } = useAuth();
   const searchParams = useSearchParams();
   const rubricIdParam = searchParams.get("id");
+
+  // Auth guard: only logged-in teachers can access
+  useEffect(() => {
+    if (!isReady) return;
+    if (!isAuthenticated || !user || user.role !== "teacher") {
+      router.replace("/signin");
+    }
+  }, [isReady, isAuthenticated, user, router]);
 
   const [formData, setFormData] = useState<RubricSetFormData>({
     title: "",
@@ -462,387 +473,392 @@ function RubricSetBuilderContent() {
       ? formData.questions[selectedQuestionIndex]
       : null;
 
+  // Show loading while auth is being checked
+  if (!isReady || !isAuthenticated || !user || user.role !== "teacher") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#006A71]"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F2EFE7] flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-[#9ACBD0]">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-[#F2EFE7]">
+      <TeacherSidebar />
+      <div className="ml-60">
+        {/* Top bar */}
+        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-[#9ACBD0]/30">
+          <div className="flex items-center justify-between px-8 py-4">
             <div>
-              <h1 className="text-3xl font-bold text-[#006A71]">
+              <h1 className="text-2xl font-bold text-[#006A71]">
                 {rubricSetId ? "Edit Rubric" : "Rubric Builder"}
               </h1>
-              <p className="mt-1 text-sm text-[#48A6A7]">
+              <p className="text-sm text-[#48A6A7]">
                 {rubricSetId
                   ? "Modify an existing assessment rubric"
                   : "Create assessments with multiple questions"}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="px-4 py-2 bg-[#9ACBD0] text-white rounded-lg hover:bg-[#48A6A7] transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              <FileUp className="w-4 h-4" />
+              Upload Document
+            </button>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="px-8 py-8">
+          {/* Loading State */}
+          {isLoadingRubric && (
+            <div className="flex items-center justify-center py-16">
+              <div className="flex items-center gap-3 text-[#48A6A7]">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span>Loading rubric...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {!isLoadingRubric && error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
               <button
-                onClick={() => setShowUploadModal(true)}
-                className="px-4 py-2 bg-[#9ACBD0] text-white rounded-lg hover:bg-[#48A6A7] transition-colors text-sm font-medium flex items-center gap-2"
+                onClick={() => setError(null)}
+                className="text-red-400 hover:text-red-600 transition-colors"
               >
-                <FileUp className="w-4 h-4" />
-                Upload Document
+                <X className="w-4 h-4" />
               </button>
-              <Link
-                href="/"
-                className="text-[#48A6A7] hover:text-[#006A71] transition-colors text-sm font-medium flex items-center gap-2"
+            </div>
+          )}
+
+          {/* Success Display */}
+          {!isLoadingRubric && success && (
+            <div className="mb-6 bg-[#48A6A7]/10 border border-[#48A6A7] rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-[#006A71] shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-[#006A71]">{success}</p>
+              </div>
+              <button
+                onClick={() => setSuccess(null)}
+                className="text-[#48A6A7] hover:text-[#006A71] transition-colors"
               >
-                <Home className="w-4 h-4" /> Home
-              </Link>
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </div>
-        </div>
-      </header>
+          )}
 
-      {/* Main Content */}
-      <main className="flex-1 mx-auto max-w-7xl w-full px-4 py-8 sm:px-6 lg:px-8">
-        {/* Loading State */}
-        {isLoadingRubric && (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex items-center gap-3 text-[#48A6A7]">
-              <Loader2 className="w-6 h-6 animate-spin" />
-              <span>Loading rubric...</span>
-            </div>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {!isLoadingRubric && error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-400 hover:text-red-600 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Success Display */}
-        {!isLoadingRubric && success && (
-          <div className="mb-6 bg-[#48A6A7]/10 border border-[#48A6A7] rounded-lg p-4 flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-[#006A71] shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm text-[#006A71]">{success}</p>
-            </div>
-            <button
-              onClick={() => setSuccess(null)}
-              className="text-[#48A6A7] hover:text-[#006A71] transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {!isLoadingRubric && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left Sidebar - Basic Info & Questions List */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Basic Information */}
-              <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-                <h2 className="text-lg font-semibold text-[#006A71] mb-4">
-                  Assessment Info
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[#006A71] mb-2">
-                      Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => updateField("title", e.target.value)}
-                      className="w-full px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm"
-                      placeholder="Assessment Title"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[#006A71] mb-2">
-                      Subject *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.subject}
-                      onChange={(e) => updateField("subject", e.target.value)}
-                      className="w-full px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm"
-                      placeholder="e.g., Physics"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[#006A71] mb-2">
-                      Total Marks *
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.total_marks}
-                      onChange={(e) =>
-                        updateField(
-                          "total_marks",
-                          parseFloat(e.target.value) || 0,
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm"
-                      min="0"
-                      step="0.5"
-                    />
-                    <p className="mt-1 text-xs text-[#9ACBD0]">
-                      Questions total: {calculateTotalMarks()} marks
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Questions List */}
-              <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-[#006A71]">
-                    Questions ({formData.questions.length})
+          {!isLoadingRubric && (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Left Sidebar - Basic Info & Questions List */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Basic Information */}
+                <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+                  <h2 className="text-lg font-semibold text-[#006A71] mb-4">
+                    Assessment Info
                   </h2>
-                  <button
-                    type="button"
-                    onClick={addQuestion}
-                    disabled={isPublished}
-                    className="p-1.5 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[#006A71] mb-2">
+                        Title *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.title}
+                        onChange={(e) => updateField("title", e.target.value)}
+                        className="w-full px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm"
+                        placeholder="Assessment Title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#006A71] mb-2">
+                        Subject *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.subject}
+                        onChange={(e) => updateField("subject", e.target.value)}
+                        className="w-full px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm"
+                        placeholder="e.g., Physics"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#006A71] mb-2">
+                        Total Marks *
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.total_marks}
+                        onChange={(e) =>
+                          updateField(
+                            "total_marks",
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] text-sm"
+                        min="0"
+                        step="0.5"
+                      />
+                      <p className="mt-1 text-xs text-[#9ACBD0]">
+                        Questions total: {calculateTotalMarks()} marks
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                {formData.questions.length === 0 ? (
-                  <div className="text-center py-8 text-[#9ACBD0] text-sm">
-                    <FileText className="w-8 h-8 mx-auto mb-2" />
-                    No questions yet
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {formData.questions.map((question, index) => (
-                      <div
-                        key={index}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          selectedQuestionIndex === index
-                            ? "border-[#006A71] bg-[#006A71]/5"
-                            : "border-[#9ACBD0] hover:border-[#48A6A7]"
-                        }`}
-                        onClick={() => setSelectedQuestionIndex(index)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-[#006A71] text-sm">
-                                Q{question.question_number}
-                              </span>
-                              <span className="text-xs text-[#48A6A7]">
-                                {question.max_marks} marks
-                              </span>
-                            </div>
-                            <p className="text-xs text-[#9ACBD0] mt-1 truncate">
-                              {question.question_text || "No text"}
-                            </p>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeQuestion(index);
-                            }}
-                            className="ml-2 p-1 text-red-400 hover:text-red-600 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2.5 bg-[#F2EFE7] text-[#006A71] border border-[#9ACBD0] rounded-lg hover:bg-[#9ACBD0]/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
-                >
-                  <Save className="w-4 h-4" />
-                  {isSubmitting ? "Saving..." : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePublishClick}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2.5 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
-                >
-                  <Upload className="w-4 h-4" />
-                  {isSubmitting ? "Publishing..." : "Publish"}
-                </button>
-                {formData.questions.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTester(!showTester)}
-                    className="w-full px-4 py-2.5 bg-[#9ACBD0]/20 text-[#006A71] border border-[#9ACBD0] rounded-lg hover:bg-[#9ACBD0]/40 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-                  >
-                    <FileText className="w-4 h-4" />
-                    {showTester ? "Hide Tester" : "Test Rubric Set"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Right Content - Question Editor or Tester */}
-            <div className="lg:col-span-3 space-y-6">
-              {showTester ? (
-                <MultiQuestionTester questions={formData.questions} />
-              ) : selectedQuestion ? (
-                <>
-                  {/* Question Details */}
-                  <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-                    <h2 className="text-xl font-semibold text-[#006A71] mb-4">
-                      Question {selectedQuestion.question_number}
+                {/* Questions List */}
+                <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-[#006A71]">
+                      Questions ({formData.questions.length})
                     </h2>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#006A71] mb-2">
-                          Question Text *
-                        </label>
-                        <textarea
-                          value={selectedQuestion.question_text}
-                          onChange={(e) =>
-                            updateQuestion(
-                              selectedQuestionIndex!,
-                              "question_text",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] resize-none"
-                          rows={4}
-                          placeholder="Enter the question text..."
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-[#006A71] mb-2">
-                          Max Marks *
-                        </label>
-                        <input
-                          type="number"
-                          value={selectedQuestion.max_marks}
-                          onChange={(e) =>
-                            updateQuestion(
-                              selectedQuestionIndex!,
-                              "max_marks",
-                              parseFloat(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71]"
-                          min="0"
-                          step="0.5"
-                        />
-                        <p className="mt-1.5 text-xs text-[#9ACBD0]">
-                          Rules total:{" "}
-                          {calculateQuestionRuleMarks(selectedQuestionIndex!)}{" "}
-                          marks
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Evaluation Rules */}
-                  <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold text-[#006A71]">
-                        Evaluation Rules (
-                        {selectedQuestion.evaluation_rules.length})
-                      </h2>
-                      <button
-                        type="button"
-                        onClick={addRuleToQuestion}
-                        className="px-4 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors flex items-center gap-2 text-sm"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Rule
-                      </button>
-                    </div>
-
-                    {selectedQuestion.evaluation_rules.length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed border-[#9ACBD0] rounded-xl">
-                        <FileText className="w-12 h-12 mx-auto text-[#9ACBD0] mb-4" />
-                        <h3 className="text-lg font-medium text-[#006A71] mb-2">
-                          No evaluation rules yet
-                        </h3>
-                        <p className="text-[#48A6A7] text-sm mb-4">
-                          Add rules to define how this question should be graded
-                        </p>
-                        <button
-                          type="button"
-                          onClick={addRuleToQuestion}
-                          className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors"
-                        >
-                          Add First Rule
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {selectedQuestion.evaluation_rules.map(
-                          (rule, ruleIndex) => (
-                            <RuleEditor
-                              key={rule.id || `rule-${ruleIndex}`}
-                              rule={rule}
-                              ruleNumber={ruleIndex + 1}
-                              onChange={(updatedRule) =>
-                                updateRuleInQuestion(ruleIndex, updatedRule)
-                              }
-                              onDelete={() => removeRuleFromQuestion(ruleIndex)}
-                            />
-                          ),
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="bg-white rounded-xl border border-[#9ACBD0] p-12 text-center">
-                  <FileText className="w-16 h-16 mx-auto text-[#9ACBD0] mb-4" />
-                  <h3 className="text-xl font-medium text-[#006A71] mb-2">
-                    No question selected
-                  </h3>
-                  <p className="text-[#48A6A7] mb-6">
-                    Select a question from the list or add a new one to get
-                    started
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <button
                       type="button"
                       onClick={addQuestion}
-                      className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors"
+                      disabled={isPublished}
+                      className="p-1.5 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50"
                     >
-                      Add First Question
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowUploadModal(true)}
-                      className="px-6 py-2 border border-[#48A6A7] text-[#48A6A7] rounded-lg hover:bg-[#48A6A7] hover:text-white transition-colors flex items-center gap-2"
-                    >
-                      <FileUp className="w-4 h-4" />
-                      Upload Document
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {formData.questions.length === 0 ? (
+                    <div className="text-center py-8 text-[#9ACBD0] text-sm">
+                      <FileText className="w-8 h-8 mx-auto mb-2" />
+                      No questions yet
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {formData.questions.map((question, index) => (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            selectedQuestionIndex === index
+                              ? "border-[#006A71] bg-[#006A71]/5"
+                              : "border-[#9ACBD0] hover:border-[#48A6A7]"
+                          }`}
+                          onClick={() => setSelectedQuestionIndex(index)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[#006A71] text-sm">
+                                  Q{question.question_number}
+                                </span>
+                                <span className="text-xs text-[#48A6A7]">
+                                  {question.max_marks} marks
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#9ACBD0] mt-1 truncate">
+                                {question.question_text || "No text"}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeQuestion(index);
+                              }}
+                              className="ml-2 p-1 text-red-400 hover:text-red-600 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 bg-[#F2EFE7] text-[#006A71] border border-[#9ACBD0] rounded-lg hover:bg-[#9ACBD0]/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePublishClick}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2.5 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {isSubmitting ? "Publishing..." : "Publish"}
+                  </button>
+                  {formData.questions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTester(!showTester)}
+                      className="w-full px-4 py-2.5 bg-[#9ACBD0]/20 text-[#006A71] border border-[#9ACBD0] rounded-lg hover:bg-[#9ACBD0]/40 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                    >
+                      <FileText className="w-4 h-4" />
+                      {showTester ? "Hide Tester" : "Test Rubric Set"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Content - Question Editor or Tester */}
+              <div className="lg:col-span-3 space-y-6">
+                {showTester ? (
+                  <MultiQuestionTester questions={formData.questions} />
+                ) : selectedQuestion ? (
+                  <>
+                    {/* Question Details */}
+                    <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+                      <h2 className="text-xl font-semibold text-[#006A71] mb-4">
+                        Question {selectedQuestion.question_number}
+                      </h2>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[#006A71] mb-2">
+                            Question Text *
+                          </label>
+                          <textarea
+                            value={selectedQuestion.question_text}
+                            onChange={(e) =>
+                              updateQuestion(
+                                selectedQuestionIndex!,
+                                "question_text",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71] resize-none"
+                            rows={4}
+                            placeholder="Enter the question text..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-[#006A71] mb-2">
+                            Max Marks *
+                          </label>
+                          <input
+                            type="number"
+                            value={selectedQuestion.max_marks}
+                            onChange={(e) =>
+                              updateQuestion(
+                                selectedQuestionIndex!,
+                                "max_marks",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                            className="w-full px-4 py-2.5 border border-[#9ACBD0] rounded-lg focus:ring-2 focus:ring-[#48A6A7] focus:border-[#48A6A7] bg-white text-[#006A71]"
+                            min="0"
+                            step="0.5"
+                          />
+                          <p className="mt-1.5 text-xs text-[#9ACBD0]">
+                            Rules total:{" "}
+                            {calculateQuestionRuleMarks(selectedQuestionIndex!)}{" "}
+                            marks
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Evaluation Rules */}
+                    <div className="bg-white rounded-xl border border-[#9ACBD0] p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-semibold text-[#006A71]">
+                          Evaluation Rules (
+                          {selectedQuestion.evaluation_rules.length})
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={addRuleToQuestion}
+                          className="px-4 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors flex items-center gap-2 text-sm"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Rule
+                        </button>
+                      </div>
+
+                      {selectedQuestion.evaluation_rules.length === 0 ? (
+                        <div className="text-center py-12 border-2 border-dashed border-[#9ACBD0] rounded-xl">
+                          <FileText className="w-12 h-12 mx-auto text-[#9ACBD0] mb-4" />
+                          <h3 className="text-lg font-medium text-[#006A71] mb-2">
+                            No evaluation rules yet
+                          </h3>
+                          <p className="text-[#48A6A7] text-sm mb-4">
+                            Add rules to define how this question should be
+                            graded
+                          </p>
+                          <button
+                            type="button"
+                            onClick={addRuleToQuestion}
+                            className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors"
+                          >
+                            Add First Rule
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {selectedQuestion.evaluation_rules.map(
+                            (rule, ruleIndex) => (
+                              <RuleEditor
+                                key={rule.id || `rule-${ruleIndex}`}
+                                rule={rule}
+                                ruleNumber={ruleIndex + 1}
+                                onChange={(updatedRule) =>
+                                  updateRuleInQuestion(ruleIndex, updatedRule)
+                                }
+                                onDelete={() =>
+                                  removeRuleFromQuestion(ruleIndex)
+                                }
+                              />
+                            ),
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-white rounded-xl border border-[#9ACBD0] p-12 text-center">
+                    <FileText className="w-16 h-16 mx-auto text-[#9ACBD0] mb-4" />
+                    <h3 className="text-xl font-medium text-[#006A71] mb-2">
+                      No question selected
+                    </h3>
+                    <p className="text-[#48A6A7] mb-6">
+                      Select a question from the list or add a new one to get
+                      started
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={addQuestion}
+                        className="px-6 py-2 bg-[#48A6A7] text-white rounded-lg hover:bg-[#006A71] transition-colors"
+                      >
+                        Add First Question
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowUploadModal(true)}
+                        className="px-6 py-2 border border-[#48A6A7] text-[#48A6A7] rounded-lg hover:bg-[#48A6A7] hover:text-white transition-colors flex items-center gap-2"
+                      >
+                        <FileUp className="w-4 h-4" />
+                        Upload Document
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
       {/* Publish Confirmation Modal */}
       {showPublishModal && (

@@ -32,7 +32,7 @@ export default function SignInPage() {
       } else if (user.role === "student") {
         router.replace("/student/dashboard");
       } else {
-        router.replace("/");
+        router.replace("/signin");
       }
     }
   }, [isReady, isAuthenticated, user, router]);
@@ -56,8 +56,8 @@ export default function SignInPage() {
       } else if (user.role === "student") {
         router.replace("/student/dashboard");
       } else {
-        // Fallback to homepage if role is unexpected
-        router.replace("/");
+        // Fallback to signin if role is unexpected
+        router.replace("/signin");
       }
     } catch (err: unknown) {
       const message =

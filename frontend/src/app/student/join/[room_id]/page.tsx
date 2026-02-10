@@ -175,10 +175,10 @@ function SessionView({
           )}
           {isEnded && (
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/student/dashboard")}
               className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Return Home
+              Return to Dashboard
             </button>
           )}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,8 +13,10 @@ import {
   Bell,
   Calendar,
   Loader2,
+  Video,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getSessionStatus, type SessionJoinResponse } from "@/api/tutoring";
 
 /* ─── Quick-action card data ─────────────────────────────────────────────── */
 
@@ -77,12 +79,48 @@ export default function StudentDashboard() {
   const router = useRouter();
   const { isReady, isAuthenticated, user } = useAuth();
 
+  // Active session state
+  const [activeSessionTeacher, setActiveSessionTeacher] = useState<
+    string | null
+  >(null);
+  const [hasActiveSession, setHasActiveSession] = useState(false);
+
   // Authorization check - redirect to signin if not authenticated
   useEffect(() => {
     if (isReady && !isAuthenticated) {
       router.replace("/signin");
     }
   }, [isReady, isAuthenticated, router]);
+
+  // Check for an active tutoring session in sessionStorage
+  useEffect(() => {
+    if (!isReady || !user) return;
+
+    try {
+      const saved = sessionStorage.getItem("tutoring_student_session_data");
+      if (saved) {
+        const parsed: SessionJoinResponse = JSON.parse(saved);
+        getSessionStatus(parsed.session_id)
+          .then((status) => {
+            if (
+              status.status === "ACTIVE" ||
+              status.status === "WAITING" ||
+              status.status === "GRACE"
+            ) {
+              setHasActiveSession(true);
+              setActiveSessionTeacher(parsed.teacher_name);
+            } else {
+              sessionStorage.removeItem("tutoring_student_session_data");
+              sessionStorage.removeItem("tutoring_student_user_data");
+            }
+          })
+          .catch(() => {
+            sessionStorage.removeItem("tutoring_student_session_data");
+            sessionStorage.removeItem("tutoring_student_user_data");
+          });
+      }
+    } catch {}
+  }, [isReady, user]);
 
   const today = new Date().toLocaleDateString("en-US", {
     month: "short",
@@ -129,6 +167,33 @@ export default function StudentDashboard() {
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <main className="px-8 py-6 max-w-6xl">
+        {/* Active session banner */}
+        {hasActiveSession && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                <Video className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-800">
+                  Active Tutoring Session
+                </p>
+                <p className="text-xs text-green-600">
+                  You&apos;re currently in a session
+                  {activeSessionTeacher ? ` with ${activeSessionTeacher}` : ""}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push("/student/tutoring/session")}
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors shadow"
+            >
+              Go to Session
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Quick actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-10">
           {actions.map((a) => (

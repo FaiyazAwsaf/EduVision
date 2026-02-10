@@ -47,10 +47,10 @@ export default function ContentPage() {
             </div>
             <div className="flex items-center gap-3">
               <Link
-                href="/"
+                href="/teacher/dashboard"
                 className="text-[#48A6A7] hover:text-[#006A71] transition-colors text-sm font-medium flex items-center gap-2"
               >
-                <Home className="w-4 h-4" /> Home
+                <Home className="w-4 h-4" /> Dashboard
               </Link>
               <Link
                 href="/study-plans"
