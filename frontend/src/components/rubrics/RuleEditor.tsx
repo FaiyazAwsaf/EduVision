@@ -102,7 +102,7 @@ export default function RuleEditor({
       const config = rule.config as KeywordConfig;
       updateConfig(
         "required_keywords",
-        (config.required_keywords || []).filter((_, i) => i !== index)
+        (config.required_keywords || []).filter((_, i) => i !== index),
       );
     }
   };
@@ -125,7 +125,7 @@ export default function RuleEditor({
       const config = rule.config as StepwiseConfig;
       updateConfig(
         "expected_patterns",
-        (config.expected_patterns || []).filter((_, i) => i !== index)
+        (config.expected_patterns || []).filter((_, i) => i !== index),
       );
     }
   };
@@ -247,7 +247,8 @@ export default function RuleEditor({
                   Add
                 </button>
               </div>
-              {((rule.config as KeywordConfig).required_keywords || []).length > 0 && (
+              {((rule.config as KeywordConfig).required_keywords || []).length >
+                0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {((rule.config as KeywordConfig).required_keywords || []).map(
                     (keyword, index) => (
@@ -277,7 +278,7 @@ export default function RuleEditor({
                           </svg>
                         </button>
                       </span>
-                    )
+                    ),
                   )}
                 </div>
               )}
@@ -298,7 +299,7 @@ export default function RuleEditor({
                 onChange={(e) =>
                   updateConfig(
                     "expected_value",
-                    parseFloat(e.target.value) || 0
+                    parseFloat(e.target.value) || 0,
                   )
                 }
                 disabled={disabled}
@@ -386,40 +387,41 @@ export default function RuleEditor({
                   Add
                 </button>
               </div>
-              {((rule.config as StepwiseConfig).expected_patterns || []).length > 0 && (
+              {((rule.config as StepwiseConfig).expected_patterns || [])
+                .length > 0 && (
                 <div className="mt-2 space-y-2">
-                  {((rule.config as StepwiseConfig).expected_patterns || []).map(
-                    (pattern, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between px-3 py-2 bg-background rounded-lg"
+                  {(
+                    (rule.config as StepwiseConfig).expected_patterns || []
+                  ).map((pattern, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between px-3 py-2 bg-background rounded-lg"
+                    >
+                      <code className="text-sm text-primary-dark">
+                        {pattern}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => removePattern(index)}
+                        disabled={disabled}
+                        className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <code className="text-sm text-primary-dark">
-                          {pattern}
-                        </code>
-                        <button
-                          type="button"
-                          onClick={() => removePattern(index)}
-                          disabled={disabled}
-                          className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    )
-                  )}
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

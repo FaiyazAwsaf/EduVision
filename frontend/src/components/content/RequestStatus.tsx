@@ -100,7 +100,7 @@ export default function RequestStatusComponent({
       } catch (err) {
         if (isMounted) {
           setError(
-            err instanceof Error ? err.message : "Failed to check status"
+            err instanceof Error ? err.message : "Failed to check status",
           );
           setLifecycleState("failed");
           if (pollingIntervalRef.current) {

@@ -56,9 +56,7 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
               </span>
             ))}
           </div>
-          <span className="text-primary">
-            ({feedback.usefulness_rating}/5)
-          </span>
+          <span className="text-primary">({feedback.usefulness_rating}/5)</span>
         </div>
 
         {/* Difficulty Rating */}
@@ -74,13 +72,19 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
           <span className="font-medium text-primary-dark">Correctness:</span>
           <span
             className={
-              feedback.correctness_flag ? "text-green-700 flex items-center gap-1" : "text-red-700 flex items-center gap-1"
+              feedback.correctness_flag
+                ? "text-green-700 flex items-center gap-1"
+                : "text-red-700 flex items-center gap-1"
             }
           >
             {feedback.correctness_flag ? (
-              <><Check className="w-4 h-4" /> Correct</>
+              <>
+                <Check className="w-4 h-4" /> Correct
+              </>
             ) : (
-              <><X className="w-4 h-4" /> Incorrect</>
+              <>
+                <X className="w-4 h-4" /> Incorrect
+              </>
             )}
           </span>
         </div>
@@ -88,7 +92,9 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
         {/* Missing Topics */}
         {feedback.missing_topics && (
           <div>
-            <span className="font-medium text-primary-dark">Missing Topics:</span>
+            <span className="font-medium text-primary-dark">
+              Missing Topics:
+            </span>
             <p className="mt-1 text-primary bg-white rounded p-2 border border-secondary">
               {feedback.missing_topics}
             </p>
@@ -98,7 +104,9 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
         {/* Freeform Comment */}
         {feedback.freeform_comment && (
           <div>
-            <span className="font-medium text-primary-dark">Additional Comments:</span>
+            <span className="font-medium text-primary-dark">
+              Additional Comments:
+            </span>
             <p className="mt-1 text-primary bg-white rounded p-2 border border-secondary">
               {feedback.freeform_comment}
             </p>

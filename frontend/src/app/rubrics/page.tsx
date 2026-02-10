@@ -3,13 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  FileUp,
-  CheckCircle,
-  AlertCircle,
-  X,
-  Loader2,
-} from "lucide-react";
+import { FileUp, CheckCircle, AlertCircle, X, Loader2 } from "lucide-react";
 import Sidebar from "@/components/shared/Sidebar";
 import { MultiQuestionTester } from "@/components/rubrics";
 import type { EvaluationRule } from "@/types/rubrics";
@@ -81,7 +75,9 @@ function RubricSetBuilderContent() {
   const [rubricSetId, setRubricSetId] = useState<string | null>(null);
   const [rubricVersion, setRubricVersion] = useState<number>(1);
   const [isPublished, setIsPublished] = useState(false);
-  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number | null>(null);
+  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<
+    number | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingRubric, setIsLoadingRubric] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +158,10 @@ function RubricSetBuilderContent() {
     });
     if (selectedQuestionIndex === index) {
       setSelectedQuestionIndex(null);
-    } else if (selectedQuestionIndex !== null && selectedQuestionIndex > index) {
+    } else if (
+      selectedQuestionIndex !== null &&
+      selectedQuestionIndex > index
+    ) {
       setSelectedQuestionIndex(selectedQuestionIndex - 1);
     }
   };
@@ -209,11 +208,16 @@ function RubricSetBuilderContent() {
   const removeRuleFromQuestion = (ruleIndex: number) => {
     if (selectedQuestionIndex === null) return;
     const question = formData.questions[selectedQuestionIndex];
-    const newRules = question.evaluation_rules.filter((_, i) => i !== ruleIndex);
+    const newRules = question.evaluation_rules.filter(
+      (_, i) => i !== ruleIndex,
+    );
     updateQuestion(selectedQuestionIndex, "evaluation_rules", newRules);
   };
 
-  const updateRuleInQuestion = (ruleIndex: number, updatedRule: EvaluationRule) => {
+  const updateRuleInQuestion = (
+    ruleIndex: number,
+    updatedRule: EvaluationRule,
+  ) => {
     if (selectedQuestionIndex === null) return;
     const question = formData.questions[selectedQuestionIndex];
     const newRules = question.evaluation_rules.map((rule, i) =>
@@ -240,8 +244,10 @@ function RubricSetBuilderContent() {
 
     if (!formData.title.trim()) errors.push("Title is required");
     if (!formData.subject.trim()) errors.push("Subject is required");
-    if (formData.total_marks <= 0) errors.push("Total marks must be greater than 0");
-    if (formData.questions.length === 0) errors.push("At least one question is required");
+    if (formData.total_marks <= 0)
+      errors.push("Total marks must be greater than 0");
+    if (formData.questions.length === 0)
+      errors.push("At least one question is required");
 
     const questionsTotal = calculateTotalMarks();
     if (Math.abs(questionsTotal - formData.total_marks) > 0.01) {
@@ -255,10 +261,14 @@ function RubricSetBuilderContent() {
         errors.push(`Question ${question.question_number}: Text is required`);
       }
       if (question.max_marks <= 0) {
-        errors.push(`Question ${question.question_number}: Marks must be greater than 0`);
+        errors.push(
+          `Question ${question.question_number}: Marks must be greater than 0`,
+        );
       }
       if (question.evaluation_rules.length === 0) {
-        errors.push(`Question ${question.question_number}: At least one rule is required`);
+        errors.push(
+          `Question ${question.question_number}: At least one rule is required`,
+        );
       }
 
       const ruleMarks = calculateQuestionRuleMarks(index);
@@ -288,7 +298,9 @@ function RubricSetBuilderContent() {
       if (rubricSetId) {
         const result = await updateRubricSet(rubricSetId, formData);
         setRubricVersion(result.version);
-        setSuccess(`Rubric set updated successfully! (Version ${result.version})`);
+        setSuccess(
+          `Rubric set updated successfully! (Version ${result.version})`,
+        );
       } else {
         const result = await createRubricSet(formData);
         setRubricSetId(result.id);
@@ -296,7 +308,9 @@ function RubricSetBuilderContent() {
         setSuccess("Rubric set created successfully!");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save rubric set");
+      setError(
+        err instanceof Error ? err.message : "Failed to save rubric set",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -323,9 +337,13 @@ function RubricSetBuilderContent() {
       const result = await publishRubricSet(rubricSetId);
       setRubricVersion(result.version);
       setIsPublished(true);
-      setSuccess(`Rubric set published successfully! (Version ${result.version})`);
+      setSuccess(
+        `Rubric set published successfully! (Version ${result.version})`,
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to publish rubric set");
+      setError(
+        err instanceof Error ? err.message : "Failed to publish rubric set",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -376,7 +394,8 @@ function RubricSetBuilderContent() {
               ...config,
               step_description: (config.step_description as string) || "",
               expected_patterns: (config.expected_patterns as string[]) || [],
-              allow_partial_credit: (config.allow_partial_credit as boolean) ?? true,
+              allow_partial_credit:
+                (config.allow_partial_credit as boolean) ?? true,
             };
           default:
             return config;
@@ -386,20 +405,29 @@ function RubricSetBuilderContent() {
       const questionsWithIds = (parsedData.questions || []).map(
         (question: QuestionRubric) => ({
           ...question,
-          evaluation_rules: ((question.evaluation_rules || []) as unknown as Record<string, unknown>[]).map(
-            (rule) => ({
-              ...rule,
-              id: (rule.id as string) || crypto.randomUUID(),
-              type: (rule.type as string) || "keyword",
-              marks: (rule.marks as number) || 0,
-              config: normalizeRuleConfig(rule),
-              feedback: {
-                on_success: ((rule.feedback as Record<string, unknown>)?.on_success as string) || "Correct",
-                on_partial: ((rule.feedback as Record<string, unknown>)?.on_partial as string) || null,
-                on_failure: ((rule.feedback as Record<string, unknown>)?.on_failure as string) || "Incorrect",
-              },
-            }),
-          ) as unknown as EvaluationRule[],
+          evaluation_rules: (
+            (question.evaluation_rules || []) as unknown as Record<
+              string,
+              unknown
+            >[]
+          ).map((rule) => ({
+            ...rule,
+            id: (rule.id as string) || crypto.randomUUID(),
+            type: (rule.type as string) || "keyword",
+            marks: (rule.marks as number) || 0,
+            config: normalizeRuleConfig(rule),
+            feedback: {
+              on_success:
+                ((rule.feedback as Record<string, unknown>)
+                  ?.on_success as string) || "Correct",
+              on_partial:
+                ((rule.feedback as Record<string, unknown>)
+                  ?.on_partial as string) || null,
+              on_failure:
+                ((rule.feedback as Record<string, unknown>)
+                  ?.on_failure as string) || "Incorrect",
+            },
+          })) as unknown as EvaluationRule[],
         }),
       );
 
@@ -417,7 +445,9 @@ function RubricSetBuilderContent() {
 
       setShowUploadModal(false);
       setUploadedFile(null);
-      setSuccess("Document parsed successfully! Review and edit the extracted rubric data.");
+      setSuccess(
+        "Document parsed successfully! Review and edit the extracted rubric data.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse document");
     } finally {
@@ -428,7 +458,9 @@ function RubricSetBuilderContent() {
   // ─── Derived state ────────────────────────────────────────────────────────
 
   const selectedQuestion =
-    selectedQuestionIndex !== null ? formData.questions[selectedQuestionIndex] : null;
+    selectedQuestionIndex !== null
+      ? formData.questions[selectedQuestionIndex]
+      : null;
 
   // ─── Auth loading guard ───────────────────────────────────────────────────
 
@@ -484,7 +516,10 @@ function RubricSetBuilderContent() {
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
               <p className="flex-1 text-sm text-red-700">{error}</p>
-              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 transition-colors">
+              <button
+                onClick={() => setError(null)}
+                className="text-red-400 hover:text-red-600 transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -494,7 +529,10 @@ function RubricSetBuilderContent() {
             <div className="mb-6 bg-primary/10 border border-primary rounded-lg p-4 flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-primary-dark shrink-0 mt-0.5" />
               <p className="flex-1 text-sm text-primary-dark">{success}</p>
-              <button onClick={() => setSuccess(null)} className="text-primary hover:text-primary-dark transition-colors">
+              <button
+                onClick={() => setSuccess(null)}
+                className="text-primary hover:text-primary-dark transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -541,7 +579,9 @@ function RubricSetBuilderContent() {
                   <QuestionEditorPanel
                     question={selectedQuestion}
                     questionIndex={selectedQuestionIndex!}
-                    questionRuleMarks={calculateQuestionRuleMarks(selectedQuestionIndex!)}
+                    questionRuleMarks={calculateQuestionRuleMarks(
+                      selectedQuestionIndex!,
+                    )}
                     onUpdateField={(field, value) =>
                       updateQuestion(selectedQuestionIndex!, field, value)
                     }

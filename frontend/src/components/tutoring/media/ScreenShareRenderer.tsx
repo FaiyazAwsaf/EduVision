@@ -40,7 +40,7 @@ export function ScreenShareRenderer({
     if (!videoElement || !track) return;
 
     console.log(
-      `[ScreenShare] Attaching ${isLocal ? "local" : "remote"} screen share`
+      `[ScreenShare] Attaching ${isLocal ? "local" : "remote"} screen share`,
     );
 
     // Use callback if provided, otherwise attach directly
@@ -54,9 +54,9 @@ export function ScreenShareRenderer({
     // Detach on cleanup
     return () => {
       console.log(
-        `[ScreenShare] Detaching ${isLocal ? "local" : "remote"} screen share`
+        `[ScreenShare] Detaching ${isLocal ? "local" : "remote"} screen share`,
       );
-      
+
       if (detachScreenShare && isAttached) {
         detachScreenShare(videoElement);
         setIsAttached(false);
@@ -90,7 +90,10 @@ export function ScreenShareRenderer({
   }
 
   return (
-    <div className="relative w-full h-full rounded-xl overflow-hidden shadow-2xl" style={{ backgroundColor: "#000" }}>
+    <div
+      className="relative w-full h-full rounded-xl overflow-hidden shadow-2xl"
+      style={{ backgroundColor: "#000" }}
+    >
       {/* Video element */}
       <video
         ref={videoRef}
@@ -101,19 +104,25 @@ export function ScreenShareRenderer({
       />
 
       {/* Top overlay label with screen share indicator */}
-      <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg" style={{ backgroundColor: "rgba(0, 106, 113, 0.95)" }}>
+      <div
+        className="absolute top-4 left-4 flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg"
+        style={{ backgroundColor: "rgba(0, 106, 113, 0.95)" }}
+      >
         <Monitor className="w-4 h-4 text-white" />
         <span className="text-white text-sm font-medium">
-          {isLocal 
-            ? "You're presenting" 
-            : participantName 
-            ? `${participantName} is presenting` 
-            : "Screen presentation"}
+          {isLocal
+            ? "You're presenting"
+            : participantName
+              ? `${participantName} is presenting`
+              : "Screen presentation"}
         </span>
       </div>
 
       {/* Sharing indicator badge */}
-      <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5" style={{ backgroundColor: "var(--primary)" }}>
+      <div
+        className="absolute top-4 right-4 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5"
+        style={{ backgroundColor: "var(--primary)" }}
+      >
         <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
         <span className="text-white text-xs font-medium">Live</span>
       </div>

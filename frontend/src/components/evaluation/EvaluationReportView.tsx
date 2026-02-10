@@ -54,7 +54,9 @@ export default function EvaluationReportView({
             Back
           </button>
         )}
-        <h1 className="text-2xl font-bold text-primary-dark">Evaluation Report</h1>
+        <h1 className="text-2xl font-bold text-primary-dark">
+          Evaluation Report
+        </h1>
         <div />
       </div>
 

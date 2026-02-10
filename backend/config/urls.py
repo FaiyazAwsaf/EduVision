@@ -48,6 +48,7 @@ def api_root(request):
             'evaluation': '/api/evaluation/',
             'rubrics': '/api/rubrics/',
             'whiteboard': '/api/whiteboard/',
+            'school': '/api/school/',
             'admin': '/admin/',
         }
     })
@@ -95,6 +96,9 @@ urlpatterns = [
     # path('api/evaluation/', include('apps.evaluation.api.urls')),
     path('api/evaluation/', include('apps.evaluation.urls')),
     path('api/', include('apps.rubrics.urls')),
+
+    # school (classes, sections, teachers, students)
+    path('api/school/', include('apps.students.urls', namespace='students')),
 ]
 
 # Serve media files in development

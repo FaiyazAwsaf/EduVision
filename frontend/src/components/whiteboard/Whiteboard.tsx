@@ -113,7 +113,10 @@ export default function Whiteboard({
 
         case "latex_added":
           if (message.data?.latexObject) {
-            setLatexObjects((prev) => [...prev, message.data!.latexObject as LatexObject]);
+            setLatexObjects((prev) => [
+              ...prev,
+              message.data!.latexObject as LatexObject,
+            ]);
             console.log("[Whiteboard] Remote LaTeX object added");
           }
           break;
@@ -362,7 +365,9 @@ export default function Whiteboard({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
           <div className="bg-white p-6 rounded-lg shadow-xl">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-primary-dark font-bold">Converting to LaTeX...</p>
+            <p className="text-primary-dark font-bold">
+              Converting to LaTeX...
+            </p>
           </div>
         </div>
       )}

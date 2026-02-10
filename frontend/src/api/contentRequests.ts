@@ -36,7 +36,7 @@ import type {
  * @throws Error if request fails
  */
 export async function createContentRequest(
-  payload: CreateContentRequestPayload
+  payload: CreateContentRequestPayload,
 ): Promise<ContentRequest> {
   const response = await fetch(API_ENDPOINTS.CONTENT_REQUESTS, {
     method: "POST",
@@ -64,7 +64,7 @@ export async function createContentRequest(
  * @throws Error if request not found or network fails
  */
 export async function getRequestStatus(
-  requestId: string
+  requestId: string,
 ): Promise<ContentRequest> {
   const response = await fetch(
     API_ENDPOINTS.CONTENT_REQUEST_DETAIL(requestId),
@@ -73,7 +73,7 @@ export async function getRequestStatus(
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -102,7 +102,7 @@ export async function getRequestStatus(
  */
 export async function getGeneratedContent(
   requestId: string,
-  format: "json" | "text" = "json"
+  format: "json" | "text" = "json",
 ): Promise<GeneratedContent> {
   const url = `${API_ENDPOINTS.GENERATED_CONTENT(requestId)}?format=${format}`;
 
@@ -137,11 +137,11 @@ export async function getGeneratedContent(
  */
 export async function downloadGeneratedContent(
   requestId: string,
-  format: Extract<OutputFormat, OutputFormat.PDF | OutputFormat.WORKSHEET>
+  format: Extract<OutputFormat, OutputFormat.PDF | OutputFormat.WORKSHEET>,
 ): Promise<void> {
   const formatParam = format.toLowerCase();
   const url = `${API_ENDPOINTS.GENERATED_CONTENT(
-    requestId
+    requestId,
   )}download/?format=${formatParam}`;
 
   const response = await fetch(url, {
@@ -220,7 +220,7 @@ export async function listContentRequests(): Promise<ContentRequest[]> {
  */
 export async function submitFeedback(
   contentId: string,
-  feedback: FeedbackPayload
+  feedback: FeedbackPayload,
 ): Promise<Feedback> {
   const response = await fetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}generated-content/${contentId}/feedback/`,
@@ -230,13 +230,13 @@ export async function submitFeedback(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(feedback),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorData: ApiError = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error || errorData.detail || "Failed to submit feedback"
+      errorData.error || errorData.detail || "Failed to submit feedback",
     );
   }
 
@@ -258,7 +258,7 @@ export async function getFeedback(contentId: string): Promise<Feedback | null> {
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (response.status === 404) {
@@ -289,7 +289,7 @@ export async function getFeedback(contentId: string): Promise<Feedback | null> {
  */
 export async function submitLearningContext(
   requestId: string,
-  context: LearningContextPayload
+  context: LearningContextPayload,
 ): Promise<LearningContext> {
   const response = await fetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
@@ -299,13 +299,15 @@ export async function submitLearningContext(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(context),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorData: ApiError = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error || errorData.detail || "Failed to submit learning context"
+      errorData.error ||
+        errorData.detail ||
+        "Failed to submit learning context",
     );
   }
 
@@ -320,7 +322,7 @@ export async function submitLearningContext(
  * @throws Error if request fails (other than 404)
  */
 export async function getLearningContext(
-  requestId: string
+  requestId: string,
 ): Promise<LearningContext | null> {
   const response = await fetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
@@ -329,7 +331,7 @@ export async function getLearningContext(
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (response.status === 404) {
@@ -357,7 +359,7 @@ export async function getLearningContext(
  * @throws Error if request fails
  */
 export async function createStudyPlan(
-  payload: CreateStudyPlanPayload
+  payload: CreateStudyPlanPayload,
 ): Promise<StudyPlan> {
   const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
     method: "POST",
@@ -453,7 +455,7 @@ export async function deleteStudyPlan(planId: string): Promise<void> {
  */
 export async function addStudyPlanItem(
   planId: string,
-  payload: CreateStudyPlanItemPayload
+  payload: CreateStudyPlanItemPayload,
 ): Promise<StudyPlanItem> {
   const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/items/`, {
     method: "POST",
@@ -481,7 +483,7 @@ export async function addStudyPlanItem(
  * @throws Error if request fails
  */
 export async function listStudyPlanItems(
-  studyPlanId?: string
+  studyPlanId?: string,
 ): Promise<StudyPlanItem[]> {
   const url = studyPlanId
     ? `${API_ENDPOINTS.STUDY_PLAN_ITEMS}?study_plan_id=${studyPlanId}`
@@ -538,7 +540,7 @@ export async function getStudyPlanItem(itemId: string): Promise<StudyPlanItem> {
  */
 export async function updateStudyPlanItem(
   itemId: string,
-  payload: UpdateStudyPlanItemPayload
+  payload: UpdateStudyPlanItemPayload,
 ): Promise<StudyPlanItem> {
   const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
     method: "PATCH",
@@ -584,7 +586,7 @@ export async function deleteStudyPlanItem(itemId: string): Promise<void> {
  * @throws Error if request fails
  */
 export async function markStudyPlanItemComplete(
-  itemId: string
+  itemId: string,
 ): Promise<StudyPlanItem> {
   const response = await fetch(
     `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/complete/`,
@@ -593,7 +595,7 @@ export async function markStudyPlanItemComplete(
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -613,7 +615,7 @@ export async function markStudyPlanItemComplete(
  */
 export async function linkRequestToStudyPlanItem(
   itemId: string,
-  requestId: string
+  requestId: string,
 ): Promise<StudyPlanItem> {
   const response = await fetch(
     `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/link-request/`,
@@ -623,7 +625,7 @@ export async function linkRequestToStudyPlanItem(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ request_id: requestId }),
-    }
+    },
   );
 
   if (!response.ok) {

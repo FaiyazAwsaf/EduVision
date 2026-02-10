@@ -117,7 +117,10 @@ export async function deleteRubricSet(id: string): Promise<void> {
   });
 
   if (!response.ok) {
-    const message = await parseApiError(response, "Failed to delete rubric set");
+    const message = await parseApiError(
+      response,
+      "Failed to delete rubric set",
+    );
     throw new Error(message);
   }
 }
@@ -146,7 +149,9 @@ export async function parseRubricDocument(file: File): Promise<RubricSet> {
   });
 }
 
-export async function getRubricSetVersions(id: string): Promise<RubricVersion[]> {
+export async function getRubricSetVersions(
+  id: string,
+): Promise<RubricVersion[]> {
   return rubricsFetch<RubricVersion[]>(`${RUBRICS_URL}/${id}/versions/`);
 }
 

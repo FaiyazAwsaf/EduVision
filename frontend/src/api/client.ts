@@ -34,7 +34,9 @@ export async function apiFetch(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  const url = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${endpoint}`;
 
   // Default to JSON content-type unless body is FormData
   const headers = new Headers(options.headers);

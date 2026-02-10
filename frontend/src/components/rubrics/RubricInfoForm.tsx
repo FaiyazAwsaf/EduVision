@@ -61,7 +61,9 @@ export default function RubricInfoForm({
           <input
             type="number"
             value={totalMarks}
-            onChange={(e) => onTotalMarksChange(parseFloat(e.target.value) || 0)}
+            onChange={(e) =>
+              onTotalMarksChange(parseFloat(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-secondary rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white text-primary-dark text-sm"
             min="0"
             step="0.5"

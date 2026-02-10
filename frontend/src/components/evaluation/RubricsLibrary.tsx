@@ -217,12 +217,15 @@ export default function RubricsLibrary({
                                     <span className="font-medium">
                                       Keywords:
                                     </span>{" "}
-                                    {Array.isArray(rule.config.required_keywords)
+                                    {Array.isArray(
+                                      rule.config.required_keywords,
+                                    )
                                       ? rule.config.required_keywords.join(", ")
                                       : "None"}
                                     <div className="text-xs mt-1">
                                       Mode:{" "}
-                                      {rule.config.scoring_mode === "proportional"
+                                      {rule.config.scoring_mode ===
+                                      "proportional"
                                         ? "Proportional"
                                         : "All or Nothing"}
                                     </div>

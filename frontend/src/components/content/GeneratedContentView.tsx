@@ -126,7 +126,9 @@ export default function GeneratedContentView({
           </div>
           <div>
             <dt className="font-medium text-primary">Generated</dt>
-            <dd className="text-primary-dark">{formatDate(content.created_at)}</dd>
+            <dd className="text-primary-dark">
+              {formatDate(content.created_at)}
+            </dd>
           </div>
           <div>
             <dt className="font-medium text-primary">AI Model</dt>

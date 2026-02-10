@@ -174,13 +174,19 @@ export function MediaSession({
         style={{ backgroundColor: "#FFFFFF", borderColor: "var(--secondary)" }}
       >
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold" style={{ color: "var(--primary-dark)" }}>
+          <h1
+            className="text-lg font-semibold"
+            style={{ color: "var(--primary-dark)" }}
+          >
             EduVision Tutoring
           </h1>
           {sessionId && (
             <span
               className="text-sm px-3 py-1 rounded-full"
-              style={{ backgroundColor: "var(--secondary)", color: "var(--primary-dark)" }}
+              style={{
+                backgroundColor: "var(--secondary)",
+                color: "var(--primary-dark)",
+              }}
             >
               {role === "teacher" ? "Teacher" : "Student"}
             </span>
@@ -242,7 +248,9 @@ export function MediaSession({
       <div
         ref={videoContainerRef}
         className="flex-1 relative overflow-hidden"
-        style={isFullscreen ? { backgroundColor: "var(--background)" } : undefined}
+        style={
+          isFullscreen ? { backgroundColor: "var(--background)" } : undefined
+        }
       >
         {isAnyScreenSharing ? (
           /* Screen Share Layout: Full screen with minimized videos at top */

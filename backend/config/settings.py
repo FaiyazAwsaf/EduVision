@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.tutoring.apps.TutoringConfig", 
     "apps.evaluation.apps.EvaluationConfig",
     "apps.rubrics.apps.RubricsConfig",
+    "apps.students.apps.StudentsConfig",
 ]
 
 MIDDLEWARE = [

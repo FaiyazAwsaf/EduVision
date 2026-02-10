@@ -72,7 +72,10 @@ function VideoTile({
   const displayName = name || (isLocal ? "You" : "Waiting...");
 
   return (
-    <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg" style={{ backgroundColor: "var(--background)" }}>
+    <div
+      className="relative w-full h-full rounded-xl overflow-hidden shadow-lg"
+      style={{ backgroundColor: "var(--background)" }}
+    >
       {/* Video element */}
       <video
         ref={videoRef}
@@ -86,7 +89,10 @@ function VideoTile({
 
       {/* Placeholder when no video */}
       {!hasVideo && (
-        <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: "var(--primary-dark)" }}>
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{ backgroundColor: "var(--primary-dark)" }}
+        >
           <div className="flex flex-col items-center gap-3">
             {/* Avatar Circle */}
             <div
@@ -102,9 +108,17 @@ function VideoTile({
               )}
             </div>
             {/* Name */}
-            <span className="text-white text-lg font-medium">{displayName}</span>
+            <span className="text-white text-lg font-medium">
+              {displayName}
+            </span>
             {!isLocal && !isPeerConnected && (
-              <span className="text-sm px-3 py-1 rounded-full" style={{ backgroundColor: "var(--secondary)", color: "var(--primary-dark)" }}>
+              <span
+                className="text-sm px-3 py-1 rounded-full"
+                style={{
+                  backgroundColor: "var(--secondary)",
+                  color: "var(--primary-dark)",
+                }}
+              >
                 Waiting to join...
               </span>
             )}
@@ -113,15 +127,30 @@ function VideoTile({
       )}
 
       {/* Bottom Overlay with Name and Audio Status */}
-      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 flex items-center justify-between" style={{ background: "linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent)" }}>
+      <div
+        className="absolute bottom-0 left-0 right-0 px-4 py-3 flex items-center justify-between"
+        style={{
+          background:
+            "linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent)",
+        }}
+      >
         <div className="flex items-center gap-2">
           {isTeacher && (
-            <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: "var(--primary)", color: "#FFFFFF" }}>
+            <span
+              className="text-xs px-2 py-1 rounded font-medium"
+              style={{ backgroundColor: "var(--primary)", color: "#FFFFFF" }}
+            >
               {isLocal ? "You" : "Teacher"}
             </span>
           )}
           {!isTeacher && !isLocal && (
-            <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: "var(--secondary)", color: "var(--primary-dark)" }}>
+            <span
+              className="text-xs px-2 py-1 rounded font-medium"
+              style={{
+                backgroundColor: "var(--secondary)",
+                color: "var(--primary-dark)",
+              }}
+            >
               Student
             </span>
           )}
@@ -131,7 +160,9 @@ function VideoTile({
         </div>
 
         {/* Audio indicator */}
-        <div className={`p-1.5 rounded-full ${hasAudio ? "bg-white/20" : "bg-red-500"}`}>
+        <div
+          className={`p-1.5 rounded-full ${hasAudio ? "bg-white/20" : "bg-red-500"}`}
+        >
           {hasAudio ? (
             <Mic className="w-4 h-4 text-white" />
           ) : (

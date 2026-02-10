@@ -6,10 +6,7 @@
  */
 
 import { API_BASE_URL, parseApiError } from "@/api/client";
-import type {
-  RubricSet,
-  QuestionRubric,
-} from "@/types/rubrics";
+import type { RubricSet, QuestionRubric } from "@/types/rubrics";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -124,7 +121,10 @@ async function evaluationFetch<T>(
   });
 
   if (!response.ok) {
-    const message = await parseApiError(response, `API Error: ${response.status}`);
+    const message = await parseApiError(
+      response,
+      `API Error: ${response.status}`,
+    );
     throw new Error(message);
   }
 
@@ -145,7 +145,10 @@ export async function getRubricSets(filters?: {
   const url = `${API_BASE_URL}/rubrics/${query}`;
   const response = await fetch(url);
   if (!response.ok) {
-    const message = await parseApiError(response, "Failed to fetch rubric sets");
+    const message = await parseApiError(
+      response,
+      "Failed to fetch rubric sets",
+    );
     throw new Error(message);
   }
   return response.json();
@@ -205,7 +208,9 @@ export async function evaluateScript(scriptId: string): Promise<AnswerScript> {
   });
 }
 
-export async function getEvaluationReport(scriptId: string): Promise<EvaluationReport> {
+export async function getEvaluationReport(
+  scriptId: string,
+): Promise<EvaluationReport> {
   return evaluationFetch<EvaluationReport>(`/scripts/${scriptId}/report/`);
 }
 

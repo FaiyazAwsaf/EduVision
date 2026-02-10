@@ -7,10 +7,16 @@ interface MultiQuestionTesterProps {
   questions: QuestionRubric[];
 }
 
-export default function MultiQuestionTester({ questions }: MultiQuestionTesterProps) {
+export default function MultiQuestionTester({
+  questions,
+}: MultiQuestionTesterProps) {
   const [answers, setAnswers] = useState<Record<string | number, string>>({});
   const [testResults, setTestResults] = useState<QuestionResult[] | null>(null);
-  const [overallScore, setOverallScore] = useState<{ score: number; max: number; percentage: number } | null>(null);
+  const [overallScore, setOverallScore] = useState<{
+    score: number;
+    max: number;
+    percentage: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +76,8 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
           Test Sample Answers
         </h2>
         <p className="text-sm text-primary mb-6">
-          Enter sample answers for each question to see how your rubric set would evaluate them.
+          Enter sample answers for each question to see how your rubric set
+          would evaluate them.
         </p>
 
         {questions.length === 0 ? (
@@ -80,7 +87,10 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
         ) : (
           <div className="space-y-6">
             {questions.map((question) => (
-              <div key={question.question_number} className="border border-secondary rounded-lg p-4">
+              <div
+                key={question.question_number}
+                className="border border-secondary rounded-lg p-4"
+              >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <h3 className="font-semibold text-primary-dark">
@@ -145,10 +155,14 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
           <div
             className={`${getScoreBgColor(overallScore.percentage)} rounded-lg p-6 text-center`}
           >
-            <div className={`text-5xl font-bold ${getScoreColor(overallScore.percentage)} mb-2`}>
+            <div
+              className={`text-5xl font-bold ${getScoreColor(overallScore.percentage)} mb-2`}
+            >
               {overallScore.score.toFixed(2)} / {overallScore.max.toFixed(2)}
             </div>
-            <div className={`text-2xl font-semibold ${getScoreColor(overallScore.percentage)}`}>
+            <div
+              className={`text-2xl font-semibold ${getScoreColor(overallScore.percentage)}`}
+            >
               {overallScore.percentage.toFixed(1)}%
             </div>
           </div>
@@ -175,10 +189,14 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
                       Question {result.question_number}
                     </h3>
                     <div className="flex items-center gap-2">
-                      <span className={`text-lg font-bold ${getScoreColor(percentage)}`}>
+                      <span
+                        className={`text-lg font-bold ${getScoreColor(percentage)}`}
+                      >
                         {result.score.toFixed(2)} / {result.max_marks}
                       </span>
-                      <span className={`text-sm font-semibold ${getScoreColor(percentage)}`}>
+                      <span
+                        className={`text-sm font-semibold ${getScoreColor(percentage)}`}
+                      >
                         ({percentage.toFixed(1)}%)
                       </span>
                     </div>
@@ -186,29 +204,40 @@ export default function MultiQuestionTester({ questions }: MultiQuestionTesterPr
 
                   {result.rule_results && result.rule_results.length > 0 && (
                     <div className="space-y-2 mb-3">
-                      {result.rule_results.map((ruleResult: any, index: number) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between text-sm bg-background rounded px-3 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={ruleResult.matched ? "text-green-600" : "text-orange-600"}>
-                              {ruleResult.matched ? "✓" : "○"}
-                            </span>
-                            <span className="text-primary-dark font-medium">
-                              Rule {index + 1} ({ruleResult.rule_type})
+                      {result.rule_results.map(
+                        (ruleResult: any, index: number) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between text-sm bg-background rounded px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  ruleResult.matched
+                                    ? "text-green-600"
+                                    : "text-orange-600"
+                                }
+                              >
+                                {ruleResult.matched ? "✓" : "○"}
+                              </span>
+                              <span className="text-primary-dark font-medium">
+                                Rule {index + 1} ({ruleResult.rule_type})
+                              </span>
+                            </div>
+                            <span className="text-primary font-semibold">
+                              {ruleResult.score_awarded.toFixed(2)} /{" "}
+                              {ruleResult.max_marks}
                             </span>
                           </div>
-                          <span className="text-primary font-semibold">
-                            {ruleResult.score_awarded.toFixed(2)} / {ruleResult.max_marks}
-                          </span>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   )}
 
                   <div className="bg-background rounded-lg p-3">
-                    <p className="text-xs font-semibold text-primary-dark mb-1">Feedback:</p>
+                    <p className="text-xs font-semibold text-primary-dark mb-1">
+                      Feedback:
+                    </p>
                     <p className="text-sm text-primary whitespace-pre-wrap">
                       {result.feedback}
                     </p>

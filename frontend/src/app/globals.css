@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F2EFE7;
-  --foreground: #006A71;
-  --primary: #48A6A7;
-  --primary-dark: #006A71;
-  --secondary: #9ACBD0;
-  --surface: #FFFFFF;
-  --text-primary: #006A71;
-  --text-secondary: #48A6A7;
-  --text-muted: #6B7280;
-  --border: #9ACBD0;
-  --border-light: #E5E7EB;
+  --background: #f2efe7;
+  --foreground: #006a71;
+  --primary: #48a6a7;
+  --primary-dark: #006a71;
+  --secondary: #9acbd0;
+  --surface: #ffffff;
+  --text-primary: #006a71;
+  --text-secondary: #48a6a7;
+  --text-muted: #6b7280;
+  --border: #9acbd0;
+  --border-light: #e5e7eb;
 }
 
 @theme inline {
@@ -33,18 +33,25 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-family:
+    var(--font-sans),
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* Form element styling */
-input, select, textarea {
-  color: #006A71;
+input,
+select,
+textarea {
+  color: #006a71;
 }
 
-input::placeholder, textarea::placeholder {
-  color: #9ACBD0;
+input::placeholder,
+textarea::placeholder {
+  color: #9acbd0;
 }
 
 select option {
-  color: #006A71;
+  color: #006a71;
 }
