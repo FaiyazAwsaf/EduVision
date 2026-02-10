@@ -22,7 +22,7 @@ import {
   getScript,
   getEvaluationReport,
   deleteScript,
-  type RubricSet,
+  type RubricSetListItem,
   type AnswerScript,
   type EvaluationReport,
 } from "@/api/evaluation";
@@ -37,7 +37,7 @@ export default function EvaluationPage() {
   const router = useRouter();
   const { isReady, isAuthenticated, user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("upload");
-  const [rubricSets, setRubricSets] = useState<RubricSet[]>([]);
+  const [rubricSets, setRubricSets] = useState<RubricSetListItem[]>([]);
   const [scripts, setScripts] = useState<AnswerScript[]>([]);
   const [selectedReport, setSelectedReport] = useState<EvaluationReport | null>(
     null,

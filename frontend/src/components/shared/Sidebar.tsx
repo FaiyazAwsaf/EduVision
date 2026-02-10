@@ -137,7 +137,10 @@ export default function Sidebar({ role }: SidebarProps) {
         </button>
 
         {/* User pill */}
-        <div className="mt-3 flex items-center gap-3 bg-background rounded-xl px-3 py-3">
+        <Link
+          href={role === "student" ? "/student/profile" : "/teacher/profile"}
+          className="mt-3 flex items-center gap-3 bg-background rounded-xl px-3 py-3 hover:bg-primary/5 transition-colors cursor-pointer"
+        >
           <div className="w-9 h-9 rounded-full bg-primary-dark flex items-center justify-center text-white font-semibold text-sm shadow-sm">
             {initials}
           </div>
@@ -147,7 +150,7 @@ export default function Sidebar({ role }: SidebarProps) {
             </p>
             <p className="text-[11px] text-primary">{config.roleLabel}</p>
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );

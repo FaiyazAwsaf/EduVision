@@ -2,10 +2,14 @@
 
 import React, { useRef, useState } from "react";
 import { useScriptUpload } from "@/hooks/useScriptUpload";
-import { getRubricSets, uploadScript, type RubricSet } from "@/api/evaluation";
+import {
+  getRubricSets,
+  uploadScript,
+  type RubricSetListItem,
+} from "@/api/evaluation";
 
 interface ScriptUploadFormProps {
-  rubricSets: RubricSet[];
+  rubricSets: RubricSetListItem[];
   onUploadComplete: (scriptId: string) => void;
 }
 
@@ -106,8 +110,8 @@ export default function ScriptUploadForm({
             .map((rubricSet) => (
               <option key={rubricSet.id} value={rubricSet.id}>
                 {rubricSet.title} - {rubricSet.subject} (
-                {rubricSet.questions?.length || 0} questions,{" "}
-                {rubricSet.total_marks} marks)
+                {rubricSet.question_count} questions, {rubricSet.total_marks}{" "}
+                marks)
               </option>
             ))}
         </select>

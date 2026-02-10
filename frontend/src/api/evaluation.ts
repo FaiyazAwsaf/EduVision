@@ -2,11 +2,19 @@
  * Evaluation API Client
  *
  * Handles script upload, evaluation, and report retrieval.
- * Uses function exports for consistency with other API modules.
+ * Rubric fetching is delegated to the rubrics API module.
  */
 
 import { API_BASE_URL, parseApiError } from "@/api/client";
-import type { RubricSet, QuestionRubric } from "@/types/rubrics";
+import type {
+  RubricSet,
+  RubricSetListItem,
+  QuestionRubric,
+} from "@/types/rubrics";
+
+// Re-export rubric helpers so existing consumers keep working
+export { listRubricSets as getRubricSets, getRubricSet } from "@/api/rubrics";
+export type { RubricSet, RubricSetListItem, QuestionRubric };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -131,39 +139,6 @@ async function evaluationFetch<T>(
   return response.json();
 }
 
-// ─── Rubric Sets (from rubrics module) ───────────────────────────────────────
-
-export async function getRubricSets(filters?: {
-  state?: "draft" | "published" | "archived";
-  subject?: string;
-}): Promise<RubricSet[]> {
-  const params = new URLSearchParams();
-  if (filters?.state) params.set("state", filters.state);
-  if (filters?.subject) params.set("subject", filters.subject);
-
-  const query = params.toString() ? `?${params.toString()}` : "";
-  const url = `${API_BASE_URL}/rubrics/${query}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    const message = await parseApiError(
-      response,
-      "Failed to fetch rubric sets",
-    );
-    throw new Error(message);
-  }
-  return response.json();
-}
-
-export async function getRubricSet(id: string): Promise<RubricSet> {
-  const url = `${API_BASE_URL}/rubrics/${id}/`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    const message = await parseApiError(response, "Failed to fetch rubric set");
-    throw new Error(message);
-  }
-  return response.json();
-}
-
 // ─── Answer Scripts ──────────────────────────────────────────────────────────
 
 export async function getScripts(filters?: {
@@ -238,6 +213,3 @@ export async function overrideMarks(
     },
   );
 }
-
-// Re-export types from rubrics for backward compatibility
-export type { RubricSet, QuestionRubric };
