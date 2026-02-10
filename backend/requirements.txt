@@ -35,3 +35,5 @@ pytest-django==4.9.0
 pytest-cov==6.0.0
 requests==2.32.3  # For API testing
 
+
+opencv-python-headless
