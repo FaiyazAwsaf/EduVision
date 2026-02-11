@@ -9,7 +9,10 @@ Usage:
 import random
 from django.core.management.base import BaseCommand
 from apps.authentication.models import CustomUser
-from apps.students.models import Class, Section, TeacherProfile, StudentProfile
+from apps.students.models import (
+    Class, Section, TeacherProfile, StudentProfile,
+    Subject, TeacherSubjectAssignment,
+)
 
 
 # ─── Bangladeshi name pools ──────────────────────────────────────────────────
@@ -93,6 +96,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["flush"]:
             self.stdout.write("Flushing existing seed data …")
+            TeacherSubjectAssignment.objects.all().delete()
+            Subject.objects.all().delete()
             TeacherProfile.objects.all().delete()
             StudentProfile.objects.all().delete()
             Section.objects.all().delete()
@@ -101,14 +106,46 @@ class Command(BaseCommand):
             CustomUser.objects.filter(username__startswith="seed_").delete()
 
         self._create_classes_and_sections()
+        self._create_subjects()
         self._create_teachers()
         self._create_students()
+        self._create_teaching_assignments()
 
         self.stdout.write(self.style.SUCCESS("\n✓ Seeding complete!"))
-        self.stdout.write(f"  Classes  : {Class.objects.count()}")
-        self.stdout.write(f"  Sections : {Section.objects.count()}")
-        self.stdout.write(f"  Teachers : {TeacherProfile.objects.count()}")
-        self.stdout.write(f"  Students : {StudentProfile.objects.count()}")
+        self.stdout.write(f"  Classes     : {Class.objects.count()}")
+        self.stdout.write(f"  Sections    : {Section.objects.count()}")
+        self.stdout.write(f"  Subjects    : {Subject.objects.count()}")
+        self.stdout.write(f"  Teachers    : {TeacherProfile.objects.count()}")
+        self.stdout.write(f"  Students    : {StudentProfile.objects.count()}")
+        self.stdout.write(f"  Assignments : {TeacherSubjectAssignment.objects.count()}")
+
+    # ── Subjects ──────────────────────────────────────────────────────────
+
+    SUBJECTS = [
+        ("Mathematics", "MATH"),
+        ("Physics", "PHY"),
+        ("Chemistry", "CHEM"),
+        ("Biology", "BIO"),
+        ("English", "ENG"),
+        ("Bengali", "BAN"),
+        ("ICT", "ICT"),
+        ("History", "HIST"),
+        ("Geography", "GEO"),
+        ("Islamic Studies", "IS"),
+        ("Accounting", "ACC"),
+        ("Business Studies", "BUS"),
+    ]
+
+    def _create_subjects(self):
+        self.stdout.write("Creating subjects …")
+        for name, code in self.SUBJECTS:
+            obj, created = Subject.objects.get_or_create(
+                code=code,
+                defaults={"name": name},
+            )
+            if created:
+                self.stdout.write(f"  + {obj}")
+        self.stdout.write(f"  {Subject.objects.count()} subjects total")
 
     # ── Classes & Sections ────────────────────────────────────────────────
 
@@ -268,3 +305,42 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(f"  Created {student_count} students total")
+
+    # ── Teaching Assignments ──────────────────────────────────────────────
+
+    def _create_teaching_assignments(self):
+        """
+        Assign each seed teacher to 2-3 sections for the subject matching
+        their department.  This populates TeacherSubjectAssignment.
+        """
+        self.stdout.write("Creating teaching assignments …")
+
+        # Map department name → Subject
+        subject_map = {s.name: s for s in Subject.objects.all()}
+
+        teachers = TeacherProfile.objects.filter(
+            user__username__startswith="seed_teacher_"
+        ).select_related("user")
+
+        sections = list(Section.objects.select_related("class_ref").all())
+        assignment_count = 0
+
+        for tp in teachers:
+            subject = subject_map.get(tp.department)
+            if not subject:
+                continue
+
+            # Pick 2-3 random sections for this teacher
+            num = min(random.randint(2, 3), len(sections))
+            chosen = random.sample(sections, num)
+
+            for sec in chosen:
+                _, created = TeacherSubjectAssignment.objects.get_or_create(
+                    teacher=tp.user,
+                    subject=subject,
+                    section=sec,
+                )
+                if created:
+                    assignment_count += 1
+
+        self.stdout.write(f"  Created {assignment_count} teaching assignments")

@@ -21,6 +21,7 @@ export default function ScriptUploadForm({
   const [selectedRubricSet, setSelectedRubricSet] = useState<string>("");
   const [studentName, setStudentName] = useState<string>("");
   const [studentId, setStudentId] = useState<string>("");
+  const [rollNumber, setRollNumber] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -52,11 +53,6 @@ export default function ScriptUploadForm({
     e.preventDefault();
     setErrors([]);
 
-    if (!selectedRubricSet) {
-      setErrors(["Please select a rubric set"]);
-      return;
-    }
-
     if (files.length === 0) {
       setErrors(["Please upload at least one page"]);
       return;
@@ -66,15 +62,17 @@ export default function ScriptUploadForm({
 
     try {
       const script = await uploadScript({
-        rubric_set: selectedRubricSet,
+        rubric_set: selectedRubricSet || undefined,
         student_name: studentName || undefined,
         student_id: studentId || undefined,
+        roll_number: rollNumber || undefined,
         pages: files,
       });
 
       clearFiles();
       setStudentName("");
       setStudentId("");
+      setRollNumber("");
       onUploadComplete(script.id);
     } catch (error) {
       setErrors([
@@ -95,14 +93,13 @@ export default function ScriptUploadForm({
           htmlFor="rubricSet"
           className="block text-sm font-medium text-secondary mb-2"
         >
-          Rubric Set (Question Paper) *
+          Rubric Set (Question Paper)
         </label>
         <select
           id="rubricSet"
           value={selectedRubricSet}
           onChange={(e) => setSelectedRubricSet(e.target.value)}
           className="w-full px-4 py-3  border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
-          required
         >
           <option value="">Select a rubric set...</option>
           {rubricSets
@@ -118,7 +115,26 @@ export default function ScriptUploadForm({
       </div>
 
       {/* Student Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label
+            htmlFor="rollNumber"
+            className="block text-sm font-medium text-secondary mb-2"
+          >
+            Roll Number
+          </label>
+          <input
+            type="text"
+            id="rollNumber"
+            value={rollNumber}
+            onChange={(e) => setRollNumber(e.target.value)}
+            placeholder="e.g. 9A-001"
+            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
+          <p className="text-xs text-secondary mt-1">
+            Auto-links to student profile
+          </p>
+        </div>
         <div>
           <label
             htmlFor="studentName"
@@ -276,7 +292,7 @@ export default function ScriptUploadForm({
         </button>
         <button
           type="submit"
-          disabled={isUploading || files.length === 0 || !selectedRubricSet}
+          disabled={isUploading || files.length === 0}
           className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {isUploading ? (

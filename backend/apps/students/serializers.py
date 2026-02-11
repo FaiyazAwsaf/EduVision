@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Class, Section, TeacherProfile, StudentProfile
+from .models import (
+    Class, Section, TeacherProfile, StudentProfile,
+    Subject, TeacherSubjectAssignment,
+)
 
 
 # ─── Class / Section ─────────────────────────────────────────────────────────
@@ -141,3 +144,66 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["user_id", "created_at", "updated_at"]
+
+
+# ─── Subject & Teaching Assignments ──────────────────────────────────────────
+
+
+class SubjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subject
+        fields = ["id", "name", "code", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class TeacherSubjectAssignmentSerializer(serializers.ModelSerializer):
+    """Full detail serializer with nested subject/section info."""
+
+    subject_detail = SubjectSerializer(source="subject", read_only=True)
+    section_detail = SectionBriefSerializer(source="section", read_only=True)
+    teacher_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeacherSubjectAssignment
+        fields = [
+            "id",
+            "teacher",
+            "subject",
+            "section",
+            "subject_detail",
+            "section_detail",
+            "teacher_name",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def get_teacher_name(self, obj):
+        return f"{obj.teacher.first_name} {obj.teacher.last_name}"
+
+
+class MyTeachingAssignmentSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for the logged-in teacher's own assignments."""
+
+    subject_name = serializers.CharField(source="subject.name", read_only=True)
+    subject_code = serializers.CharField(source="subject.code", read_only=True)
+    section_name = serializers.CharField(source="section.name", read_only=True)
+    class_name = serializers.CharField(source="section.class_ref.name", read_only=True)
+    stream = serializers.CharField(source="section.class_ref.stream", read_only=True)
+    academic_year = serializers.CharField(
+        source="section.class_ref.academic_year", read_only=True
+    )
+
+    class Meta:
+        model = TeacherSubjectAssignment
+        fields = [
+            "id",
+            "subject",
+            "subject_name",
+            "subject_code",
+            "section",
+            "section_name",
+            "class_name",
+            "stream",
+            "academic_year",
+            "created_at",
+        ]

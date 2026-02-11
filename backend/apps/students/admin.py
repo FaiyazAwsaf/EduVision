@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Class, Section, TeacherProfile, StudentProfile
+from .models import (
+    Class, Section, TeacherProfile, StudentProfile,
+    Subject, TeacherSubjectAssignment,
+)
 
 
 # ─── Class ────────────────────────────────────────────────────────────────────
@@ -89,3 +92,26 @@ class StudentProfileAdmin(admin.ModelAdmin):
     @admin.display(description="Section")
     def get_section(self, obj):
         return obj.section.name if obj.section else "-"
+
+
+# ─── Subject ─────────────────────────────────────────────────────────────────
+
+
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "created_at")
+    search_fields = ("name", "code")
+
+
+# ─── Teaching Assignments ────────────────────────────────────────────────────
+
+
+@admin.register(TeacherSubjectAssignment)
+class TeacherSubjectAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "teacher", "subject", "section", "created_at")
+    list_filter = ("subject", "section__class_ref__name")
+    search_fields = (
+        "teacher__first_name",
+        "teacher__last_name",
+        "subject__name",
+    )

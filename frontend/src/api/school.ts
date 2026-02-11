@@ -175,3 +175,58 @@ export async function getMyStudentDetail(
 ): Promise<StudentProfile> {
   return schoolFetch<StudentProfile>(`/my-students/${userId}/`);
 }
+
+// ─── Teaching Assignments ───────────────────────────────────────────────────
+
+export interface TeachingAssignment {
+  id: string;
+  subject: string;
+  subject_name: string;
+  subject_code: string;
+  section: number;
+  section_name: string;
+  class_name: string;
+  stream: string;
+  academic_year: string;
+  created_at: string;
+}
+
+/** Get the logged-in teacher's teaching assignments (subject + section combos). */
+export async function getMyTeachingAssignments(): Promise<
+  TeachingAssignment[]
+> {
+  return schoolFetch<TeachingAssignment[]>("/my-assignments/");
+}
+
+// ─── Teacher Profile (self) ─────────────────────────────────────────────────
+
+export async function getMyTeacherProfile(): Promise<TeacherProfile> {
+  // Fetch the current user's teacher profile
+  // This uses the authenticated user's ID which we get from the JWT
+  const { getCurrentUser } = await import("@/api/auth");
+  const user = getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  return schoolFetch<TeacherProfile>(`/teachers/${user.id}/`);
+}
+
+// ─── Insights / Analytics ───────────────────────────────────────────────────
+
+export interface SchoolInsights {
+  total_students: number;
+  content_summary: {
+    total: number;
+    completed: number;
+    success_rate: number;
+    by_type: { content_type: string; count: number }[];
+  };
+  tutoring_summary: {
+    total_sessions: number;
+    avg_duration_seconds: number;
+    sessions_by_day: { date: string; count: number }[];
+  };
+}
+
+/** Fetch school-level insights (student count, content, tutoring) for the teacher. */
+export async function getSchoolInsights(): Promise<SchoolInsights> {
+  return schoolFetch<SchoolInsights>("/insights/");
+}

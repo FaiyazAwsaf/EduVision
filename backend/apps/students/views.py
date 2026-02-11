@@ -1,17 +1,25 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Avg, F, ExpressionWrapper, DurationField
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from apps.authentication.models import CustomUser
 from apps.authentication.backends import CustomUserJWTAuthentication
-from .models import Class, Section, TeacherProfile, StudentProfile
+from .models import (
+    Class, Section, TeacherProfile, StudentProfile,
+    Subject, TeacherSubjectAssignment,
+)
 from .serializers import (
     ClassSerializer,
     SectionSerializer,
     TeacherProfileSerializer,
     StudentProfileSerializer,
     MyClassSerializer,
+    SubjectSerializer,
+    TeacherSubjectAssignmentSerializer,
+    MyTeachingAssignmentSerializer,
 )
 
 
@@ -239,6 +247,85 @@ class StudentProfileListView(generics.ListAPIView):
         return qs
 
 
+# ─── Subject & Assignment views ──────────────────────────────────────────────
+
+
+class SubjectListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /api/school/subjects/   → list all subjects
+    POST /api/school/subjects/   → create a new subject (admin)
+    """
+
+    serializer_class = SubjectSerializer
+    queryset = Subject.objects.all()
+    pagination_class = None
+
+
+class SubjectDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET / PUT / PATCH / DELETE  /api/school/subjects/<uuid:pk>/
+    """
+
+    serializer_class = SubjectSerializer
+    queryset = Subject.objects.all()
+
+
+class TeacherSubjectAssignmentListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /api/school/assignments/   → list all assignments (admin)
+    POST /api/school/assignments/   → create assignment (admin)
+    """
+
+    serializer_class = TeacherSubjectAssignmentSerializer
+
+    def get_queryset(self):
+        qs = TeacherSubjectAssignment.objects.select_related(
+            "teacher", "subject", "section__class_ref"
+        ).all()
+
+        teacher_id = self.request.query_params.get("teacher")
+        if teacher_id:
+            qs = qs.filter(teacher_id=teacher_id)
+
+        subject_id = self.request.query_params.get("subject")
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+
+        section_id = self.request.query_params.get("section")
+        if section_id:
+            qs = qs.filter(section_id=section_id)
+
+        return qs
+
+
+class TeacherSubjectAssignmentDetailView(generics.RetrieveDestroyAPIView):
+    """
+    GET / DELETE  /api/school/assignments/<uuid:pk>/
+    """
+
+    serializer_class = TeacherSubjectAssignmentSerializer
+    queryset = TeacherSubjectAssignment.objects.select_related(
+        "teacher", "subject", "section__class_ref"
+    )
+
+
+class MyTeachingAssignmentsView(generics.ListAPIView):
+    """
+    GET /api/school/my-assignments/
+    Returns the logged-in teacher's subject + section combos.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = MyTeachingAssignmentSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return TeacherSubjectAssignment.objects.filter(
+            teacher=self.request.user
+        ).select_related("subject", "section__class_ref")
+
+
 # ─── Class-teacher-scoped views ──────────────────────────────────────────────
 
 
@@ -332,3 +419,92 @@ class MyStudentDetailView(generics.RetrieveAPIView):
         return StudentProfile.objects.filter(
             section=section
         ).select_related("user", "section__class_ref")
+
+
+# ─── School Insights (Teacher) ──────────────────────────────────────────────
+
+
+class SchoolInsightsView(APIView):
+    """
+    GET /api/school/insights/
+    Returns student count, content generation summary, and tutoring activity
+    scoped to the logged-in teacher.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        now = timezone.now()
+
+        # Total students across teacher's assigned sections
+        teacher_sections = TeacherSubjectAssignment.objects.filter(
+            teacher=user
+        ).values_list("section_id", flat=True)
+
+        total_students = StudentProfile.objects.filter(
+            section_id__in=teacher_sections
+        ).distinct().count()
+
+        # ── Content Generation Summary ───────────────────────────────────
+        from apps.content_requests.models import ContentRequestModel
+
+        teacher_content = ContentRequestModel.objects.filter(created_by=user)
+        total_content = teacher_content.count()
+        completed_content = teacher_content.filter(status="completed").count()
+
+        content_by_type = list(
+            teacher_content.values("content_type")
+            .annotate(count=Count("id"))
+            .order_by("-count")
+        )
+
+        # ── Tutoring Summary ─────────────────────────────────────────────
+        from apps.tutoring.models import TutoringSession
+
+        teacher_sessions = TutoringSession.objects.filter(teacher=user)
+        total_sessions = teacher_sessions.count()
+        ended_sessions = teacher_sessions.filter(ended_at__isnull=False)
+
+        # Average duration for ended sessions
+        avg_duration_seconds = 0
+        if ended_sessions.exists():
+            durations = []
+            for s in ended_sessions:
+                delta = s.ended_at - s.created_at
+                durations.append(delta.total_seconds())
+            avg_duration_seconds = round(sum(durations) / len(durations)) if durations else 0
+
+        # Sessions per day over last 14 days
+        fourteen_days_ago = now - timedelta(days=14)
+        sessions_by_day = []
+        for day_offset in range(13, -1, -1):
+            day_start = (now - timedelta(days=day_offset)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            day_end = day_start + timedelta(days=1)
+            cnt = teacher_sessions.filter(
+                created_at__gte=day_start, created_at__lt=day_end
+            ).count()
+            sessions_by_day.append({
+                "date": day_start.strftime("%b %d"),
+                "count": cnt,
+            })
+
+        return Response({
+            "total_students": total_students,
+            "content_summary": {
+                "total": total_content,
+                "completed": completed_content,
+                "success_rate": round(
+                    (completed_content / total_content * 100) if total_content > 0 else 0, 1
+                ),
+                "by_type": content_by_type,
+            },
+            "tutoring_summary": {
+                "total_sessions": total_sessions,
+                "avg_duration_seconds": avg_duration_seconds,
+                "sessions_by_day": sessions_by_day,
+            },
+        })

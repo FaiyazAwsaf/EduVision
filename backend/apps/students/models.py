@@ -195,3 +195,68 @@ class StudentProfile(models.Model):
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} ({self.roll_number})"
 
+
+# ─── Subjects & Teaching Assignments ────────────────────────────────────────
+
+
+class Subject(models.Model):
+    """A subject taught in the institution (e.g. ICT, Mathematics)."""
+
+    id = models.UUIDField(primary_key=True, default=None, editable=False)
+    name = models.CharField(max_length=100, help_text="e.g. 'ICT', 'Mathematics'")
+    code = models.CharField(max_length=20, unique=True, help_text="e.g. 'ICT', 'MATH'")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "subjects"
+        ordering = ["name"]
+
+    def save(self, *args, **kwargs):
+        if self.id is None:
+            import uuid
+            self.id = uuid.uuid4()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class TeacherSubjectAssignment(models.Model):
+    """
+    Which teacher teaches which subject to which section.
+    This is the authorization source of truth for evaluation scoping.
+    """
+
+    id = models.UUIDField(primary_key=True, default=None, editable=False)
+    teacher = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="teaching_assignments",
+        limit_choices_to={"role": "teacher"},
+    )
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name="assignments",
+    )
+    section = models.ForeignKey(
+        Section,
+        on_delete=models.CASCADE,
+        related_name="subject_assignments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "teacher_subject_assignments"
+        unique_together = ("teacher", "subject", "section")
+        ordering = ["subject__name", "section__class_ref__name"]
+
+    def save(self, *args, **kwargs):
+        if self.id is None:
+            import uuid
+            self.id = uuid.uuid4()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.teacher.first_name} teaches {self.subject.name} to {self.section}"
+

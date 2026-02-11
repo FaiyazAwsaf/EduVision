@@ -80,7 +80,7 @@ const studentNavItems: NavEntry[] = [
     ],
   },
   { label: "Tutoring", href: "/student/tutoring", icon: MessageSquare },
-  { label: "Scripts", href: "/evaluation", icon: ScrollText },
+  { label: "Scripts", href: "/student/scripts", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
 ];
 

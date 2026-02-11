@@ -10,9 +10,15 @@ from .views import (
     StudentProfileCreateView,
     StudentProfileDetailView,
     StudentProfileListView,
+    SubjectListCreateView,
+    SubjectDetailView,
+    TeacherSubjectAssignmentListCreateView,
+    TeacherSubjectAssignmentDetailView,
+    MyTeachingAssignmentsView,
     MyClassView,
     MyStudentsListView,
     MyStudentDetailView,
+    SchoolInsightsView,
 )
 
 app_name = "students"
@@ -40,6 +46,13 @@ urlpatterns = [
         StudentProfileDetailView.as_view(),
         name="student-detail",
     ),
+    # ── Subjects ──────────────────────────────────────────────────────────────
+    path("subjects/", SubjectListCreateView.as_view(), name="subject-list"),
+    path("subjects/<uuid:pk>/", SubjectDetailView.as_view(), name="subject-detail"),
+    # ── Teaching Assignments ──────────────────────────────────────────────────
+    path("assignments/", TeacherSubjectAssignmentListCreateView.as_view(), name="assignment-list"),
+    path("assignments/<uuid:pk>/", TeacherSubjectAssignmentDetailView.as_view(), name="assignment-detail"),
+    path("my-assignments/", MyTeachingAssignmentsView.as_view(), name="my-assignments"),
     # ── Class-teacher-scoped ─────────────────────────────────────────────────
     path("my-class/", MyClassView.as_view(), name="my-class"),
     path("my-students/", MyStudentsListView.as_view(), name="my-students-list"),
@@ -48,4 +61,6 @@ urlpatterns = [
         MyStudentDetailView.as_view(),
         name="my-student-detail",
     ),
+    # ── Insights / Analytics ──────────────────────────────────────────────
+    path("insights/", SchoolInsightsView.as_view(), name="school-insights"),
 ]
