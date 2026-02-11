@@ -327,7 +327,7 @@ function clearTeacherSession() {
 // Main page component
 export default function TeacherDashboardPage() {
   const router = useRouter();
-  const { user: authUser } = useAuth();
+  const { user: authUser, isReady, isAuthenticated } = useAuth();
   const [user, setUser] = useState<TutoringUser | null>(null);
   const [sessionData, setSessionData] = useState<SessionCreateResponse | null>(
     null,
@@ -335,6 +335,13 @@ export default function TeacherDashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
+
+  // Role guard: only teachers can access
+  useEffect(() => {
+    if (isReady && (!isAuthenticated || authUser?.role !== "teacher")) {
+      router.replace(authUser?.role === "student" ? "/student/dashboard" : "/signin");
+    }
+  }, [isReady, isAuthenticated, authUser, router]);
 
   // Restore session from sessionStorage on mount.
   // If no session data exists, redirect back to dashboard — this page

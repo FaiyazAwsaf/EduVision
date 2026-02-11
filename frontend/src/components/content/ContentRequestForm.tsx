@@ -29,11 +29,31 @@ import {
 
 interface ContentRequestFormProps {
   onSuccess: (requestId: string) => void;
+  userRole?: "student" | "teacher";
 }
+
+const STUDENT_CONTENT_TYPES = [
+  { value: ContentType.SUMMARY, label: "Summary" },
+  { value: ContentType.WORKED_EXAMPLES, label: "Worked Examples" },
+  { value: ContentType.FORMULA_SHEET, label: "Formula Sheet" },
+];
+
+const TEACHER_CONTENT_TYPES = [
+  { value: ContentType.SUMMARY, label: "Summary" },
+  { value: ContentType.WORKED_EXAMPLES, label: "Worked Examples" },
+  { value: ContentType.FORMULA_SHEET, label: "Formula Sheet" },
+  { value: ContentType.LESSON_PLAN, label: "Lesson Plan" },
+  { value: ContentType.QUIZ_GENERATOR, label: "Quiz Generator" },
+  { value: ContentType.WORKSHEET_BUILDER, label: "Worksheet Builder" },
+  { value: ContentType.TOPIC_EXPLANATION, label: "Topic Explanation" },
+];
 
 export default function ContentRequestForm({
   onSuccess,
+  userRole = "student",
 }: ContentRequestFormProps) {
+  const contentTypes =
+    userRole === "teacher" ? TEACHER_CONTENT_TYPES : STUDENT_CONTENT_TYPES;
   const [formData, setFormData] = useState<CreateContentRequestPayload>({
     topic: "",
     content_type: ContentType.SUMMARY,
@@ -82,11 +102,13 @@ export default function ContentRequestForm({
       if (learningContext) {
         try {
           await submitLearningContext(response.id, learningContext);
-          console.log("[Phase 4] Learning context submitted for personalization");
+          console.log(
+            "[Phase 4] Learning context submitted for personalization",
+          );
         } catch (contextError) {
           console.warn(
             "[Phase 4] Failed to submit learning context:",
-            contextError
+            contextError,
           );
           // Don't fail the entire request if context submission fails
           // The request will still be processed with default generation
@@ -163,7 +185,43 @@ export default function ContentRequestForm({
           <option value={ContentType.SUMMARY}>Summary</option>
           <option value={ContentType.WORKED_EXAMPLES}>Worked Examples</option>
           <option value={ContentType.FORMULA_SHEET}>Formula Sheet</option>
+          {userRole === "teacher" && (
+            <>
+              <option value={ContentType.LESSON_PLAN}>Lesson Plan</option>
+              <option value={ContentType.QUIZ_GENERATOR}>Quiz Generator</option>
+              <option value={ContentType.WORKSHEET_BUILDER}>
+                Worksheet Builder
+              </option>
+              <option value={ContentType.TOPIC_EXPLANATION}>
+                Topic Explanation
+              </option>
+            </>
+          )}
         </select>
+      </div>
+
+      {/* Subject (optional, useful for teachers) */}
+      <div>
+        <label
+          htmlFor="subject"
+          className="block text-sm font-medium text-primary-dark"
+        >
+          Subject
+        </label>
+        <input
+          type="text"
+          id="subject"
+          value={formData.subject || ""}
+          onChange={(e) =>
+            setFormData({ ...formData, subject: e.target.value })
+          }
+          placeholder="e.g., Mathematics, Physics"
+          disabled={isSubmitting}
+          className="mt-1 block w-full rounded-md border border-secondary px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-100 disabled:text-gray-500 placeholder:text-secondary"
+        />
+        <p className="mt-1 text-sm text-primary">
+          Academic subject for this content
+        </p>
       </div>
 
       {/* Style */}

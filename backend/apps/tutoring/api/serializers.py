@@ -50,7 +50,7 @@ class SessionStatusSerializer(serializers.ModelSerializer):
     
     teacher_id = serializers.UUIDField(source='teacher.id')
     teacher_name = serializers.SerializerMethodField()
-    student_id = serializers.UUIDField(source='student.id', allow_null=True)
+    student_id = serializers.SerializerMethodField()
     student_name = serializers.SerializerMethodField()
     
     class Meta:
@@ -70,6 +70,10 @@ class SessionStatusSerializer(serializers.ModelSerializer):
     def get_teacher_name(self, obj):
         """Get teacher's full name from first_name and last_name."""
         return f"{obj.teacher.first_name} {obj.teacher.last_name}"
+    
+    def get_student_id(self, obj):
+        """Get student UUID, or None if no student."""
+        return str(obj.student.id) if obj.student else None
     
     def get_student_name(self, obj):
         """Get student's full name from first_name and last_name."""
@@ -84,7 +88,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
     student_name = serializers.SerializerMethodField()
     teacher_id = serializers.UUIDField(source='teacher.id')
-    student_id = serializers.UUIDField(source='student.id', allow_null=True)
+    student_id = serializers.SerializerMethodField()
     
     class Meta:
         model = TutoringSession
@@ -103,6 +107,10 @@ class SessionListSerializer(serializers.ModelSerializer):
     def get_teacher_name(self, obj):
         """Get teacher's full name from first_name and last_name."""
         return f"{obj.teacher.first_name} {obj.teacher.last_name}"
+    
+    def get_student_id(self, obj):
+        """Get student UUID, or None if no student."""
+        return str(obj.student.id) if obj.student else None
     
     def get_student_name(self, obj):
         """Get student's full name from first_name and last_name."""

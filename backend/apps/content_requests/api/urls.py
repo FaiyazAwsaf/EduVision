@@ -32,6 +32,7 @@ from .views import (
     ContentRequestListCreateView,
     ContentRequestDetailView,
     GeneratedContentView,
+    RegenerateContentView,
     download_generated_content_view
 )
 from .views_feedback import FeedbackView
@@ -67,6 +68,13 @@ urlpatterns = [
         '<str:request_id>/content/download/',
         download_generated_content_view,
         name='download-content'
+    ),
+    
+    # Regenerate content from an existing request
+    path(
+        '<str:request_id>/regenerate/',
+        RegenerateContentView.as_view(),
+        name='regenerate-content'
     ),
     
     # Learning context endpoints (Phase 4)

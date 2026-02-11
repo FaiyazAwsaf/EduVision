@@ -28,11 +28,11 @@ export default function StudentProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Auth guard
+  // Auth + role guard
   useEffect(() => {
     if (!isReady) return;
     if (!isAuthenticated || !user || user.role !== "student") {
-      router.replace("/signin");
+      router.replace(user?.role === "teacher" ? "/teacher/dashboard" : "/signin");
     }
   }, [isReady, isAuthenticated, user, router]);
 

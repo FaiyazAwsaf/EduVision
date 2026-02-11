@@ -28,6 +28,16 @@ class CustomUser(models.Model):
         hashed = check_password(password_raw, self.password_hash)
         return hashed
     
+    @property
+    def is_authenticated(self):
+        """Required by DRF's IsAuthenticated permission."""
+        return True
+    
+    @property
+    def is_anonymous(self):
+        """Required by Django's auth framework."""
+        return False
+    
     class Meta:
         db_table = "authentication_user"
 

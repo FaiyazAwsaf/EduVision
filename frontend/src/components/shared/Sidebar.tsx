@@ -16,6 +16,7 @@ import {
   Settings,
   BookOpen,
   LogOut,
+  History,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -34,6 +35,7 @@ const teacherNavItems: NavItem[] = [
   { label: "Students", href: "/teacher/students", icon: Users },
   { label: "Script Engine", href: "/evaluation", icon: ScrollText },
   { label: "Content Generation", href: "/content", icon: FileText },
+  { label: "Content History", href: "/content/history", icon: History },
   { label: "Rubrics", href: "/rubrics", icon: ClipboardCheck },
   { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
 ];
@@ -41,6 +43,7 @@ const teacherNavItems: NavItem[] = [
 const studentNavItems: NavItem[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
   { label: "Content Request", href: "/content", icon: FileText },
+  { label: "My Content", href: "/content/history", icon: History },
   { label: "Tutoring", href: "/student/tutoring", icon: MessageSquare },
   { label: "Scripts", href: "/evaluation", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },

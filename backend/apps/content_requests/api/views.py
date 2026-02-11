@@ -26,6 +26,8 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer, BaseRenderer
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes as perm_classes_decorator
 from django.http import Http404, HttpResponse
 
 class BinaryFileRenderer(BaseRenderer):
@@ -66,6 +68,7 @@ class ContentRequestListCreateView(APIView):
     GET /api/content-requests
         List all content requests (with optional filtering)
     """
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
         """
@@ -100,7 +103,10 @@ class ContentRequestListCreateView(APIView):
         
         try:
             service = get_content_request_service()
-            content_request = service.create_request(**serializer.validated_data)
+            content_request = service.create_request(
+                **serializer.validated_data,
+                user=request.user
+            )
             
             # Get the model instance from repository using the domain entity's ID
             model_instance = ContentRequestModel.objects.get(id=content_request.id)
@@ -138,6 +144,11 @@ class ContentRequestListCreateView(APIView):
         
         Query parameters:
             - status: Filter by status (optional)
+            - content_type: Filter by content type (optional)
+            - subject: Filter by subject (optional, case-insensitive contains)
+            - search: Search in topic (optional, case-insensitive contains)
+            - created_after: Filter by creation date >= (ISO format, optional)
+            - created_before: Filter by creation date <= (ISO format, optional)
             - limit: Max results (default: 100, max: 1000)
             - offset: Pagination offset (default: 0)
         
@@ -149,15 +160,23 @@ class ContentRequestListCreateView(APIView):
         try:
             # Get query parameters
             status_filter = request.query_params.get('status')
+            content_type_filter = request.query_params.get('content_type')
+            subject_filter = request.query_params.get('subject')
+            search_filter = request.query_params.get('search')
+            created_after = request.query_params.get('created_after')
+            created_before = request.query_params.get('created_before')
             limit = min(int(request.query_params.get('limit', 100)), 1000)
             offset = int(request.query_params.get('offset', 0))
             
-            # Validate status if provided
+            # Build queryset with user ownership filter
+            qs = ContentRequestModel.objects.filter(created_by=request.user).order_by('-created_at')
+            
+            # Apply optional filters
             if status_filter:
                 from ..domain.enums import RequestStatus
                 try:
-                    # Accept both uppercase and lowercase
                     status_enum = RequestStatus(status_filter.upper())
+                    qs = qs.filter(status=status_enum.value)
                 except ValueError:
                     return Response(
                         {
@@ -166,24 +185,40 @@ class ContentRequestListCreateView(APIView):
                         },
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                
-                service = get_content_request_service()
-                requests = service.list_requests(
-                    status=status_enum,
-                    limit=limit,
-                    offset=offset
-                )
-            else:
-                service = get_content_request_service()
-                requests = service.list_requests(limit=limit, offset=offset)
             
-            serializer = ContentRequestListSerializer(requests, many=True)
+            if content_type_filter:
+                qs = qs.filter(content_type=content_type_filter.upper())
             
-            logger.debug(f"Listed {len(requests)} content requests")
+            if subject_filter:
+                qs = qs.filter(subject__icontains=subject_filter)
+            
+            if search_filter:
+                qs = qs.filter(topic__icontains=search_filter)
+            
+            if created_after:
+                from django.utils.dateparse import parse_datetime
+                dt = parse_datetime(created_after)
+                if dt:
+                    qs = qs.filter(created_at__gte=dt)
+            
+            if created_before:
+                from django.utils.dateparse import parse_datetime as parse_dt
+                dt = parse_dt(created_before)
+                if dt:
+                    qs = qs.filter(created_at__lte=dt)
+            
+            # Paginate
+            total = qs.count()
+            models = qs[offset:offset + limit]
+            
+            serializer = ContentRequestListSerializer(models, many=True)
+            
+            logger.debug(f"Listed {len(serializer.data)} content requests")
             return Response(
                 {
                     'results': serializer.data,
-                    'count': len(serializer.data)
+                    'count': len(serializer.data),
+                    'total': total,
                 },
                 status=status.HTTP_200_OK
             )
@@ -215,6 +250,7 @@ class ContentRequestDetailView(APIView):
     GET /api/content-requests/{id}
         Retrieve full details of a content request
     """
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, request_id):
         """
@@ -256,7 +292,15 @@ class ContentRequestDetailView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            serializer = ContentRequestResponseSerializer(content_request)
+            # Verify ownership
+            model_instance = ContentRequestModel.objects.get(id=uuid_obj)
+            if model_instance.created_by_id and model_instance.created_by_id != request.user.id:
+                return Response(
+                    {'error': 'Not found', 'detail': f'Content request {request_id} does not exist'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            serializer = ContentRequestResponseSerializer(model_instance)
             
             logger.debug(f"Retrieved content request {request_id}")
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -284,6 +328,7 @@ class GeneratedContentView(APIView):
         Retrieve generated content for a request
     """
     
+    permission_classes = [IsAuthenticated]
     renderer_classes = [JSONRenderer, BinaryFileRenderer]
     
     def get(self, request, request_id):
@@ -322,6 +367,14 @@ class GeneratedContentView(APIView):
                         'error': 'Content request not found',
                         'detail': f'Content request {request_id} does not exist'
                     },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Verify ownership
+            model_instance = ContentRequestModel.objects.get(id=uuid_obj)
+            if model_instance.created_by_id and model_instance.created_by_id != request.user.id:
+                return Response(
+                    {'error': 'Not found', 'detail': f'Content request {request_id} does not exist'},
                     status=status.HTTP_404_NOT_FOUND
                 )
             
@@ -440,10 +493,11 @@ class GeneratedContentView(APIView):
             )
 
 
+@api_view(['GET'])
+@perm_classes_decorator([IsAuthenticated])
 def download_generated_content_view(request, request_id):
     """
-    Plain Django view for downloading formatted content (PDF/Worksheet).
-    Bypasses DRF to handle binary file downloads properly.
+    Authenticated view for downloading formatted content (PDF/Worksheet).
     """
     try:
         # Validate UUID
@@ -519,8 +573,60 @@ def download_generated_content_view(request, request_id):
         )
 
 
-# Phase 3+ views will be added here when additional features are implemented
-# Examples:
-# - ContentGenerationStatusView: for polling generation status
-# - FeedbackSubmissionView: for submitting user feedback
-# - RequestStatisticsView: for analytics and monitoring
+class RegenerateContentView(APIView):
+    """
+    POST /api/content-requests/<id>/regenerate/
+    Creates a new content request with the same params as the original.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, request_id):
+        try:
+            uuid_obj = UUID(request_id)
+        except ValueError:
+            return Response(
+                {'error': 'Invalid request ID'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            original = ContentRequestModel.objects.get(id=uuid_obj)
+        except ContentRequestModel.DoesNotExist:
+            return Response(
+                {'error': 'Content request not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verify ownership
+        if original.created_by_id and original.created_by_id != request.user.id:
+            return Response(
+                {'error': 'Not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Create a new request with same params
+        new_request = ContentRequestModel.objects.create(
+            topic=original.topic,
+            content_type=original.content_type,
+            style=original.style,
+            output_format=original.output_format,
+            difficulty=original.difficulty,
+            notes=original.notes,
+            subject=original.subject,
+            role=original.role,
+            target_class=original.target_class,
+            target_section=original.target_section,
+            created_by=request.user,
+            regenerated_from=original,
+            status='PENDING',
+        )
+        
+        # Enqueue for processing
+        from ..tasks import process_content_request
+        try:
+            process_content_request.delay(str(new_request.id))
+        except Exception as e:
+            logger.error(f"Failed to enqueue regenerated request: {e}")
+        
+        response_serializer = ContentRequestResponseSerializer(new_request)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)

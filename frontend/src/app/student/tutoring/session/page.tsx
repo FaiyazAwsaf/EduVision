@@ -202,11 +202,18 @@ function SessionView({
 
 export default function StudentSessionPage() {
   const router = useRouter();
-  const { user: authUser } = useAuth();
+  const { user: authUser, isReady, isAuthenticated } = useAuth();
   const [user, setUser] = useState<TutoringUser | null>(null);
   const [joinData, setJoinData] = useState<SessionJoinResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
+
+  // Role guard: only students can access
+  useEffect(() => {
+    if (isReady && (!isAuthenticated || authUser?.role !== "student")) {
+      router.replace(authUser?.role === "teacher" ? "/teacher/dashboard" : "/signin");
+    }
+  }, [isReady, isAuthenticated, authUser, router]);
 
   // Restore session from sessionStorage on mount.
   // If no session data exists, redirect to the tutoring join page.

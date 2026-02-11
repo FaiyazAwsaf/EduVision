@@ -10,12 +10,16 @@ from enum import Enum
 class ContentType(str, Enum):
     """
     Types of content that can be generated.
-    
-    Extensible for future content types like PRACTICE_PROBLEMS, LESSON_PLANS, etc.
+    Student types: SUMMARY, WORKED_EXAMPLES, FORMULA_SHEET
+    Teacher types: LESSON_PLAN, QUIZ_GENERATOR, WORKSHEET_BUILDER, TOPIC_EXPLANATION
     """
     SUMMARY = "SUMMARY"
     WORKED_EXAMPLES = "WORKED_EXAMPLES"
     FORMULA_SHEET = "FORMULA_SHEET"
+    LESSON_PLAN = "LESSON_PLAN"
+    QUIZ_GENERATOR = "QUIZ_GENERATOR"
+    WORKSHEET_BUILDER = "WORKSHEET_BUILDER"
+    TOPIC_EXPLANATION = "TOPIC_EXPLANATION"
 
     @classmethod
     def choices(cls):

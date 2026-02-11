@@ -89,8 +89,11 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (isReady && !isAuthenticated) {
       router.replace("/signin");
+    } else if (isReady && isAuthenticated && user?.role !== "student") {
+      // Redirect non-students to their appropriate dashboard
+      router.replace("/teacher/dashboard");
     }
-  }, [isReady, isAuthenticated, router]);
+  }, [isReady, isAuthenticated, user, router]);
 
   // Check for an active tutoring session in sessionStorage
   useEffect(() => {
@@ -128,8 +131,8 @@ export default function StudentDashboard() {
     year: "numeric",
   });
 
-  // Show loading state while checking authentication
-  if (!isReady || !user) {
+  // Show loading state while checking authentication or if wrong role (will redirect)
+  if (!isReady || !user || user.role !== "student") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />

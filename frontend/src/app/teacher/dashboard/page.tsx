@@ -119,8 +119,11 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (isReady && !isAuthenticated) {
       router.replace("/signin");
+    } else if (isReady && isAuthenticated && user?.role !== "teacher") {
+      // Redirect non-teachers to their appropriate dashboard
+      router.replace("/student/dashboard");
     }
-  }, [isReady, isAuthenticated, router]);
+  }, [isReady, isAuthenticated, user, router]);
 
   // Fetch active sessions for this teacher
   const fetchSessions = useCallback(async () => {
@@ -177,8 +180,8 @@ export default function TeacherDashboard() {
     }
   };
 
-  // Show loading state while checking authentication
-  if (!isReady || !user) {
+  // Show loading state while checking authentication or if wrong role (will redirect)
+  if (!isReady || !user || user.role !== "teacher") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />

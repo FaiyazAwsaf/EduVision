@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, ValidationError as DRFValidationError
+from rest_framework.permissions import IsAuthenticated
 from django.db import IntegrityError
 
 from ..persistence.feedback_repository import FeedbackRepository
@@ -28,17 +29,8 @@ class FeedbackView(APIView):
     GET /api/generated-content/{id}/feedback
     - Retrieve existing feedback
     - Returns 404 if no feedback exists
-    
-    Design decisions:
-    - No authentication required (pre-auth phase)
-    - One feedback per content (enforced at DB level)
-    - All errors return clear messages
-    
-    Extension Points:
-    - Add user authentication
-    - Add rate limiting
-    - Add moderation workflow
     """
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, content_id):
         """

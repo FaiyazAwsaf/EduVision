@@ -37,12 +37,14 @@ export default function StudentTutoringPage() {
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // Auth guard
+  // Auth + role guard
   useEffect(() => {
-    if (isReady && !isAuthenticated) {
-      router.replace("/signin");
+    if (isReady && (!isAuthenticated || user?.role !== "student")) {
+      router.replace(
+        !isAuthenticated ? "/signin" : user?.role === "teacher" ? "/teacher/dashboard" : "/signin"
+      );
     }
-  }, [isReady, isAuthenticated, router]);
+  }, [isReady, isAuthenticated, user, router]);
 
   // Check for an existing active session in sessionStorage
   useEffect(() => {
