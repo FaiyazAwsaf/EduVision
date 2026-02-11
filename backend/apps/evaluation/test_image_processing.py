@@ -1,17 +1,12 @@
-"""
-Test script for image preprocessing functions.
-
-Usage:
-    python test_image_processing.py <input_image_path>
-
-Example:
-    python test_image_processing.py /path/to/answer_script.jpg
-"""
-
 import sys
 import cv2
 from pathlib import Path
-from image_processing import sharpen_image, binarize_image, preprocess_script_image
+from image_processing import (
+    sharpen_image,
+    binarize_image,
+    equalize_histogram,
+    preprocess_script_image,
+)
 
 
 def test_preprocessing(input_path: str):
@@ -37,30 +32,33 @@ def test_preprocessing(input_path: str):
     cv2.imwrite(str(original_path), image)
     print(f"✓ Saved original: {original_path}")
     
-    # 1. Sharpening only
-    sharpened = sharpen_image(image.copy())
-    sharpened_path = output_dir / f"{base_name}_1_sharpened.png"
-    cv2.imwrite(str(sharpened_path), sharpened)
-    print(f"✓ Saved sharpened: {sharpened_path}")
-    
-    # 2. Binarization only (Adaptive)
-    binary_adaptive = binarize_image(image.copy(), method="adaptive")
-    binary_adaptive_path = output_dir / f"{base_name}_2_binary_adaptive.png"
-    cv2.imwrite(str(binary_adaptive_path), binary_adaptive)
-    print(f"✓ Saved binary (adaptive): {binary_adaptive_path}")
-    
-    # 3. Binarization only (Otsu)
-    binary_otsu = binarize_image(image.copy(), method="otsu")
-    binary_otsu_path = output_dir / f"{base_name}_3_binary_otsu.png"
-    cv2.imwrite(str(binary_otsu_path), binary_otsu)
-    print(f"✓ Saved binary (otsu): {binary_otsu_path}")
-    
-    # 4. Both: Sharpening + Adaptive Binarization
+    # 1. Sharpening + Histogram Equalization
+    sharpened_equalized = equalize_histogram(sharpen_image(image.copy()))
+    sharpened_equalized_path = output_dir / f"{base_name}_1_sharp_equalized.png"
+    cv2.imwrite(str(sharpened_equalized_path), sharpened_equalized)
+    print(f"✓ Saved sharpened + equalized: {sharpened_equalized_path}")
+
+    # 2. Sharpening + Binarization (Adaptive)
     sharpened_then_binary = binarize_image(sharpen_image(image.copy()), method="adaptive")
-    both_path = output_dir / f"{base_name}_4_sharpened_binary.png"
-    cv2.imwrite(str(both_path), sharpened_then_binary)
-    print(f"✓ Saved sharpened + binary: {both_path}")
-    
+    sharpened_binary_path = output_dir / f"{base_name}_2_sharp_binary.png"
+    cv2.imwrite(str(sharpened_binary_path), sharpened_then_binary)
+    print(f"✓ Saved sharpened + binary: {sharpened_binary_path}")
+
+    # 3. Sharpening + Histogram Equalization + Binarization (Adaptive)
+    sharp_equalized_binary = binarize_image(
+        equalize_histogram(sharpen_image(image.copy())),
+        method="adaptive",
+    )
+    sharp_equalized_binary_path = output_dir / f"{base_name}_3_sharp_equalized_binary.png"
+    cv2.imwrite(str(sharp_equalized_binary_path), sharp_equalized_binary)
+    print(f"✓ Saved sharpened + equalized + binary: {sharp_equalized_binary_path}")
+
+    # 4. Histogram Equalization + Binarization (Adaptive)
+    equalized_binary = binarize_image(equalize_histogram(image.copy()), method="adaptive")
+    equalized_binary_path = output_dir / f"{base_name}_4_equalized_binary.png"
+    cv2.imwrite(str(equalized_binary_path), equalized_binary)
+    print(f"✓ Saved equalized + binary: {equalized_binary_path}")
+
     # 5. Using the complete pipeline
     with open(input_path, 'rb') as f:
         image_bytes = f.read()
@@ -68,6 +66,7 @@ def test_preprocessing(input_path: str):
     processed_bytes = preprocess_script_image(
         image_bytes,
         sharpen=True,
+        equalize=True,
         binarize=True,
         binarization_method="adaptive"
     )
@@ -82,10 +81,10 @@ def test_preprocessing(input_path: str):
     print(f"  Directory: {output_dir}")
     print("\nFiles created:")
     print(f"  1. {base_name}_0_original.png - Original image")
-    print(f"  2. {base_name}_1_sharpened.png - Sharpening only")
-    print(f"  3. {base_name}_2_binary_adaptive.png - Adaptive threshold")
-    print(f"  4. {base_name}_3_binary_otsu.png - Otsu threshold")
-    print(f"  5. {base_name}_4_sharpened_binary.png - Sharpened + Binary")
+    print(f"  2. {base_name}_1_sharp_equalized.png - Sharpened + Equalized")
+    print(f"  3. {base_name}_2_sharp_binary.png - Sharpened + Binary")
+    print(f"  4. {base_name}_3_sharp_equalized_binary.png - Sharpened + Equalized + Binary")
+    print(f"  5. {base_name}_4_equalized_binary.png - Equalized + Binary")
     print(f"  6. {base_name}_5_pipeline.png - Complete pipeline")
     print("="*60)
 

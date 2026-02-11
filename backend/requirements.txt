@@ -37,3 +37,4 @@ requests==2.32.3  # For API testing
 
 
 opencv-python-headless
+Pillow 

@@ -1,10 +1,3 @@
-"""
-Image Preprocessing Module for Answer Script Evaluation
-
-This module provides image preprocessing techniques to enhance OCR accuracy
-for answer scripts that may have poor quality, bad lighting, or unclear handwriting.
-"""
-
 import cv2
 import numpy as np
 from PIL import Image
@@ -41,6 +34,31 @@ def sharpen_image(image: np.ndarray) -> np.ndarray:
     
     logger.debug("Applied image sharpening")
     return sharpened
+
+def equalize_histogram(image: np.ndarray) -> np.ndarray:
+    """
+    Apply histogram equalization to improve contrast.
+
+    For color images, equalizes the luminance channel only.
+
+    Args:
+        image: Input image as numpy array (grayscale or BGR)
+
+    Returns:
+        Contrast-enhanced image as numpy array
+    """
+    if len(image.shape) == 2:
+        equalized = cv2.equalizeHist(image)
+        logger.debug("Applied histogram equalization (grayscale)")
+        return equalized
+
+    ycrcb = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)
+    y_channel, cr_channel, cb_channel = cv2.split(ycrcb)
+    y_channel = cv2.equalizeHist(y_channel)
+    merged = cv2.merge((y_channel, cr_channel, cb_channel))
+    equalized = cv2.cvtColor(merged, cv2.COLOR_YCrCb2BGR)
+    logger.debug("Applied histogram equalization (luminance)")
+    return equalized
 
 
 def binarize_image(image: np.ndarray, method: str = "adaptive") -> np.ndarray:
@@ -106,6 +124,7 @@ def binarize_image(image: np.ndarray, method: str = "adaptive") -> np.ndarray:
 def preprocess_script_image(
     image_bytes: bytes,
     sharpen: bool = True,
+    equalize: bool = False,
     binarize: bool = True,
     binarization_method: str = "adaptive"
 ) -> bytes:
@@ -118,6 +137,7 @@ def preprocess_script_image(
     Args:
         image_bytes: Input image as bytes
         sharpen: Whether to apply sharpening
+        equalize: Whether to apply histogram equalization
         binarize: Whether to apply binarization
         binarization_method: Method for binarization ("adaptive", "otsu", "simple")
     
@@ -136,6 +156,10 @@ def preprocess_script_image(
         # Apply sharpening
         if sharpen:
             image = sharpen_image(image)
+
+        # Apply histogram equalization
+        if equalize:
+            image = equalize_histogram(image)
         
         # Apply binarization
         if binarize:
@@ -161,6 +185,7 @@ def preprocess_script_image(
 def preprocess_pil_image(
     pil_image: Image.Image,
     sharpen: bool = True,
+    equalize: bool = False,
     binarize: bool = True,
     binarization_method: str = "adaptive"
 ) -> Image.Image:
@@ -170,6 +195,7 @@ def preprocess_pil_image(
     Args:
         pil_image: Input PIL Image
         sharpen: Whether to apply sharpening
+        equalize: Whether to apply histogram equalization
         binarize: Whether to apply binarization
         binarization_method: Method for binarization
     
@@ -187,6 +213,10 @@ def preprocess_pil_image(
         # Apply sharpening
         if sharpen:
             image_array = sharpen_image(image_array)
+
+        # Apply histogram equalization
+        if equalize:
+            image_array = equalize_histogram(image_array)
         
         # Apply binarization
         if binarize:
