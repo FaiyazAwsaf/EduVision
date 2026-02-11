@@ -1,31 +1,20 @@
 "use client";
 
 /**
- * Teacher Session Page
+ * Teacher Session Page - Google Meet-style layout
  *
- * Displays the active tutoring session for a teacher.
- * Shows a participant list with online/offline indicators for all students.
- * Session info includes section name, participant count, and session controls.
+ * Full-screen session view with a slim top bar, MediaSession filling the viewport,
+ * and integrated control bar / participant panel.
  */
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertTriangle,
-  Clock,
-  Square,
-  GraduationCap,
-  Circle,
-  ArrowLeft,
-  Users,
-  User,
-} from "lucide-react";
+import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
 import { ConnectionStatusBadge } from "@/components/tutoring/ConnectionStatus";
 import {
   SessionProvider,
   useSession,
-  type SessionParticipant,
 } from "@/contexts/SessionContext";
 import { MediaSession } from "@/components/tutoring/media/MediaSession";
 import {
@@ -35,33 +24,26 @@ import {
   getErrorMessage,
   ApiError,
 } from "@/api/tutoring";
-import {
-  ParticipantEvent,
-  StatusChangeEvent,
-  SessionEndedEvent,
-} from "@/lib/websocket";
+import { SessionEndedEvent } from "@/lib/websocket";
 import { useAuth } from "@/contexts/AuthContext";
 
-// ─── Inner SessionView component ──────────────────────────────────────────────
+// ─── Inner SessionView (uses WebSocket context) ───────────────────────────────
 
 function SessionView({
   sessionData,
   user,
   onEndSession,
-  onNewSession,
   isLoading,
 }: {
   sessionData: SessionCreateResponse;
   user: TutoringUser;
   onEndSession: () => void;
-  onNewSession: () => void;
   isLoading: boolean;
 }) {
+  const router = useRouter();
   const {
     sessionState,
     connectionState,
-    isConnected,
-    isSessionActive,
     isSessionEnded,
     error: wsError,
   } = useSession();
@@ -72,225 +54,80 @@ function SessionView({
     | "GRACE"
     | "ENDED";
   const isEnded = effectiveStatus === "ENDED";
-  const isActive = effectiveStatus === "ACTIVE";
-  const isWaiting = effectiveStatus === "WAITING";
 
-  const participants: SessionParticipant[] =
-    sessionState?.participants || [];
-  const onlineCount = participants.filter((p) => p.connected).length;
+  const sectionLabel = sessionData.section_name
+    ? `Class ${sessionData.class_name} - Section ${sessionData.section_name}`
+    : "Tutoring Session";
+
+  // If session ended, show a return screen
+  if (isEnded) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: "#F2EFE7" }}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#9ACBD0" }}>
+            <ArrowLeft className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2" style={{ color: "#006A71" }}>Session Ended</h2>
+          <p className="mb-6" style={{ color: "#48A6A7" }}>The tutoring session has ended.</p>
+          <button
+            onClick={() => router.push("/teacher/dashboard")}
+            className="px-6 py-2.5 text-white font-medium rounded-full transition-colors"
+            style={{ backgroundColor: "#48A6A7" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#006A71")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#48A6A7")}
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
-      {/* Session Header */}
-      <div className="p-6 border-b border-secondary/20">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-primary-dark">
-              Tutoring Session
-            </h2>
-            {sessionData.section_name && (
-              <p className="text-sm text-muted mt-0.5">
-                Class {sessionData.class_name} - Section{" "}
-                {sessionData.section_name}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <ConnectionStatusBadge state={connectionState} showLabel={true} />
-            <SessionStatusBadge status={effectiveStatus} />
-          </div>
+    <div className="h-screen flex flex-col" style={{ backgroundColor: "#F2EFE7" }}>
+      {/* Slim top bar */}
+      <div
+        className="flex items-center justify-between px-4 py-2 border-b"
+        style={{
+          backgroundColor: "#ffffff",
+          borderColor: "#9ACBD0",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/teacher/dashboard")}
+            className="p-1.5 rounded-full transition-colors"
+            style={{ color: "#006A71" }}
+            title="Back to dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-medium" style={{ color: "#006A71" }}>{sectionLabel}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <ConnectionStatusBadge state={connectionState} showLabel={false} />
+          <SessionStatusBadge status={effectiveStatus} />
         </div>
       </div>
 
-      {/* Session Details */}
-      <div className="p-6 space-y-6">
-        {/* WebSocket Error */}
-        {wsError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <p className="text-red-700">{wsError}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Status Message */}
-        {isWaiting && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-yellow-600" />
-              <div>
-                <p className="font-medium text-yellow-800">
-                  Waiting for students to join...
-                </p>
-                <p className="text-sm text-yellow-600">
-                  Students from the selected section will see this session and
-                  can join automatically.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isActive && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <Circle className="w-6 h-6 text-green-600 fill-green-600" />
-              <div>
-                <p className="font-medium text-green-800">
-                  Session Active - {participants.length}{" "}
-                  {participants.length === 1 ? "student" : "students"} joined
-                </p>
-                <p className="text-sm text-green-600">
-                  {onlineCount} currently online
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isEnded && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <Square className="w-6 h-6 text-gray-600 fill-gray-600" />
-              <div>
-                <p className="font-medium text-gray-800">Session has ended</p>
-                <p className="text-sm text-gray-600">
-                  You can start a new session anytime.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Participants */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-medium text-primary-dark">
-              Participants
-            </label>
-            <span className="text-xs text-muted">
-              {participants.length}{" "}
-              {participants.length === 1 ? "student" : "students"}
-              {onlineCount > 0 && ` (${onlineCount} online)`}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {/* Teacher (self) */}
-            <div className="flex items-center gap-3 px-4 py-2 rounded-lg border bg-green-50 border-green-200">
-              <User className="w-6 h-6" style={{ color: "#48A6A7" }} />
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">{user.full_name}</p>
-                <p className="text-xs text-gray-500">Teacher</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
-                <span className="text-xs text-gray-600">Online</span>
-              </div>
-            </div>
-
-            {/* Student Participants */}
-            {participants.length > 0 ? (
-              participants.map((p) => {
-                const statusColor = p.connected
-                  ? "bg-green-500"
-                  : "bg-gray-400";
-                const bgColor = p.connected ? "bg-green-50" : "bg-gray-50";
-                const borderColor = p.connected
-                  ? "border-green-200"
-                  : "border-gray-200";
-
-                return (
-                  <div
-                    key={p.id}
-                    className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${bgColor} ${borderColor}`}
-                  >
-                    <GraduationCap
-                      className="w-6 h-6"
-                      style={{ color: "#48A6A7" }}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-500">Student</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`inline-flex h-2 w-2 rounded-full ${statusColor}`}
-                      />
-                      <span className="text-xs text-gray-600">
-                        {p.connected ? "Online" : "Offline"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-dashed border-gray-300 bg-gray-50">
-                <GraduationCap className="w-6 h-6 text-gray-400" />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-400">
-                    Waiting for students...
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Students from the section will appear here
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+      {/* WS error banner */}
+      {wsError && (
+        <div className="mx-2 mt-1 px-3 py-1.5 rounded flex items-center gap-2 bg-red-50 border border-red-300">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+          <span className="text-sm text-red-700">{wsError}</span>
         </div>
+      )}
 
-        {/* Session Info */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
-              Session ID
-            </label>
-            <p className="text-sm text-gray-700 font-mono">
-              {sessionData.session_id?.substring(0, 8)}...
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
-              Room ID
-            </label>
-            <p className="text-sm text-gray-700 font-mono">
-              {sessionData.room_id?.substring(0, 20)}...
-            </p>
-          </div>
-        </div>
-
-        {/* Media Session */}
-        {!isEnded && (
-          <MediaSession
-            wsUrl={sessionData.livekit_ws_url}
-            token={sessionData.token}
-            role="teacher"
-            sessionId={sessionData.session_id}
-          />
-        )}
-      </div>
-
-      {/* Session Actions */}
-      <div className="p-6 border-t border-secondary/20 bg-background/30">
-        <div className="flex items-center justify-end gap-3">
-          {!isEnded ? (
-            <button
-              onClick={onEndSession}
-              disabled={isLoading}
-              className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? "Ending..." : "End Session"}
-            </button>
-          ) : (
-            <button
-              onClick={onNewSession}
-              className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-colors"
-            >
-              Start New Session
-            </button>
-          )}
-        </div>
+      {/* Media fills remaining space */}
+      <div className="flex-1 min-h-0">
+        <MediaSession
+          wsUrl={sessionData.livekit_ws_url}
+          token={sessionData.token}
+          role="teacher"
+          userName={user.full_name}
+          sessionLabel={sectionLabel}
+          onEndSession={onEndSession}
+        />
       </div>
     </div>
   );
@@ -364,7 +201,8 @@ export default function TeacherSessionPage() {
 
   // Restore session on mount
   useEffect(() => {
-    const { sessionData: savedSession, user: savedUser } = loadTeacherSession();
+    const { sessionData: savedSession, user: savedUser } =
+      loadTeacherSession();
     if (savedSession && savedUser) {
       setSessionData(savedSession);
       setUser(savedUser);
@@ -383,107 +221,80 @@ export default function TeacherSessionPage() {
 
   const handleEndSession = async () => {
     if (!sessionData?.session_id) return;
-
     setIsLoading(true);
     setError(null);
-
     try {
       await endSession(sessionData.session_id);
       clearTeacherSession();
       router.push("/teacher/dashboard");
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(getErrorMessage(apiError));
+      setError(getErrorMessage(err as ApiError));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleNewSession = () => {
-    clearTeacherSession();
-    router.push("/teacher/dashboard");
-  };
-
-  const handleBack = () => {
-    router.push("/teacher/dashboard");
-  };
-
   const handleSessionEnded = useCallback(
     (event: SessionEndedEvent) => {
-      console.log("Session ended:", event);
       clearTeacherSession();
       router.push("/teacher/dashboard");
     },
     [router],
   );
 
-  return (
-    <div className="min-h-screen">
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
-        <div className="flex items-center justify-between px-8 py-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg text-muted hover:text-primary-dark hover:bg-background transition-colors"
-              title="Back to dashboard"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-primary-dark">
-                Live Session
-              </h1>
-              <p className="text-sm text-primary">
-                Tutoring session in progress
-              </p>
-            </div>
-          </div>
-          {user && (
-            <div className="text-sm text-muted">
-              Logged in as{" "}
-              <span className="font-semibold text-primary-dark">
-                {user.full_name}
-              </span>
-            </div>
-          )}
+  // Loading state
+  if (isRestoring) {
+    return (
+      <div
+        className="h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#F2EFE7" }}
+      >
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" style={{ color: "#48A6A7" }} />
+          <p style={{ color: "#006A71" }}>Loading session...</p>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      {/* ── Content ──────────────────────────────────────────────────────── */}
-      <main className="px-8 py-6 max-w-4xl mx-auto">
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <p className="text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Loading */}
-        {isRestoring ? (
-          <div className="bg-white rounded-2xl border border-secondary/30 p-8 text-center shadow-sm">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted">Loading session...</p>
-          </div>
-        ) : sessionData ? (
-          <SessionProvider
-            sessionId={sessionData.session_id}
-            userId={user!.id}
-            onSessionEnded={handleSessionEnded}
+  // Error state
+  if (error) {
+    return (
+      <div
+        className="h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#F2EFE7" }}
+      >
+        <div className="text-center max-w-md">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => router.push("/teacher/dashboard")}
+            className="px-5 py-2 text-white rounded-full transition-colors"
+            style={{ backgroundColor: "#48A6A7" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#006A71")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#48A6A7")}
           >
-            <SessionView
-              sessionData={sessionData}
-              user={user!}
-              onEndSession={handleEndSession}
-              onNewSession={handleNewSession}
-              isLoading={isLoading}
-            />
-          </SessionProvider>
-        ) : null}
-      </main>
-    </div>
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionData || !user) return null;
+
+  return (
+    <SessionProvider
+      sessionId={sessionData.session_id}
+      userId={user.id}
+      onSessionEnded={handleSessionEnded}
+    >
+      <SessionView
+        sessionData={sessionData}
+        user={user}
+        onEndSession={handleEndSession}
+        isLoading={isLoading}
+      />
+    </SessionProvider>
   );
 }
