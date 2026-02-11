@@ -97,14 +97,14 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Channel Layers Configuration (Django Channels)
-# Uses Redis when REDIS_URL is set (Docker / production), otherwise in-memory for local dev
-_REDIS_URL = os.environ.get("REDIS_URL")
-if _REDIS_URL:
+# Set USE_REDIS_CHANNELS=true in Docker/production to use Redis for cross-worker WebSocket support.
+# Local dev defaults to in-memory (sufficient for single-process runserver).
+if os.environ.get("USE_REDIS_CHANNELS", "").lower() in ("true", "1", "yes"):
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [_REDIS_URL],
+                "hosts": [os.environ.get("REDIS_URL", "redis://localhost:6379/0")],
             },
         },
     }

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   Plus,
   Eye,
-  Pencil,
   ArrowRight,
   Loader2,
   Users,
@@ -14,6 +13,10 @@ import {
   Video,
   GraduationCap,
   BookOpen,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Hourglass,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -22,48 +25,7 @@ import {
   type SessionStatus,
 } from "@/api/tutoring";
 import { getMyClass, type MyClassInfo } from "@/api/school";
-
-/* ─── Dummy data (submissions – keep for now) ────────────────────────────── */
-
-type EngineStatus = "AI SCORED" | "OCR COMPLETE" | "PROCESSING...";
-
-const recentSubmissions: {
-  id: number;
-  student: string;
-  avatarColor: string;
-  assignment: string;
-  status: EngineStatus;
-  statusColor: string;
-  statusDot: string;
-}[] = [
-  {
-    id: 1,
-    student: "Liam Thompson",
-    avatarColor: "#9ACBD0",
-    assignment: "Lab Report #3",
-    status: "AI SCORED",
-    statusColor: "text-primary-dark",
-    statusDot: "bg-primary",
-  },
-  {
-    id: 2,
-    student: "Ava Chen",
-    avatarColor: "#F0C987",
-    assignment: "Midterm Essay",
-    status: "OCR COMPLETE",
-    statusColor: "text-primary-dark",
-    statusDot: "bg-primary",
-  },
-  {
-    id: 3,
-    student: "Noah Wilson",
-    avatarColor: "#FFD6A5",
-    assignment: "Calculus HW 8",
-    status: "PROCESSING...",
-    statusColor: "text-amber-600",
-    statusDot: "bg-amber-400",
-  },
-];
+import { getScripts, type AnswerScript } from "@/api/evaluation";
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -117,6 +79,8 @@ export default function TeacherDashboard() {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [creatingSession, setCreatingSession] = useState(false);
   const [myClass, setMyClass] = useState<MyClassInfo | null>(null);
+  const [recentScripts, setRecentScripts] = useState<AnswerScript[]>([]);
+  const [loadingScripts, setLoadingScripts] = useState(true);
 
   // Authorization check
   useEffect(() => {
@@ -161,6 +125,24 @@ export default function TeacherDashboard() {
         .then(setMyClass)
         .catch(() => setMyClass(null)); // silently ignore if not a class teacher
     }
+  }, [isReady, isAuthenticated]);
+
+  // Fetch recent script submissions
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return;
+    setLoadingScripts(true);
+    getScripts()
+      .then((scripts) => {
+        // Sort by newest first, take up to 6
+        const sorted = [...scripts].sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() -
+            new Date(a.created_at).getTime(),
+        );
+        setRecentScripts(sorted.slice(0, 6));
+      })
+      .catch(() => setRecentScripts([]))
+      .finally(() => setLoadingScripts(false));
   }, [isReady, isAuthenticated]);
 
   // Create a new session and redirect to the session page
@@ -452,84 +434,165 @@ export default function TeacherDashboard() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-primary-dark">
-              Recent Script Submissions
+              Recent Submissions
             </h2>
             <Link
               href="/evaluation"
               className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
             >
-              View Engine Queue
+              View All
             </Link>
           </div>
 
-          <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-4 gap-4 px-6 py-3 bg-background/50 border-b border-secondary/20 text-xs font-semibold text-muted uppercase tracking-wide">
-              <span>Student</span>
-              <span>Assignment</span>
-              <span>Engine Status</span>
-              <span>Actions</span>
+          {loadingScripts ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
             </div>
-
-            {/* Rows */}
-            {recentSubmissions.map((sub) => (
-              <div
-                key={sub.id}
-                className="grid grid-cols-4 gap-4 px-6 py-4 border-b border-secondary/10 last:border-b-0 items-center hover:bg-background/30 transition-colors"
-              >
-                {/* Student */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold"
-                    style={{ backgroundColor: sub.avatarColor }}
-                  >
-                    {sub.student
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <span className="text-sm font-medium text-primary-dark">
-                    {sub.student}
-                  </span>
-                </div>
-
-                {/* Assignment */}
-                <span className="text-sm text-muted">{sub.assignment}</span>
-
-                {/* Status */}
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${sub.statusDot}`} />
-                  <span
-                    className={`text-xs font-semibold tracking-wide ${sub.statusColor}`}
-                  >
-                    {sub.status}
-                  </span>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                  {sub.status === "AI SCORED" && (
-                    <button className="p-1.5 rounded-lg hover:bg-[#E8F4F5] transition text-primary">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  )}
-                  {sub.status === "OCR COMPLETE" && (
-                    <button className="p-1.5 rounded-lg hover:bg-[#E8F4F5] transition text-primary">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  )}
-                  {sub.status === "PROCESSING..." && (
-                    <button
-                      className="p-1.5 rounded-lg text-secondary cursor-not-allowed"
-                      disabled
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+          ) : recentScripts.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
+              <FileText className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
+                No submissions yet
+              </p>
+              <p className="text-xs text-muted">
+                Scripts submitted by students or uploaded by you will appear
+                here
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
+              {/* Table header */}
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-background/50 border-b border-secondary/20 text-xs font-semibold text-muted uppercase tracking-wide">
+                <span className="col-span-3">Student</span>
+                <span className="col-span-3">Form / Rubric</span>
+                <span className="col-span-2">Status</span>
+                <span className="col-span-2">Score</span>
+                <span className="col-span-2">Submitted</span>
               </div>
-            ))}
-          </div>
+
+              {/* Rows */}
+              {recentScripts.map((script) => {
+                const studentName =
+                  script.student_full_name ||
+                  script.student_name ||
+                  "Unknown Student";
+                const formTitle =
+                  script.submission_form_title ||
+                  script.rubric_set_title ||
+                  "Manual Upload";
+
+                return (
+                  <Link
+                    key={script.id}
+                    href={`/evaluation?script=${script.id}`}
+                    className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-secondary/10 last:border-b-0 items-center hover:bg-background/30 transition-colors"
+                  >
+                    {/* Student */}
+                    <div className="col-span-3 flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+                        style={{ backgroundColor: avatarColor(studentName) }}
+                      >
+                        {initials(studentName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary-dark truncate">
+                          {studentName}
+                        </p>
+                        {script.student_roll_number && (
+                          <p className="text-[10px] text-muted">
+                            {script.student_roll_number}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Form / Rubric */}
+                    <div className="col-span-3 min-w-0">
+                      <p className="text-sm text-primary-dark truncate">
+                        {formTitle}
+                      </p>
+                      {script.page_count != null && (
+                        <p className="text-[10px] text-muted">
+                          {script.page_count} page
+                          {script.page_count !== 1 ? "s" : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Status */}
+                    <div className="col-span-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                          script.status === "evaluated"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : script.status === "pending"
+                              ? "bg-amber-50 text-amber-700"
+                              : script.status === "processing"
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {script.status === "evaluated" && (
+                          <CheckCircle className="w-3 h-3" />
+                        )}
+                        {script.status === "pending" && (
+                          <Hourglass className="w-3 h-3" />
+                        )}
+                        {script.status === "processing" && (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        )}
+                        {script.status === "error" && (
+                          <AlertCircle className="w-3 h-3" />
+                        )}
+                        {script.status.charAt(0).toUpperCase() +
+                          script.status.slice(1)}
+                      </span>
+                    </div>
+
+                    {/* Score */}
+                    <div className="col-span-2">
+                      {script.status === "evaluated" &&
+                      script.percentage != null ? (
+                        <div>
+                          <p
+                            className={`text-sm font-bold ${
+                              script.percentage >= 80
+                                ? "text-emerald-600"
+                                : script.percentage >= 60
+                                  ? "text-primary"
+                                  : script.percentage >= 40
+                                    ? "text-amber-600"
+                                    : "text-red-600"
+                            }`}
+                          >
+                            {script.percentage.toFixed(1)}%
+                          </p>
+                          {script.total_score != null && (
+                            <p className="text-[10px] text-muted">
+                              {script.total_score.toFixed(1)} marks
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </div>
+
+                    {/* Time */}
+                    <div className="col-span-2 flex items-center justify-between">
+                      <span className="text-xs text-muted">
+                        {formatSessionTime(script.created_at)}
+                      </span>
+                      {script.status === "evaluated" && (
+                        <Eye className="w-4 h-4 text-primary" />
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </main>
     </div>
