@@ -17,12 +17,19 @@ load_dotenv(BASE_DIR.parent / ".env")  # Root directory .env
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-kf-j8*1=_&4ek(vd04jln1j!ba!io9sz^+#$xo_5))_)5)4z2p"
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-kf-j8*1=_&4ek(vd04jln1j!ba!io9sz^+#$xo_5))_)5)4z2p",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if h.strip()
+]
 
 
 # Application definition
@@ -90,21 +97,23 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Channel Layers Configuration (Django Channels)
-# Using in-memory channel layer for development (use Redis in production)
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
-    },
-}
-# For production with Redis, use:
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [("127.0.0.1", 6379)],
-#         },
-#     },
-# }
+# Uses Redis when REDIS_URL is set (Docker / production), otherwise in-memory for local dev
+_REDIS_URL = os.environ.get("REDIS_URL")
+if _REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [_REDIS_URL],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
 
 
 # Database
@@ -230,8 +239,12 @@ SIMPLE_JWT = {
 # ============================================================================
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Next.js frontend
-    "http://127.0.0.1:3000",
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True

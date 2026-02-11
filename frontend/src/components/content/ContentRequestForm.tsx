@@ -55,6 +55,10 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  PenLine,
+  BookMarked,
+  Ruler,
+  Pencil,
 } from "lucide-react";
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
@@ -141,9 +145,14 @@ interface ContentTemplate {
   notes?: string;
 }
 
-const TEACHER_TEMPLATES: ContentTemplate[] = [
+interface TemplateWithIcon extends ContentTemplate {
+  icon: React.ReactNode;
+}
+
+const TEACHER_TEMPLATES: TemplateWithIcon[] = [
   {
-    label: "📝 Quick Quiz",
+    label: "Quick Quiz",
+    icon: <PenLine className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.QUIZ_GENERATOR,
     style: Style.DETAILED,
@@ -152,7 +161,8 @@ const TEACHER_TEMPLATES: ContentTemplate[] = [
       "Generate a 10-question quiz with mix of MCQ and short answer. Include answer key.",
   },
   {
-    label: "📋 Worksheet",
+    label: "Worksheet",
+    icon: <ClipboardList className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.WORKSHEET_BUILDER,
     style: Style.STEP_BY_STEP,
@@ -161,7 +171,8 @@ const TEACHER_TEMPLATES: ContentTemplate[] = [
       "Create a printable worksheet with progressive difficulty. Include space for student work.",
   },
   {
-    label: "📖 Lesson Plan",
+    label: "Lesson Plan",
+    icon: <BookOpen className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.LESSON_PLAN,
     style: Style.DETAILED,
@@ -169,7 +180,8 @@ const TEACHER_TEMPLATES: ContentTemplate[] = [
       "Include learning objectives, warm-up activity, main instruction, practice, and assessment.",
   },
   {
-    label: "💡 Explain Topic",
+    label: "Explain Topic",
+    icon: <Lightbulb className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.TOPIC_EXPLANATION,
     style: Style.STEP_BY_STEP,
@@ -178,9 +190,10 @@ const TEACHER_TEMPLATES: ContentTemplate[] = [
   },
 ];
 
-const STUDENT_TEMPLATES: ContentTemplate[] = [
+const STUDENT_TEMPLATES: TemplateWithIcon[] = [
   {
-    label: "📚 Exam Summary",
+    label: "Exam Summary",
+    icon: <BookMarked className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.SUMMARY,
     style: Style.BRIEF,
@@ -188,7 +201,8 @@ const STUDENT_TEMPLATES: ContentTemplate[] = [
       "Focus on exam-relevant points, key definitions, and important formulas.",
   },
   {
-    label: "✏️ Practice Problems",
+    label: "Practice Problems",
+    icon: <Pencil className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.WORKED_EXAMPLES,
     style: Style.STEP_BY_STEP,
@@ -197,7 +211,8 @@ const STUDENT_TEMPLATES: ContentTemplate[] = [
       "Show step-by-step solutions. Include similar practice problems at the end.",
   },
   {
-    label: "📐 Formula Reference",
+    label: "Formula Reference",
+    icon: <Ruler className="w-4 h-4" />,
     topic: "",
     content_type: ContentType.FORMULA_SHEET,
     style: Style.BRIEF,
@@ -430,8 +445,9 @@ export default function ContentRequestForm({
               type="button"
               onClick={() => applyTemplate(tpl)}
               disabled={isSubmitting}
-              className="text-left px-3 py-2.5 rounded-lg border border-secondary/60 hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-primary-dark disabled:opacity-50"
+              className="text-left px-3 py-2.5 rounded-lg border border-secondary/60 hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-primary-dark disabled:opacity-50 flex items-center gap-2"
             >
+              <span className="text-primary">{tpl.icon}</span>
               {tpl.label}
             </button>
           ))}

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { FileText } from "lucide-react";
 import * as fabric from "fabric";
 
 export type SelectionBounds = {
@@ -303,7 +304,7 @@ export default function SelectionTool({
         onClick={handleConvert}
         className="px-4 py-2 bg-primary text-white rounded-lg shadow-lg hover:bg-primary-dark transition-colors font-medium flex items-center gap-2"
       >
-        <span>📝</span>
+        <FileText className="w-4 h-4" />
         Convert to Notation
       </button>
       <button

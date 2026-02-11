@@ -35,7 +35,7 @@ const actions = [
     description: "1-on-1 personalized AI session",
     icon: MessageSquare,
     href: "/student/tutoring",
-    cta: "⚡ Launch",
+    cta: "Launch",
     color: "bg-[#E8F4F5]",
     iconColor: "text-primary-dark",
   },

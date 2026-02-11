@@ -8,6 +8,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Pen,
+  Eraser,
+  SquareDashedMousePointer,
+  Trash2,
+  Download,
+  Lock,
+  Unlock,
+} from "lucide-react";
 
 export type Tool = "pen" | "eraser" | "select";
 
@@ -85,7 +94,7 @@ export default function Toolbar(props: ToolbarProps) {
             isConnected ? "bg-green-500" : "bg-red-500"
           }`}
         >
-          {isConnected ? "🟢" : "🔴"}
+          {isConnected ? "Connected" : "Offline"}
         </div>
         <span className="text-primary-dark text-xs text-center">
           {isConnected ? "Connected" : "Disconnected"}
@@ -117,11 +126,13 @@ export default function Toolbar(props: ToolbarProps) {
                   ${isDisabled && tool !== "select" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                {tool === "pen"
-                  ? "✏️ Pen"
-                  : tool === "eraser"
-                    ? "🧹 Eraser"
-                    : "🔲 Select"}
+                {tool === "pen" ? (
+                  <><Pen className="w-4 h-4" /> Pen</>
+                ) : tool === "eraser" ? (
+                  <><Eraser className="w-4 h-4" /> Eraser</>
+                ) : (
+                  <><SquareDashedMousePointer className="w-4 h-4" /> Select</>
+                )}
               </button>
             ))}
           </div>
@@ -259,13 +270,13 @@ export default function Toolbar(props: ToolbarProps) {
         </span>
 
         {role === "teacher" && (
-          <button type="button" onClick={onClear} className="toolbar-btn">
-            🗑️ Clear
+          <button type="button" onClick={onClear} className="toolbar-btn flex items-center gap-1.5">
+            <Trash2 className="w-4 h-4" /> Clear
           </button>
         )}
 
-        <button type="button" onClick={onExport} className="toolbar-btn">
-          💾 Export
+        <button type="button" onClick={onExport} className="toolbar-btn flex items-center gap-1.5">
+          <Download className="w-4 h-4" /> Export
         </button>
       </div>
 
@@ -280,7 +291,11 @@ export default function Toolbar(props: ToolbarProps) {
               isDrawingLocked ? "bg-primary-dark" : "bg-primary"
             }`}
           >
-            {isDrawingLocked ? "🔒 Locked" : "🔓 Unlocked"}
+            {isDrawingLocked ? (
+              <span className="flex items-center gap-1.5"><Lock className="w-4 h-4" /> Locked</span>
+            ) : (
+              <span className="flex items-center gap-1.5"><Unlock className="w-4 h-4" /> Unlocked</span>
+            )}
           </button>
         </>
       )}

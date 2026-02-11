@@ -203,8 +203,8 @@ export async function getMyTeachingAssignments(): Promise<
 export async function getMyTeacherProfile(): Promise<TeacherProfile> {
   // Fetch the current user's teacher profile
   // This uses the authenticated user's ID which we get from the JWT
-  const { getCurrentUser } = await import("@/api/auth");
-  const user = getCurrentUser();
+  const { getUserData } = await import("@/api/auth");
+  const user = getUserData();
   if (!user) throw new Error("Not authenticated");
   return schoolFetch<TeacherProfile>(`/teachers/${user.id}/`);
 }

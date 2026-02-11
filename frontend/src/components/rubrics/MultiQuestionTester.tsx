@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Check, Circle } from "lucide-react";
 import { QuestionRubric, testRubricSet, QuestionResult } from "@/api/rubrics";
 
 interface MultiQuestionTesterProps {
@@ -218,7 +219,7 @@ export default function MultiQuestionTester({
                                     : "text-orange-600"
                                 }
                               >
-                                {ruleResult.matched ? "✓" : "○"}
+                                {ruleResult.matched ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
                               </span>
                               <span className="text-primary-dark font-medium">
                                 Rule {index + 1} ({ruleResult.rule_type})

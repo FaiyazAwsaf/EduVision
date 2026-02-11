@@ -1,6 +1,12 @@
 "use client";
 
 import React from "react";
+import {
+  Check,
+  X as XIcon,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
 import { EvaluationReport } from "@/api/evaluation";
 
 interface EvaluationReportViewProps {
@@ -214,8 +220,8 @@ export default function EvaluationReportView({
                     {result.key_points_found &&
                       result.key_points_found.length > 0 && (
                         <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                          <h4 className="text-sm font-medium text-emerald-700 mb-2">
-                            ✓ Key Points Covered
+                          <h4 className="text-sm font-medium text-emerald-700 mb-2 flex items-center gap-1.5">
+                            <Check className="w-4 h-4" /> Key Points Covered
                           </h4>
                           <ul className="text-sm text-emerald-800 space-y-1">
                             {result.key_points_found.map((point, i) => (
@@ -230,8 +236,8 @@ export default function EvaluationReportView({
                     {result.key_points_missing &&
                       result.key_points_missing.length > 0 && (
                         <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                          <h4 className="text-sm font-medium text-red-700 mb-2">
-                            ✗ Key Points Missing
+                          <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1.5">
+                            <XIcon className="w-4 h-4" /> Key Points Missing
                           </h4>
                           <ul className="text-sm text-red-800 space-y-1">
                             {result.key_points_missing.map((point, i) => (
@@ -252,8 +258,8 @@ export default function EvaluationReportView({
                 result.mistakes_identified.length > 0 && (
                   <div className="border-t border-secondary pt-4">
                     <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                      <h4 className="text-sm font-medium text-orange-700 mb-2">
-                        ⚠ Mistakes Identified
+                      <h4 className="text-sm font-medium text-orange-700 mb-2 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4" /> Mistakes Identified
                       </h4>
                       <ul className="text-sm text-orange-800 space-y-1">
                         {result.mistakes_identified.map((mistake, i) => (
@@ -285,8 +291,8 @@ export default function EvaluationReportView({
               {result.needs_manual_review && (
                 <div className="border-t border-secondary pt-4">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-700">
-                      ⚠ This question has been flagged for manual review
+                    <p className="text-sm text-yellow-700 flex items-start gap-1.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> This question has been flagged for manual review
                       {result.review_reason && `: ${result.review_reason}`}
                     </p>
                   </div>
@@ -336,7 +342,7 @@ export default function EvaluationReportView({
                       key={i}
                       className="flex items-start gap-2 text-sm text-emerald-800"
                     >
-                      <span className="text-emerald-500 mt-1">✓</span>
+                      <Check className="w-4 h-4 text-emerald-500 mt-1 shrink-0" />
                       {strength}
                     </li>
                   ))}
@@ -370,7 +376,7 @@ export default function EvaluationReportView({
                       key={i}
                       className="flex items-start gap-2 text-sm text-primary-dark"
                     >
-                      <span className="text-primary mt-1">→</span>
+                      <ArrowRight className="w-4 h-4 text-primary mt-1 shrink-0" />
                       {area}
                     </li>
                   ))}

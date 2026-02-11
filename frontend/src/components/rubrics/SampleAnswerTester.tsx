@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Check, X as XIcon } from "lucide-react";
 import { EvaluationRule } from "./RuleEditor";
 import { testRubric } from "@/api/rubrics";
 
@@ -287,7 +288,11 @@ export default function SampleAnswerTester({
                           : "bg-red-100 text-red-800"
                       }`}
                     >
-                      {result.matched ? "✓ Matched" : "✗ Not Matched"}
+                      {result.matched ? (
+                        <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Matched</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><XIcon className="w-3 h-3" /> Not Matched</span>
+                      )}
                     </span>
                   </div>
 

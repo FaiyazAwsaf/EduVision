@@ -15,7 +15,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Star } from "lucide-react";
 import { DifficultyRating, type FeedbackPayload } from "@/types/content";
 
 interface FeedbackFormProps {
@@ -84,26 +84,26 @@ export default function FeedbackForm({
             How useful was this content? <span className="text-red-500">*</span>
           </label>
           <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((star) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <button
-                key={star}
+                key={s}
                 type="button"
                 disabled={isFormDisabled}
-                onClick={() => setUsefulnessRating(star)}
-                onMouseEnter={() => setHoveredStar(star)}
+                onClick={() => setUsefulnessRating(s)}
+                onMouseEnter={() => setHoveredStar(s)}
                 onMouseLeave={() => setHoveredStar(0)}
-                className={`text-3xl transition-colors ${
+                className={`transition-colors ${
                   isFormDisabled
                     ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 } ${
-                  star <= (hoveredStar || usefulnessRating)
+                  s <= (hoveredStar || usefulnessRating)
                     ? "text-amber-500"
                     : "text-secondary"
                 }`}
-                aria-label={`${star} star${star > 1 ? "s" : ""}`}
+                aria-label={`${s} star${s > 1 ? "s" : ""}`}
               >
-                ★
+                <Star className={`w-7 h-7 ${s <= (hoveredStar || usefulnessRating) ? "fill-amber-500" : ""}`} />
               </button>
             ))}
             {usefulnessRating > 0 && (

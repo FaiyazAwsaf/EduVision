@@ -7,7 +7,7 @@
 
 "use client";
 
-import { CheckCircle, Check, X } from "lucide-react";
+import { CheckCircle, Check, X, Star } from "lucide-react";
 import { DifficultyRating, type Feedback } from "@/types/content";
 import { formatDate } from "@/utils/formatters";
 
@@ -43,17 +43,15 @@ export default function FeedbackDisplay({ feedback }: FeedbackDisplayProps) {
         <div className="flex items-center gap-2">
           <span className="font-medium text-primary-dark">Usefulness:</span>
           <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <span
-                key={star}
-                className={
-                  star <= feedback.usefulness_rating
-                    ? "text-amber-500"
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star
+                key={s}
+                className={`w-5 h-5 ${
+                  s <= feedback.usefulness_rating
+                    ? "text-amber-500 fill-amber-500"
                     : "text-secondary"
-                }
-              >
-                ★
-              </span>
+                }`}
+              />
             ))}
           </div>
           <span className="text-primary">({feedback.usefulness_rating}/5)</span>

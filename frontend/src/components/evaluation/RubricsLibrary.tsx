@@ -13,6 +13,8 @@ import {
   Filter,
   X,
   Edit,
+  Check,
+  CircleDot,
 } from "lucide-react";
 import { listRubrics, archiveRubric, getRubricSet } from "@/api/rubrics";
 import type { RubricListItem, RubricSet } from "@/api/rubrics";
@@ -256,13 +258,17 @@ export default function RubricsLibrary({
                                   </div>
                                 )}
                               <div className="text-xs text-secondary mt-2 space-y-1">
-                                <div>✓ Success: {rule.feedback.on_success}</div>
+                                <div className="flex items-start gap-1">
+                                  <Check className="w-3 h-3 mt-0.5 text-emerald-500 shrink-0" /> Success: {rule.feedback.on_success}
+                                </div>
                                 {rule.feedback.on_partial && (
-                                  <div>
-                                    ◐ Partial: {rule.feedback.on_partial}
+                                  <div className="flex items-start gap-1">
+                                    <CircleDot className="w-3 h-3 mt-0.5 text-amber-500 shrink-0" /> Partial: {rule.feedback.on_partial}
                                   </div>
                                 )}
-                                <div>✗ Failure: {rule.feedback.on_failure}</div>
+                                <div className="flex items-start gap-1">
+                                  <X className="w-3 h-3 mt-0.5 text-red-500 shrink-0" /> Failure: {rule.feedback.on_failure}
+                                </div>
                               </div>
                             </div>
                           </div>
