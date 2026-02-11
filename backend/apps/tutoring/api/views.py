@@ -1,534 +1,520 @@
 """
 Tutoring Session API Views
 
-Implements the core API endpoints for tutoring sessions:
-- POST /api/tutoring/sessions/create/ - Teacher creates session
-- POST /api/tutoring/sessions/join/ - Student joins session
+Section-based batch tutoring endpoints:
+- POST /api/tutoring/sessions/create/ - Teacher creates session (for a section)
+- POST /api/tutoring/sessions/join/ - Student joins session (by session_id)
 - GET /api/tutoring/sessions/{session_id}/status/ - Get session status
 - POST /api/tutoring/sessions/{session_id}/end/ - End session
-
-All endpoints enforce strict role-based authorization.
+- GET /api/tutoring/sessions/available/ - Student discovers joinable sessions
+- POST /api/tutoring/sessions/{session_id}/leave/ - Student leaves session
+- GET /api/tutoring/sessions/ - List sessions for current user
 """
 
 import uuid
 import logging
 from rest_framework import status
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from apps.tutoring.models import (
-    TutoringSession, 
-    SessionStatus
+    TutoringSession,
+    SessionParticipant,
+    SessionStatus as SessionStatusEnum,
 )
 from apps.tutoring.api.serializers import (
     SessionCreateSerializer,
-    SessionCreateResponseSerializer,
     SessionJoinSerializer,
-    SessionJoinResponseSerializer,
     SessionStatusSerializer,
     SessionListSerializer,
+    AvailableSessionSerializer,
 )
 from apps.tutoring.utils import (
-    generate_livekit_token, 
+    generate_livekit_token,
     get_livekit_ws_url,
     broadcast_session_status_change,
     broadcast_session_ended,
-    broadcast_participant_update
+    broadcast_participant_update,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def get_base_url(request):
-    """Get the base URL for constructing join links."""
-    # Use frontend URL for join links
-    return "http://localhost:3000"
+def _get_user(request):
+    """Get authenticated user from request."""
+    return getattr(request, 'tutoring_user', None)
 
+
+def _auth_error():
+    return Response(
+        {'error': 'Authentication required', 'detail': 'User not authenticated', 'code': 'auth_required'},
+        status=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+# ─── Session Create ────────────────────────────────────────────────────────────
 
 class SessionCreateView(APIView):
     """
     POST /api/tutoring/sessions/create/
-    
-    Create a new tutoring session. Only TEACHERS can create sessions.
-    
-    Authorization: User must be a TEACHER
-    
-    Returns:
-        - 201: Session created successfully
-        - 403: User is not a teacher
-        - 500: LiveKit token generation failed
+
+    Teacher creates a session for a specific section.
+    Validates teacher has a TeacherSubjectAssignment for that section.
     """
-    
+
     def post(self, request):
-        # Get authenticated user (attached by middleware)
-        user = getattr(request, 'tutoring_user', None)
-        
+        user = _get_user(request)
         if not user:
-            return Response(
-                {
-                    'error': 'Authentication required',
-                    'detail': 'User not authenticated',
-                    'code': 'auth_required'
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Verify user is a teacher
+            return _auth_error()
+
         if user.role != 'teacher':
-            logger.warning(
-                f"Non-teacher user {user.id} attempted to create session"
-            )
             return Response(
-                {
-                    'error': 'Forbidden',
-                    'detail': 'Only teachers can create tutoring sessions',
-                    'code': 'teacher_required'
-                },
-                status=status.HTTP_403_FORBIDDEN
+                {'error': 'Forbidden', 'detail': 'Only teachers can create sessions', 'code': 'teacher_required'},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
-        # Generate unique room ID
-        room_id = f"tutoring_{uuid.uuid4()}"
-        
+
+        serializer = SessionCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'error': 'Invalid request', 'detail': serializer.errors, 'code': 'validation_error'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        section_id = serializer.validated_data['section_id']
+
+        # Validate teacher is assigned to this section
+        from apps.students.models import TeacherSubjectAssignment, Section
         try:
-            # Generate LiveKit token for teacher
+            section = Section.objects.select_related('class_ref').get(id=section_id)
+        except Section.DoesNotExist:
+            return Response(
+                {'error': 'Not found', 'detail': 'Section not found', 'code': 'section_not_found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        has_assignment = TeacherSubjectAssignment.objects.filter(
+            teacher=user, section=section
+        ).exists()
+
+        if not has_assignment:
+            return Response(
+                {'error': 'Forbidden', 'detail': 'You are not assigned to this section', 'code': 'not_assigned'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Check if teacher already has an active session
+        active = TutoringSession.objects.filter(
+            teacher=user,
+            status__in=[SessionStatusEnum.WAITING, SessionStatusEnum.ACTIVE, SessionStatusEnum.GRACE],
+        ).first()
+        if active:
+            return Response(
+                {'error': 'Already active', 'detail': 'You already have an active session', 'code': 'already_active'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        room_id = f"tutoring_{uuid.uuid4()}"
+
+        try:
             token = generate_livekit_token(
                 room_id=room_id,
                 user_id=str(user.id),
                 user_name=f"{user.first_name} {user.last_name}",
-                role='TEACHER'
+                role='TEACHER',
             )
         except Exception as e:
-            logger.error(f"Failed to generate LiveKit token: {str(e)}")
+            logger.error(f"Failed to generate LiveKit token: {e}")
             return Response(
-                {
-                    'error': 'Token generation failed',
-                    'detail': str(e),
-                    'code': 'token_generation_failed'
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'error': 'Token generation failed', 'detail': str(e), 'code': 'token_generation_failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-        # Create session
+
         session = TutoringSession.objects.create(
             room_id=room_id,
             teacher=user,
-            status=SessionStatus.WAITING,
-            livekit_token_teacher=token
+            section=section,
+            status=SessionStatusEnum.WAITING,
+            livekit_token_teacher=token,
         )
-        
-        logger.info(
-            f"Session created: {session.id} by teacher {user.id}"
-        )
-        
-        # Build join URL (frontend route)
-        base_url = get_base_url(request)
-        join_url = f"{base_url}/student/join/{room_id}"
-        
+
+        logger.info(f"Session {session.id} created by teacher {user.id} for section {section}")
+
         return Response(
             {
                 'session_id': str(session.id),
                 'room_id': room_id,
                 'token': token,
                 'status': session.status,
-                'join_url': join_url,
                 'livekit_ws_url': get_livekit_ws_url(),
                 'teacher_id': str(user.id),
+                'section_id': section.id,
+                'section_name': section.name,
+                'class_name': section.class_ref.name,
             },
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
 
+
+# ─── Session Join ──────────────────────────────────────────────────────────────
 
 class SessionJoinView(APIView):
     """
     POST /api/tutoring/sessions/join/
-    
-    Join an existing tutoring session. Only STUDENTS can join sessions.
-    
-    Authorization: User must be a STUDENT
-    
-    Request Body:
-        - room_id: The room ID to join
-    
-    Returns:
-        - 200: Successfully joined session
-        - 400: Student already in another active session
-        - 403: User is not a student
-        - 404: Room not found
-        - 409: Another student already joined
-        - 410: Session has ended
+
+    Student joins session by session_id.
+    Validates student belongs to the session's section.
     """
-    
+
     def post(self, request):
-        # Get authenticated user
-        user = getattr(request, 'tutoring_user', None)
-        
+        user = _get_user(request)
         if not user:
-            return Response(
-                {
-                    'error': 'Authentication required',
-                    'detail': 'User not authenticated',
-                    'code': 'auth_required'
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Verify user is a student
+            return _auth_error()
+
         if user.role != 'student':
-            logger.warning(
-                f"Non-student user {user.id} attempted to join session"
-            )
             return Response(
-                {
-                    'error': 'Forbidden',
-                    'detail': 'Only students can join tutoring sessions',
-                    'code': 'student_required'
-                },
-                status=status.HTTP_403_FORBIDDEN
+                {'error': 'Forbidden', 'detail': 'Only students can join sessions', 'code': 'student_required'},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
-        # Validate request data
+
         serializer = SessionJoinSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(
-                {
-                    'error': 'Invalid request',
-                    'detail': serializer.errors,
-                    'code': 'validation_error'
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {'error': 'Invalid request', 'detail': serializer.errors, 'code': 'validation_error'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        room_id = serializer.validated_data['room_id']
-        
-        # Find session by room_id
+
+        session_id = serializer.validated_data['session_id']
+
         try:
-            session = TutoringSession.objects.get(room_id=room_id)
+            session = TutoringSession.objects.select_related('teacher', 'section', 'section__class_ref').get(id=session_id)
         except TutoringSession.DoesNotExist:
-            logger.warning(f"Room not found: {room_id}")
             return Response(
-                {
-                    'error': 'Room not found',
-                    'detail': f"No session found with room ID: {room_id}",
-                    'code': 'room_not_found'
-                },
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'Not found', 'detail': 'Session not found', 'code': 'session_not_found'},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
-        # Check if session has ended
+
         if session.is_ended:
-            logger.warning(
-                f"User {user.id} attempted to join ended session {session.id}"
-            )
             return Response(
-                {
-                    'error': 'Session ended',
-                    'detail': 'This tutoring session has already ended',
-                    'code': 'session_ended'
-                },
-                status=status.HTTP_410_GONE
+                {'error': 'Session ended', 'detail': 'This session has already ended', 'code': 'session_ended'},
+                status=status.HTTP_410_GONE,
             )
-        
-        # Check if student already joined (this session or same student)
-        if session.has_student:
-            # Check if it's the same student rejoining
-            if session.student_id == user.id:
-                # Return existing token for reconnection
-                return Response(
-                    {
-                        'session_id': str(session.id),
-                        'token': session.livekit_token_student,
-                        'status': session.status,
-                        'teacher_name': f"{session.teacher.first_name} {session.teacher.last_name}",
-                        'room_id': room_id,
-                        'livekit_ws_url': get_livekit_ws_url(),
-                    },
-                    status=status.HTTP_200_OK
-                )
-            
-            logger.warning(
-                f"User {user.id} attempted to join session {session.id} "
-                f"but another student already joined"
-            )
-            return Response(
-                {
-                    'error': 'Session full',
-                    'detail': 'Another student has already joined this session',
-                    'code': 'session_full'
-                },
-                status=status.HTTP_409_CONFLICT
-            )
-        
-        # Check if student is already in another active session
-        active_sessions = TutoringSession.objects.filter(
-            student=user,
-            status__in=[SessionStatus.WAITING, SessionStatus.ACTIVE, SessionStatus.GRACE]
-        ).exclude(id=session.id)
-        
-        if active_sessions.exists():
-            logger.warning(
-                f"User {user.id} already in another active session"
-            )
-            return Response(
-                {
-                    'error': 'Already in session',
-                    'detail': 'You are already in another active tutoring session',
-                    'code': 'already_in_session'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+
+        # Validate student is in the session's section
+        from apps.students.models import StudentProfile
         try:
-            # Generate LiveKit token for student
+            profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response(
+                {'error': 'No profile', 'detail': 'Student profile not found', 'code': 'no_profile'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if session.section and profile.section_id != session.section_id:
+            return Response(
+                {'error': 'Wrong section', 'detail': 'This session is not for your section', 'code': 'wrong_section'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Check if student already has an active participation in this session
+        existing = SessionParticipant.objects.filter(session=session, user=user, left_at__isnull=True).first()
+        if existing:
+            # Return existing token for reconnection
+            return Response(
+                {
+                    'session_id': str(session.id),
+                    'token': existing.livekit_token,
+                    'status': session.status,
+                    'teacher_name': f"{session.teacher.first_name} {session.teacher.last_name}",
+                    'room_id': session.room_id,
+                    'livekit_ws_url': get_livekit_ws_url(),
+                    'section_name': session.section.name if session.section else '',
+                    'class_name': session.section.class_ref.name if session.section else '',
+                    'participant_count': session.participant_count,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Check if student is in another active session
+        other_active = SessionParticipant.objects.filter(
+            user=user,
+            left_at__isnull=True,
+            session__status__in=[SessionStatusEnum.WAITING, SessionStatusEnum.ACTIVE, SessionStatusEnum.GRACE],
+        ).exclude(session=session).exists()
+
+        if other_active:
+            return Response(
+                {'error': 'Already in session', 'detail': 'You are already in another active session', 'code': 'already_in_session'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
             token = generate_livekit_token(
-                room_id=room_id,
+                room_id=session.room_id,
                 user_id=str(user.id),
                 user_name=f"{user.first_name} {user.last_name}",
-                role='STUDENT'
+                role='STUDENT',
             )
         except Exception as e:
-            logger.error(f"Failed to generate LiveKit token: {str(e)}")
+            logger.error(f"Failed to generate LiveKit token: {e}")
             return Response(
-                {
-                    'error': 'Token generation failed',
-                    'detail': str(e),
-                    'code': 'token_generation_failed'
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'error': 'Token generation failed', 'detail': str(e), 'code': 'token_generation_failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-        # Activate session with student
-        session.activate(student=user, token=token)
-        
-        logger.info(
-            f"Student {user.id} joined session {session.id}"
+
+        # Create participant record
+        SessionParticipant.objects.create(
+            session=session,
+            user=user,
+            livekit_token=token,
         )
-        
-        # Broadcast WebSocket event for student join
+
+        # Activate session on first join
+        previous_status = session.status
+        session.activate()
+
+        logger.info(f"Student {user.id} joined session {session.id}")
+
+        # Broadcast WebSocket events
         try:
-            broadcast_session_status_change(
-                session_id=str(session.id),
-                status=session.status,
-                previous_status=SessionStatus.WAITING,
-                metadata={
-                    'student_id': str(user.id),
-                    'student_name': f"{user.first_name} {user.last_name}",
-                    'event': 'student_joined'
-                }
-            )
+            if previous_status != session.status:
+                broadcast_session_status_change(
+                    session_id=str(session.id),
+                    status=session.status,
+                    previous_status=previous_status,
+                    metadata={
+                        'student_id': str(user.id),
+                        'student_name': f"{user.first_name} {user.last_name}",
+                        'event': 'student_joined',
+                    },
+                )
             broadcast_participant_update(
                 session_id=str(session.id),
                 user_id=str(user.id),
                 role='student',
                 user_name=f"{user.first_name} {user.last_name}",
-                event_type='participant_joined'
+                event_type='participant_joined',
             )
         except Exception as e:
-            # Don't fail the join if WebSocket broadcast fails
-            logger.warning(f"Failed to broadcast join event: {str(e)}")
-        
+            logger.warning(f"Failed to broadcast join event: {e}")
+
         return Response(
             {
                 'session_id': str(session.id),
                 'token': token,
                 'status': session.status,
                 'teacher_name': f"{session.teacher.first_name} {session.teacher.last_name}",
-                'room_id': room_id,
+                'room_id': session.room_id,
                 'livekit_ws_url': get_livekit_ws_url(),
+                'section_name': session.section.name if session.section else '',
+                'class_name': session.section.class_ref.name if session.section else '',
+                'participant_count': session.participant_count,
             },
-            status=status.HTTP_200_OK
+            status=status.HTTP_200_OK,
         )
 
+
+# ─── Session Status ────────────────────────────────────────────────────────────
 
 class SessionStatusView(APIView):
     """
     GET /api/tutoring/sessions/{session_id}/status/
-    
-    Get the current status of a tutoring session.
-    
-    Authorization: User must be the teacher or student of this session
-    
-    Returns:
-        - 200: Session status
-        - 403: User not authorized for this session
-        - 404: Session not found
+
+    Returns session status with participant list.
+    User must be teacher or an active participant.
     """
-    
+
     def get(self, request, session_id):
-        # Get authenticated user
-        user = getattr(request, 'tutoring_user', None)
-        
+        user = _get_user(request)
         if not user:
-            return Response(
-                {
-                    'error': 'Authentication required',
-                    'detail': 'User not authenticated',
-                    'code': 'auth_required'
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Find session
+            return _auth_error()
+
         try:
-            session = TutoringSession.objects.get(id=session_id)
+            session = TutoringSession.objects.select_related(
+                'teacher', 'section', 'section__class_ref'
+            ).get(id=session_id)
         except TutoringSession.DoesNotExist:
             return Response(
-                {
-                    'error': 'Session not found',
-                    'detail': f"No session found with ID: {session_id}",
-                    'code': 'session_not_found'
-                },
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'Not found', 'detail': 'Session not found', 'code': 'session_not_found'},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
-        # Verify user is a participant
+
         if not session.is_participant(user):
-            logger.warning(
-                f"User {user.id} attempted to access session {session.id} "
-                f"without authorization"
-            )
             return Response(
-                {
-                    'error': 'Forbidden',
-                    'detail': 'You are not authorized to view this session',
-                    'code': 'not_participant'
-                },
-                status=status.HTTP_403_FORBIDDEN
+                {'error': 'Forbidden', 'detail': 'You are not a participant', 'code': 'not_participant'},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         serializer = SessionStatusSerializer(session)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+# ─── Session End ───────────────────────────────────────────────────────────────
 
 class SessionEndView(APIView):
     """
     POST /api/tutoring/sessions/{session_id}/end/
-    
-    End a tutoring session. Only the teacher can end a session.
-    
-    Authorization: User must be the teacher of this session
-    
-    Returns:
-        - 200: Session ended successfully
-        - 403: User is not the teacher of this session
-        - 404: Session not found
-        - 410: Session already ended
+
+    Only the teacher can end a session. Marks all participants as left.
     """
-    
+
     def post(self, request, session_id):
-        # Get authenticated user
-        user = getattr(request, 'tutoring_user', None)
-        
+        user = _get_user(request)
         if not user:
-            return Response(
-                {
-                    'error': 'Authentication required',
-                    'detail': 'User not authenticated',
-                    'code': 'auth_required'
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Find session
+            return _auth_error()
+
         try:
-            session = TutoringSession.objects.get(id=session_id)
+            session = TutoringSession.objects.select_related(
+                'teacher', 'section', 'section__class_ref'
+            ).get(id=session_id)
         except TutoringSession.DoesNotExist:
             return Response(
-                {
-                    'error': 'Session not found',
-                    'detail': f"No session found with ID: {session_id}",
-                    'code': 'session_not_found'
-                },
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'Not found', 'detail': 'Session not found', 'code': 'session_not_found'},
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
-        # Verify user is the teacher
+
         if session.teacher_id != user.id:
-            logger.warning(
-                f"User {user.id} attempted to end session {session.id} "
-                f"without authorization"
-            )
             return Response(
-                {
-                    'error': 'Forbidden',
-                    'detail': 'Only the teacher can end this session',
-                    'code': 'teacher_required'
-                },
-                status=status.HTTP_403_FORBIDDEN
+                {'error': 'Forbidden', 'detail': 'Only the teacher can end this session', 'code': 'teacher_required'},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        
-        # Check if already ended
+
         if session.is_ended:
             return Response(
-                {
-                    'error': 'Session already ended',
-                    'detail': 'This session has already ended',
-                    'code': 'already_ended'
-                },
-                status=status.HTTP_410_GONE
+                {'error': 'Already ended', 'detail': 'Session already ended', 'code': 'already_ended'},
+                status=status.HTTP_410_GONE,
             )
-        
-        # End the session
-        previous_status = session.status
+
         session.end()
-        
-        logger.info(
-            f"Session {session.id} ended by teacher {user.id}"
-        )
-        
-        # Broadcast WebSocket event for session end
+
+        logger.info(f"Session {session.id} ended by teacher {user.id}")
+
         try:
             broadcast_session_ended(
                 session_id=str(session.id),
                 reason="Session ended by teacher",
-                ended_by="teacher"
+                ended_by="teacher",
             )
         except Exception as e:
-            # Don't fail the end if WebSocket broadcast fails
-            logger.warning(f"Failed to broadcast session end event: {str(e)}")
-        
+            logger.warning(f"Failed to broadcast session end: {e}")
+
         serializer = SessionStatusSerializer(session)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# ─── Available Sessions (student discovery) ────────────────────────────────────
+
+class AvailableSessionsView(APIView):
+    """
+    GET /api/tutoring/sessions/available/
+
+    Returns sessions available for the current student (based on section).
+    """
+
+    def get(self, request):
+        user = _get_user(request)
+        if not user:
+            return _auth_error()
+
+        if user.role != 'student':
+            return Response(
+                {'error': 'Forbidden', 'detail': 'Only students can list available sessions', 'code': 'student_required'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from apps.students.models import StudentProfile
+        try:
+            profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response([], status=status.HTTP_200_OK)
+
+        if not profile.section_id:
+            return Response([], status=status.HTTP_200_OK)
+
+        sessions = TutoringSession.objects.filter(
+            section=profile.section,
+            status__in=[SessionStatusEnum.WAITING, SessionStatusEnum.ACTIVE],
+        ).select_related('teacher', 'section', 'section__class_ref')
+
+        serializer = AvailableSessionSerializer(sessions, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ─── Leave Session ─────────────────────────────────────────────────────────────
+
+class LeaveSessionView(APIView):
+    """
+    POST /api/tutoring/sessions/{session_id}/leave/
+
+    Student leaves session without ending it.
+    """
+
+    def post(self, request, session_id):
+        user = _get_user(request)
+        if not user:
+            return _auth_error()
+
+        try:
+            session = TutoringSession.objects.get(id=session_id)
+        except TutoringSession.DoesNotExist:
+            return Response(
+                {'error': 'Not found', 'detail': 'Session not found', 'code': 'session_not_found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        participant = SessionParticipant.objects.filter(
+            session=session, user=user, left_at__isnull=True
+        ).first()
+
+        if not participant:
+            return Response(
+                {'error': 'Not in session', 'detail': 'You are not in this session', 'code': 'not_in_session'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        participant.left_at = timezone.now()
+        participant.save(update_fields=['left_at'])
+
+        logger.info(f"Student {user.id} left session {session.id}")
+
+        try:
+            broadcast_participant_update(
+                session_id=str(session.id),
+                user_id=str(user.id),
+                role='student',
+                user_name=f"{user.first_name} {user.last_name}",
+                event_type='participant_left',
+            )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast leave event: {e}")
+
+        return Response({'detail': 'Left session successfully'}, status=status.HTTP_200_OK)
+
+
+# ─── Session List ──────────────────────────────────────────────────────────────
+
 class SessionListView(APIView):
     """
     GET /api/tutoring/sessions/
-    
-    List sessions for the current user.
-    Teachers see their created sessions.
-    Students see sessions they have joined.
-    
-    Query params:
-        - status: Filter by status (WAITING, ACTIVE, ENDED)
+
+    Teachers see their sessions. Students see sessions they participated in.
     """
-    
+
     def get(self, request):
-        # Get authenticated user
-        user = getattr(request, 'tutoring_user', None)
-        
+        user = _get_user(request)
         if not user:
-            return Response(
-                {
-                    'error': 'Authentication required',
-                    'detail': 'User not authenticated',
-                    'code': 'auth_required'
-                },
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
-        # Filter sessions based on role
+            return _auth_error()
+
         if user.role == 'teacher':
             sessions = TutoringSession.objects.filter(teacher=user)
         else:
-            sessions = TutoringSession.objects.filter(student=user)
-        
-        # Apply status filter if provided
+            participated_ids = SessionParticipant.objects.filter(user=user).values_list('session_id', flat=True)
+            sessions = TutoringSession.objects.filter(id__in=participated_ids)
+
         status_filter = request.query_params.get('status')
         if status_filter:
             sessions = sessions.filter(status=status_filter)
-        
+
+        sessions = sessions.select_related('teacher', 'section', 'section__class_ref')
         serializer = SessionListSerializer(sessions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

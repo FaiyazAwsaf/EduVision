@@ -23,13 +23,21 @@ export interface Participant {
   connected: boolean;
 }
 
+export interface SectionInfo {
+  id: number;
+  name: string;
+  class_name: string | null;
+}
+
 export interface InitialState {
   session_id: string;
   room_id: string;
   status: SessionStatus;
   your_role: "teacher" | "student";
   teacher: Participant;
-  student: Participant | null;
+  /** Multiple student participants */
+  participants: (Participant & { role: string; joined_at: string })[];
+  section: SectionInfo | null;
   timestamp: string;
 }
 

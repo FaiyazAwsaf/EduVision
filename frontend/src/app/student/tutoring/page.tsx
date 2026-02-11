@@ -1,21 +1,26 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Link as LinkIcon,
   Loader2,
   AlertTriangle,
   Video,
   ArrowRight,
+  Users,
+  Clock,
+  RefreshCw,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   joinSession,
   getSessionStatus,
+  getAvailableSessions,
   getErrorMessage,
   type ApiError,
   type SessionJoinResponse,
+  type AvailableSession,
 } from "@/api/tutoring";
 
 /* ─── Storage helpers (shared with session page) ─────────────────────────── */
@@ -23,14 +28,32 @@ import {
 const STORAGE_KEY_STUDENT_SESSION = "tutoring_student_session_data";
 const STORAGE_KEY_STUDENT_USER = "tutoring_student_user_data";
 
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return date.toLocaleDateString();
+}
+
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function StudentTutoringPage() {
   const router = useRouter();
   const { isReady, isAuthenticated, user } = useAuth();
 
-  const [joinLink, setJoinLink] = useState("");
-  const [isJoining, setIsJoining] = useState(false);
+  const [availableSessions, setAvailableSessions] = useState<
+    AvailableSession[]
+  >([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [joiningSessionId, setJoiningSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Active session detection
@@ -58,7 +81,6 @@ export default function StudentTutoringPage() {
       const savedSession = sessionStorage.getItem(STORAGE_KEY_STUDENT_SESSION);
       if (savedSession) {
         const parsed: SessionJoinResponse = JSON.parse(savedSession);
-        // Verify it's still active by checking status
         getSessionStatus(parsed.session_id)
           .then((status) => {
             if (
@@ -68,7 +90,6 @@ export default function StudentTutoringPage() {
             ) {
               setHasActiveSession(true);
             } else {
-              // Session ended, clear storage
               sessionStorage.removeItem(STORAGE_KEY_STUDENT_SESSION);
               sessionStorage.removeItem(STORAGE_KEY_STUDENT_USER);
             }
@@ -86,54 +107,34 @@ export default function StudentTutoringPage() {
     }
   }, [isReady, user]);
 
-  /**
-   * Extract room_id from a join link.
-   * Supports:
-   *   - Full URL: http(s)://…/student/join/{room_id}
-   *   - Just the room_id string
-   */
-  function extractRoomId(input: string): string | null {
-    const trimmed = input.trim();
-    if (!trimmed) return null;
-
-    // Try to parse as URL
+  // Fetch available sessions
+  const fetchAvailableSessions = useCallback(async () => {
     try {
-      const url = new URL(trimmed);
-      const parts = url.pathname.split("/").filter(Boolean);
-      // Expect …/student/join/{room_id}
-      const joinIdx = parts.indexOf("join");
-      if (joinIdx !== -1 && parts[joinIdx + 1]) {
-        return parts[joinIdx + 1];
-      }
-    } catch {
-      // Not a URL — treat as raw room_id
+      const sessions = await getAvailableSessions();
+      setAvailableSessions(sessions);
+    } catch (err) {
+      console.error("Failed to fetch available sessions:", err);
+    } finally {
+      setLoadingSessions(false);
     }
+  }, []);
 
-    // If it looks like a plain room_id (alphanumeric + hyphens/underscores)
-    if (/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
-      return trimmed;
-    }
+  // Initial fetch + polling every 10 seconds
+  useEffect(() => {
+    if (!isReady || !user || hasActiveSession) return;
 
-    return null;
-  }
+    fetchAvailableSessions();
+    const interval = setInterval(fetchAvailableSessions, 10000);
+    return () => clearInterval(interval);
+  }, [isReady, user, hasActiveSession, fetchAvailableSessions]);
 
-  const handleJoin = async () => {
+  const handleJoin = async (sessionId: string) => {
     setError(null);
-
-    const roomId = extractRoomId(joinLink);
-    if (!roomId) {
-      setError(
-        "Please paste a valid session link or room ID. Example: http://localhost:3000/student/join/abc123",
-      );
-      return;
-    }
-
-    setIsJoining(true);
+    setJoiningSessionId(sessionId);
 
     try {
-      const response: SessionJoinResponse = await joinSession(roomId);
+      const response: SessionJoinResponse = await joinSession(sessionId);
 
-      // Save session data so the session page can restore it
       const tutoringUser = {
         id: user!.id,
         email: user!.email,
@@ -156,7 +157,7 @@ export default function StudentTutoringPage() {
       const apiError = err as ApiError;
       setError(getErrorMessage(apiError));
     } finally {
-      setIsJoining(false);
+      setJoiningSessionId(null);
     }
   };
 
@@ -176,18 +177,33 @@ export default function StudentTutoringPage() {
         <div className="flex items-center justify-between px-8 py-4">
           <div>
             <h1 className="text-2xl font-bold text-primary-dark">
-              Join Tutoring Session
+              Live Tutoring
             </h1>
             <p className="text-sm text-primary">
-              Paste the session link shared by your teacher to join
+              Join a live tutoring session from your section
             </p>
           </div>
+          {!hasActiveSession && (
+            <button
+              onClick={() => {
+                setLoadingSessions(true);
+                fetchAvailableSessions();
+              }}
+              disabled={loadingSessions}
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-dark transition-colors"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loadingSessions ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+          )}
         </div>
       </header>
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <main className="px-8 py-8 max-w-2xl mx-auto">
-        {/* Active session — focused view (no join card) */}
+        {/* Active session - return to it */}
         {!checkingSession && hasActiveSession ? (
           <div className="bg-white rounded-2xl border border-secondary/30 p-10 shadow-sm flex flex-col items-center text-center">
             <div className="relative flex h-5 w-5 mb-4">
@@ -209,24 +225,16 @@ export default function StudentTutoringPage() {
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+        ) : checkingSession ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
         ) : (
-          /* Join card — only when no active session */
-          <div className="bg-white rounded-2xl border border-secondary/30 p-8 shadow-sm">
-            <div className="flex flex-col items-center text-center mb-8">
-              <div className="w-16 h-16 bg-[#E8F4F5] rounded-2xl flex items-center justify-center mb-4">
-                <Video className="w-8 h-8 text-primary-dark" />
-              </div>
-              <h2 className="text-xl font-semibold text-primary-dark mb-1">
-                Enter Session Link
-              </h2>
-              <p className="text-sm text-muted">
-                Ask your teacher for the session link and paste it below
-              </p>
-            </div>
-
+          /* Available sessions list */
+          <div className="space-y-6">
             {/* Error */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
                   <p className="text-sm text-red-700">{error}</p>
@@ -234,49 +242,116 @@ export default function StudentTutoringPage() {
               </div>
             )}
 
-            {/* Input */}
-            <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor="join-link"
-                  className="block text-sm font-medium text-primary-dark mb-2"
-                >
-                  Session Link or Room ID
-                </label>
-                <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-                  <input
-                    id="join-link"
-                    type="text"
-                    value={joinLink}
-                    onChange={(e) => setJoinLink(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !isJoining) handleJoin();
-                    }}
-                    placeholder="http://localhost:3000/student/join/room-abc123"
-                    className="w-full pl-11 pr-4 py-3 border border-secondary/40 rounded-xl text-sm text-primary-dark placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
-                  />
-                </div>
+            {loadingSessions ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
               </div>
+            ) : availableSessions.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
+                <Video className="w-12 h-12 text-secondary mx-auto mb-4" />
+                <h2 className="text-lg font-semibold text-primary-dark mb-1">
+                  No Live Sessions
+                </h2>
+                <p className="text-sm text-muted">
+                  There are no live tutoring sessions for your section right now.
+                  <br />
+                  Check back later or wait for your teacher to start one.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted">
+                  {availableSessions.length} session
+                  {availableSessions.length !== 1 ? "s" : ""} available for your
+                  section
+                </p>
 
-              <button
-                onClick={handleJoin}
-                disabled={isJoining || !joinLink.trim()}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isJoining ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Joining Session…
-                  </>
-                ) : (
-                  <>
-                    <Video className="w-4 h-4" />
-                    Join Session
-                  </>
-                )}
-              </button>
-            </div>
+                {availableSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="bg-white rounded-2xl border border-secondary/30 p-6 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-base font-semibold text-primary-dark">
+                          {session.class_name && session.section_name
+                            ? `Class ${session.class_name} - Section ${session.section_name}`
+                            : "Tutoring Session"}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <User className="w-3.5 h-3.5 text-muted" />
+                          <span className="text-sm text-muted">
+                            {session.teacher_name}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-full ${
+                          session.status === "ACTIVE"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-amber-50 text-amber-600"
+                        }`}
+                      >
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span
+                            className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                              session.status === "ACTIVE"
+                                ? "bg-red-400"
+                                : "bg-amber-400"
+                            }`}
+                          />
+                          <span
+                            className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                              session.status === "ACTIVE"
+                                ? "bg-red-500"
+                                : "bg-amber-500"
+                            }`}
+                          />
+                        </span>
+                        {session.status === "ACTIVE" ? "LIVE" : "WAITING"}
+                      </span>
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex items-center gap-4 mb-5 text-xs text-muted">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>
+                          {session.participant_count}{" "}
+                          {session.participant_count === 1
+                            ? "student"
+                            : "students"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Started {formatTime(session.created_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* Join button */}
+                    <button
+                      onClick={() => handleJoin(session.id)}
+                      disabled={joiningSessionId !== null}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {joiningSessionId === session.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Joining...
+                        </>
+                      ) : (
+                        <>
+                          <Video className="w-4 h-4" />
+                          Join Session
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </main>

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Teacher Dashboard Page (Phase 2 - WebSocket Version)
+ * Teacher Session Page
  *
- * Allows teachers to create and manage tutoring sessions.
- * Uses WebSocket for real-time updates instead of polling.
- * Phase 3: Audio-only WebRTC integration.
+ * Displays the active tutoring session for a teacher.
+ * Shows a participant list with online/offline indicators for all students.
+ * Session info includes section name, participant count, and session controls.
  */
 
 import React, { useState, useCallback, useEffect } from "react";
@@ -15,16 +15,18 @@ import {
   Clock,
   Square,
   GraduationCap,
-  Check,
   Circle,
   ArrowLeft,
+  Users,
+  User,
 } from "lucide-react";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
+import { ConnectionStatusBadge } from "@/components/tutoring/ConnectionStatus";
 import {
-  ConnectionStatusBadge,
-  ParticipantStatus,
-} from "@/components/tutoring/ConnectionStatus";
-import { SessionProvider, useSession } from "@/contexts/SessionContext";
+  SessionProvider,
+  useSession,
+  type SessionParticipant,
+} from "@/contexts/SessionContext";
 import { MediaSession } from "@/components/tutoring/media/MediaSession";
 import {
   TutoringUser,
@@ -40,7 +42,8 @@ import {
 } from "@/lib/websocket";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Inner component that uses WebSocket context
+// ─── Inner SessionView component ──────────────────────────────────────────────
+
 function SessionView({
   sessionData,
   user,
@@ -63,21 +66,6 @@ function SessionView({
     error: wsError,
   } = useSession();
 
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyLink = async () => {
-    if (!sessionData.join_url) return;
-
-    try {
-      await navigator.clipboard.writeText(sessionData.join_url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy link:", err);
-    }
-  };
-
-  // Get effective status from WebSocket or fallback to initial
   const effectiveStatus = (sessionState?.status || sessionData.status) as
     | "WAITING"
     | "ACTIVE"
@@ -87,15 +75,27 @@ function SessionView({
   const isActive = effectiveStatus === "ACTIVE";
   const isWaiting = effectiveStatus === "WAITING";
 
+  const participants: SessionParticipant[] =
+    sessionState?.participants || [];
+  const onlineCount = participants.filter((p) => p.connected).length;
+
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
       {/* Session Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-secondary/20">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Tutoring Session
-          </h2>
-          <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-primary-dark">
+              Tutoring Session
+            </h2>
+            {sessionData.section_name && (
+              <p className="text-sm text-muted mt-0.5">
+                Class {sessionData.class_name} - Section{" "}
+                {sessionData.section_name}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
             <ConnectionStatusBadge state={connectionState} showLabel={true} />
             <SessionStatusBadge status={effectiveStatus} />
           </div>
@@ -121,11 +121,11 @@ function SessionView({
               <Clock className="w-6 h-6 text-yellow-600" />
               <div>
                 <p className="font-medium text-yellow-800">
-                  Waiting for student to join...
+                  Waiting for students to join...
                 </p>
                 <p className="text-sm text-yellow-600">
-                  Share the link below with your student. You&apos;ll be
-                  notified automatically when they join.
+                  Students from the selected section will see this session and
+                  can join automatically.
                 </p>
               </div>
             </div>
@@ -138,12 +138,11 @@ function SessionView({
               <Circle className="w-6 h-6 text-green-600 fill-green-600" />
               <div>
                 <p className="font-medium text-green-800">
-                  {sessionState?.student?.name
-                    ? `${sessionState.student.name} has joined!`
-                    : "Student has joined!"}
+                  Session Active - {participants.length}{" "}
+                  {participants.length === 1 ? "student" : "students"} joined
                 </p>
                 <p className="text-sm text-green-600">
-                  The tutoring session is now active.
+                  {onlineCount} currently online
                 </p>
               </div>
             </div>
@@ -166,63 +165,80 @@ function SessionView({
 
         {/* Participants */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Participants
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-primary-dark">
+              Participants
+            </label>
+            <span className="text-xs text-muted">
+              {participants.length}{" "}
+              {participants.length === 1 ? "student" : "students"}
+              {onlineCount > 0 && ` (${onlineCount} online)`}
+            </span>
+          </div>
           <div className="space-y-2">
-            <ParticipantStatus
-              name={user.full_name}
-              role="teacher"
-              connected={isConnected}
-            />
-            {sessionState?.student ? (
-              <ParticipantStatus
-                name={sessionState.student.name}
-                role="student"
-                connected={sessionState.isStudentConnected}
-              />
+            {/* Teacher (self) */}
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg border bg-green-50 border-green-200">
+              <User className="w-6 h-6" style={{ color: "#48A6A7" }} />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">{user.full_name}</p>
+                <p className="text-xs text-gray-500">Teacher</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-xs text-gray-600">Online</span>
+              </div>
+            </div>
+
+            {/* Student Participants */}
+            {participants.length > 0 ? (
+              participants.map((p) => {
+                const statusColor = p.connected
+                  ? "bg-green-500"
+                  : "bg-gray-400";
+                const bgColor = p.connected ? "bg-green-50" : "bg-gray-50";
+                const borderColor = p.connected
+                  ? "border-green-200"
+                  : "border-gray-200";
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${bgColor} ${borderColor}`}
+                  >
+                    <GraduationCap
+                      className="w-6 h-6"
+                      style={{ color: "#48A6A7" }}
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-500">Student</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-flex h-2 w-2 rounded-full ${statusColor}`}
+                      />
+                      <span className="text-xs text-gray-600">
+                        {p.connected ? "Online" : "Offline"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
             ) : (
               <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-dashed border-gray-300 bg-gray-50">
                 <GraduationCap className="w-6 h-6 text-gray-400" />
                 <div className="flex-1">
                   <p className="font-medium text-gray-400">
-                    Waiting for student...
+                    Waiting for students...
                   </p>
-                  <p className="text-xs text-gray-400">Student</p>
+                  <p className="text-xs text-gray-400">
+                    Students from the section will appear here
+                  </p>
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Join Link */}
-        {!isEnded && sessionData.join_url && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Share this link with your student:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={sessionData.join_url}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 text-sm"
-              />
-              <button
-                onClick={handleCopyLink}
-                className="px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4" /> Copied!
-                  </>
-                ) : (
-                  "Copy Link"
-                )}
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Session Info */}
         <div className="grid grid-cols-2 gap-4">
@@ -244,7 +260,7 @@ function SessionView({
           </div>
         </div>
 
-        {/* Video + Audio Session - Phase 4 */}
+        {/* Media Session */}
         {!isEnded && (
           <MediaSession
             wsUrl={sessionData.livekit_ws_url}
@@ -256,7 +272,7 @@ function SessionView({
       </div>
 
       {/* Session Actions */}
-      <div className="p-6 border-t border-gray-200 bg-gray-50">
+      <div className="p-6 border-t border-secondary/20 bg-background/30">
         <div className="flex items-center justify-end gap-3">
           {!isEnded ? (
             <button
@@ -269,7 +285,7 @@ function SessionView({
           ) : (
             <button
               onClick={onNewSession}
-              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-dark transition-colors"
             >
               Start New Session
             </button>
@@ -280,11 +296,11 @@ function SessionView({
   );
 }
 
-// Storage keys for session persistence
+// ─── Storage helpers ──────────────────────────────────────────────────────────
+
 const STORAGE_KEY_TEACHER_SESSION = "tutoring_teacher_session";
 const STORAGE_KEY_TEACHER_USER = "tutoring_teacher_user";
 
-// Helper functions for session persistence
 function saveTeacherSession(
   sessionData: SessionCreateResponse,
   user: TutoringUser,
@@ -324,8 +340,9 @@ function clearTeacherSession() {
   }
 }
 
-// Main page component
-export default function TeacherDashboardPage() {
+// ─── Main page component ─────────────────────────────────────────────────────
+
+export default function TeacherSessionPage() {
   const router = useRouter();
   const { user: authUser, isReady, isAuthenticated } = useAuth();
   const [user, setUser] = useState<TutoringUser | null>(null);
@@ -336,7 +353,7 @@ export default function TeacherDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
 
-  // Role guard: only teachers can access
+  // Role guard
   useEffect(() => {
     if (isReady && (!isAuthenticated || authUser?.role !== "teacher")) {
       router.replace(
@@ -345,9 +362,7 @@ export default function TeacherDashboardPage() {
     }
   }, [isReady, isAuthenticated, authUser, router]);
 
-  // Restore session from sessionStorage on mount.
-  // If no session data exists, redirect back to dashboard — this page
-  // should only be reached via the "+New Class" button.
+  // Restore session on mount
   useEffect(() => {
     const { sessionData: savedSession, user: savedUser } = loadTeacherSession();
     if (savedSession && savedUser) {
@@ -355,12 +370,11 @@ export default function TeacherDashboardPage() {
       setUser(savedUser);
       setIsRestoring(false);
     } else {
-      // No session to restore — redirect to dashboard
       router.replace("/teacher/dashboard");
     }
   }, [router]);
 
-  // Save session to localStorage when it changes
+  // Persist session changes
   useEffect(() => {
     if (sessionData && user) {
       saveTeacherSession(sessionData, user);
@@ -374,9 +388,7 @@ export default function TeacherDashboardPage() {
     setError(null);
 
     try {
-      // Pass the teacher_id from session creation to ensure authorization
-      await endSession(sessionData.session_id, sessionData.teacher_id);
-      // Clear storage and go back to dashboard
+      await endSession(sessionData.session_id);
       clearTeacherSession();
       router.push("/teacher/dashboard");
     } catch (err) {
@@ -393,30 +405,12 @@ export default function TeacherDashboardPage() {
   };
 
   const handleBack = () => {
-    // Keep session alive but go back to dashboard
     router.push("/teacher/dashboard");
   };
-
-  // Event handlers for WebSocket events
-  const handleParticipantJoined = useCallback((event: ParticipantEvent) => {
-    console.log("Participant joined:", event);
-    // Could add toast notification here
-  }, []);
-
-  const handleParticipantLeft = useCallback((event: ParticipantEvent) => {
-    console.log("Participant left:", event);
-    // Could add toast notification here
-  }, []);
-
-  const handleStatusChanged = useCallback((event: StatusChangeEvent) => {
-    console.log("Status changed:", event);
-    // Could add toast notification here
-  }, []);
 
   const handleSessionEnded = useCallback(
     (event: SessionEndedEvent) => {
       console.log("Session ended:", event);
-      // Clear session storage and redirect to dashboard
       clearTeacherSession();
       router.push("/teacher/dashboard");
     },
@@ -424,38 +418,41 @@ export default function TeacherDashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleBack}
-                className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                title="Back to dashboard"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Live Session
-                </h1>
-                <p className="text-gray-500 mt-1">
-                  Tutoring session in progress
-                </p>
-              </div>
+    <div className="min-h-screen">
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+        <div className="flex items-center justify-between px-8 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-2 rounded-lg text-muted hover:text-primary-dark hover:bg-background transition-colors"
+              title="Back to dashboard"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-primary-dark">
+                Live Session
+              </h1>
+              <p className="text-sm text-primary">
+                Tutoring session in progress
+              </p>
             </div>
-            {user && (
-              <div className="text-sm text-gray-600">
-                Logged in as{" "}
-                <span className="font-semibold">{user.full_name}</span>
-              </div>
-            )}
           </div>
+          {user && (
+            <div className="text-sm text-muted">
+              Logged in as{" "}
+              <span className="font-semibold text-primary-dark">
+                {user.full_name}
+              </span>
+            </div>
+          )}
         </div>
+      </header>
 
-        {/* Error Message */}
+      {/* ── Content ──────────────────────────────────────────────────────── */}
+      <main className="px-8 py-6 max-w-4xl mx-auto">
+        {/* Error */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
@@ -465,20 +462,16 @@ export default function TeacherDashboardPage() {
           </div>
         )}
 
-        {/* Loading while restoring session */}
+        {/* Loading */}
         {isRestoring ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading session...</p>
+          <div className="bg-white rounded-2xl border border-secondary/30 p-8 text-center shadow-sm">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted">Loading session...</p>
           </div>
         ) : sessionData ? (
-          /* Session View with WebSocket */
           <SessionProvider
             sessionId={sessionData.session_id}
             userId={user!.id}
-            onParticipantJoined={handleParticipantJoined}
-            onParticipantLeft={handleParticipantLeft}
-            onStatusChanged={handleStatusChanged}
             onSessionEnded={handleSessionEnded}
           >
             <SessionView
@@ -490,7 +483,7 @@ export default function TeacherDashboardPage() {
             />
           </SessionProvider>
         ) : null}
-      </div>
+      </main>
     </div>
   );
 }

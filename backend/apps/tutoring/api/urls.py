@@ -1,7 +1,5 @@
 """
 Tutoring API URL Configuration
-
-URL patterns for tutoring session management.
 """
 
 from django.urls import path
@@ -11,6 +9,8 @@ from apps.tutoring.api.views import (
     SessionStatusView,
     SessionEndView,
     SessionListView,
+    AvailableSessionsView,
+    LeaveSessionView,
 )
 
 app_name = 'tutoring'
@@ -20,6 +20,8 @@ urlpatterns = [
     path('sessions/', SessionListView.as_view(), name='session-list'),
     path('sessions/create/', SessionCreateView.as_view(), name='session-create'),
     path('sessions/join/', SessionJoinView.as_view(), name='session-join'),
+    path('sessions/available/', AvailableSessionsView.as_view(), name='session-available'),
     path('sessions/<uuid:session_id>/status/', SessionStatusView.as_view(), name='session-status'),
     path('sessions/<uuid:session_id>/end/', SessionEndView.as_view(), name='session-end'),
+    path('sessions/<uuid:session_id>/leave/', LeaveSessionView.as_view(), name='session-leave'),
 ]

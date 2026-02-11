@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   Hourglass,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -25,11 +26,14 @@ import {
   type SessionStatus,
 } from "@/api/tutoring";
 import { getMyClass, type MyClassInfo } from "@/api/school";
+import {
+  getMyTeachingAssignments,
+  type TeachingAssignment,
+} from "@/api/school";
 import { getScripts, type AnswerScript } from "@/api/evaluation";
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
-/** Format ISO date to a human-readable relative/absolute string */
 function formatSessionTime(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
@@ -43,7 +47,6 @@ function formatSessionTime(iso: string): string {
   return date.toLocaleDateString();
 }
 
-/** Pick a deterministic avatar colour from a name string */
 const AVATAR_COLORS = [
   "#9ACBD0",
   "#48A6A7",
@@ -60,7 +63,6 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-/** Get initials from a name */
 function initials(name: string): string {
   return name
     .split(" ")
@@ -68,6 +70,105 @@ function initials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+/* ─── Section Picker Modal ───────────────────────────────────────────────── */
+
+interface UniqueSection {
+  id: number;
+  section_name: string;
+  class_name: string;
+  stream: string;
+  academic_year: string;
+}
+
+function SectionPickerModal({
+  sections,
+  onSelect,
+  onClose,
+  isCreating,
+}: {
+  sections: UniqueSection[];
+  onSelect: (sectionId: number) => void;
+  onClose: () => void;
+  isCreating: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-secondary/20">
+          <div>
+            <h2 className="text-lg font-semibold text-primary-dark">
+              Start a Tutoring Session
+            </h2>
+            <p className="text-sm text-muted mt-0.5">
+              Choose the section for this session
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={isCreating}
+            className="p-2 rounded-lg text-muted hover:text-primary-dark hover:bg-background transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Section list */}
+        <div className="p-4 max-h-80 overflow-y-auto">
+          {sections.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
+                No assigned sections
+              </p>
+              <p className="text-xs text-muted">
+                You have not been assigned to any section yet
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => onSelect(section.id)}
+                  disabled={isCreating}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border border-secondary/30 hover:border-primary/50 hover:bg-primary/5 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-primary-dark">
+                      Class {section.class_name} - Section{" "}
+                      {section.section_name}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {section.stream && `${section.stream} · `}
+                      {section.academic_year}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-secondary/20">
+          <button
+            onClick={onClose}
+            disabled={isCreating}
+            className="w-full text-sm text-muted hover:text-primary-dark transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
@@ -82,21 +183,24 @@ export default function TeacherDashboard() {
   const [recentScripts, setRecentScripts] = useState<AnswerScript[]>([]);
   const [loadingScripts, setLoadingScripts] = useState(true);
 
+  // Section picker modal state
+  const [showSectionPicker, setShowSectionPicker] = useState(false);
+  const [sections, setSections] = useState<UniqueSection[]>([]);
+  const [loadingSections, setLoadingSections] = useState(false);
+
   // Authorization check
   useEffect(() => {
     if (isReady && !isAuthenticated) {
       router.replace("/signin");
     } else if (isReady && isAuthenticated && user?.role !== "teacher") {
-      // Redirect non-teachers to their appropriate dashboard
       router.replace("/student/dashboard");
     }
   }, [isReady, isAuthenticated, user, router]);
 
-  // Fetch active sessions for this teacher
+  // Fetch active sessions
   const fetchSessions = useCallback(async () => {
     try {
       setLoadingSessions(true);
-      // Fetch both WAITING and ACTIVE sessions
       const [waiting, active] = await Promise.all([
         listSessions("WAITING"),
         listSessions("ACTIVE"),
@@ -112,18 +216,17 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (isReady && isAuthenticated) {
       fetchSessions();
-      // Poll every 15 seconds for live updates
       const interval = setInterval(fetchSessions, 15000);
       return () => clearInterval(interval);
     }
   }, [isReady, isAuthenticated, fetchSessions]);
 
-  // Fetch class-teacher info (once)
+  // Fetch class-teacher info
   useEffect(() => {
     if (isReady && isAuthenticated) {
       getMyClass()
         .then(setMyClass)
-        .catch(() => setMyClass(null)); // silently ignore if not a class teacher
+        .catch(() => setMyClass(null));
     }
   }, [isReady, isAuthenticated]);
 
@@ -133,7 +236,6 @@ export default function TeacherDashboard() {
     setLoadingScripts(true);
     getScripts()
       .then((scripts) => {
-        // Sort by newest first, take up to 6
         const sorted = [...scripts].sort(
           (a, b) =>
             new Date(b.created_at).getTime() -
@@ -145,13 +247,40 @@ export default function TeacherDashboard() {
       .finally(() => setLoadingScripts(false));
   }, [isReady, isAuthenticated]);
 
-  // Create a new session and redirect to the session page
-  const handleNewClass = async () => {
+  // Open section picker: fetch teaching assignments and deduplicate by section
+  const handleOpenSectionPicker = async () => {
+    setShowSectionPicker(true);
+    setLoadingSections(true);
+    try {
+      const assignments = await getMyTeachingAssignments();
+      // Deduplicate by section id
+      const sectionMap = new Map<number, UniqueSection>();
+      for (const a of assignments) {
+        if (!sectionMap.has(a.section)) {
+          sectionMap.set(a.section, {
+            id: a.section,
+            section_name: a.section_name,
+            class_name: a.class_name,
+            stream: a.stream,
+            academic_year: a.academic_year,
+          });
+        }
+      }
+      setSections(Array.from(sectionMap.values()));
+    } catch (err) {
+      console.error("Failed to fetch sections:", err);
+      setSections([]);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+
+  // Create session for selected section
+  const handleCreateSession = async (sectionId: number) => {
     if (creatingSession) return;
     setCreatingSession(true);
     try {
-      const session = await createSession();
-      // Save session data to sessionStorage so the session page can restore it
+      const session = await createSession(sectionId);
       const tutoringUser = {
         id: user!.id,
         email: user!.email,
@@ -167,6 +296,7 @@ export default function TeacherDashboard() {
         "tutoring_teacher_user",
         JSON.stringify(tutoringUser),
       );
+      setShowSectionPicker(false);
       router.push("/teacher/dashboard/session");
     } catch (err) {
       console.error("Failed to create session:", err);
@@ -174,7 +304,7 @@ export default function TeacherDashboard() {
     }
   };
 
-  // Show loading state while checking authentication or if wrong role (will redirect)
+  // Loading state
   if (!isReady || !user || user.role !== "teacher") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -185,6 +315,19 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen">
+      {/* ── Section Picker Modal ───────────────────────────────────────── */}
+      {showSectionPicker && !loadingSections && (
+        <SectionPickerModal
+          sections={sections}
+          onSelect={handleCreateSession}
+          onClose={() => {
+            setShowSectionPicker(false);
+            setCreatingSession(false);
+          }}
+          isCreating={creatingSession}
+        />
+      )}
+
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
         <div className="flex items-center justify-between px-8 py-4">
@@ -194,24 +337,27 @@ export default function TeacherDashboard() {
             </h1>
             <p className="text-sm text-primary">
               {loadingSessions
-                ? "Loading sessions…"
+                ? "Loading sessions..."
                 : `Monitoring ${activeSessions.length} active session${activeSessions.length !== 1 ? "s" : ""} in real-time`}
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* New Class button */}
             <button
-              onClick={handleNewClass}
-              disabled={creatingSession}
+              onClick={handleOpenSectionPicker}
+              disabled={creatingSession || loadingSections}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {creatingSession ? (
+              {creatingSession || loadingSections ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              {creatingSession ? "Creating…" : "New Class"}
+              {creatingSession
+                ? "Creating..."
+                : loadingSections
+                  ? "Loading..."
+                  : "New Session"}
             </button>
           </div>
         </div>
@@ -232,7 +378,7 @@ export default function TeacherDashboard() {
                     <div className="flex items-center gap-2.5 mb-0.5">
                       <h2 className="text-lg font-semibold text-primary-dark">
                         Class {myClass.class_name}
-                        {myClass.stream && ` — ${myClass.stream}`}, Section{" "}
+                        {myClass.stream && ` - ${myClass.stream}`}, Section{" "}
                         {myClass.name}
                       </h2>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
@@ -284,19 +430,15 @@ export default function TeacherDashboard() {
                 No active sessions
               </p>
               <p className="text-xs text-muted mb-4">
-                Create a new class to start a live tutoring session
+                Start a new session to begin live tutoring
               </p>
               <button
-                onClick={handleNewClass}
+                onClick={handleOpenSectionPicker}
                 disabled={creatingSession}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {creatingSession ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
-                {creatingSession ? "Creating…" : "New Class"}
+                <Plus className="w-4 h-4" />
+                New Session
               </button>
             </div>
           ) : (
@@ -311,7 +453,9 @@ export default function TeacherDashboard() {
                   <div className="flex items-start justify-between mb-5">
                     <div className="min-w-0">
                       <h3 className="text-base font-semibold text-primary-dark truncate">
-                        Tutoring Session
+                        {session.class_name && session.section_name
+                          ? `Class ${session.class_name} - Section ${session.section_name}`
+                          : "Tutoring Session"}
                       </h3>
                       <p className="text-xs text-muted mt-0.5 font-mono truncate">
                         {session.room_id}
@@ -346,14 +490,15 @@ export default function TeacherDashboard() {
 
                   {/* Session Info */}
                   <div className="space-y-3 mb-5">
-                    {/* Status */}
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 text-xs text-muted">
                         <Users className="w-3.5 h-3.5" />
                         <span>
-                          {session.status === "ACTIVE"
-                            ? "1 Student connected"
-                            : "Waiting for student…"}
+                          {session.participant_count}{" "}
+                          {session.participant_count === 1
+                            ? "student"
+                            : "students"}{" "}
+                          connected
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted">
@@ -364,57 +509,48 @@ export default function TeacherDashboard() {
                       </div>
                     </div>
 
-                    {/* Participant cards */}
-                    <div className="flex flex-col gap-2">
-                      {/* Teacher */}
-                      <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
-                          style={{
-                            backgroundColor: avatarColor(session.teacher_name),
-                          }}
-                        >
-                          {initials(session.teacher_name)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-primary-dark truncate">
-                            {session.teacher_name}
-                          </p>
-                          <p className="text-[10px] text-muted">Teacher</p>
-                        </div>
+                    {/* Teacher card */}
+                    <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: avatarColor(session.teacher_name),
+                        }}
+                      >
+                        {initials(session.teacher_name)}
                       </div>
-
-                      {/* Student */}
-                      {session.student_name ? (
-                        <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
-                            style={{
-                              backgroundColor: avatarColor(
-                                session.student_name,
-                              ),
-                            }}
-                          >
-                            {initials(session.student_name)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-primary-dark truncate">
-                              {session.student_name}
-                            </p>
-                            <p className="text-[10px] text-muted">Student</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2.5 border border-dashed border-secondary/40 rounded-lg px-3 py-2">
-                          <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center">
-                            <Users className="w-3.5 h-3.5 text-secondary" />
-                          </div>
-                          <p className="text-xs text-secondary italic">
-                            No student has joined yet
-                          </p>
-                        </div>
-                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-primary-dark truncate">
+                          {session.teacher_name}
+                        </p>
+                        <p className="text-[10px] text-muted">Teacher</p>
+                      </div>
                     </div>
+
+                    {/* Participant summary */}
+                    {session.participant_count > 0 ? (
+                      <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <p className="text-xs font-medium text-primary-dark">
+                          {session.participant_count}{" "}
+                          {session.participant_count === 1
+                            ? "student"
+                            : "students"}{" "}
+                          in session
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2.5 border border-dashed border-secondary/40 rounded-lg px-3 py-2">
+                        <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center">
+                          <Users className="w-3.5 h-3.5 text-secondary" />
+                        </div>
+                        <p className="text-xs text-secondary italic">
+                          Waiting for students to join...
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer */}
@@ -455,13 +591,11 @@ export default function TeacherDashboard() {
                 No submissions yet
               </p>
               <p className="text-xs text-muted">
-                Scripts submitted by students or uploaded by you will appear
-                here
+                Scripts submitted by students or uploaded by you will appear here
               </p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
-              {/* Table header */}
               <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-background/50 border-b border-secondary/20 text-xs font-semibold text-muted uppercase tracking-wide">
                 <span className="col-span-3">Student</span>
                 <span className="col-span-3">Form / Rubric</span>
@@ -470,7 +604,6 @@ export default function TeacherDashboard() {
                 <span className="col-span-2">Submitted</span>
               </div>
 
-              {/* Rows */}
               {recentScripts.map((script) => {
                 const studentName =
                   script.student_full_name ||
@@ -487,7 +620,6 @@ export default function TeacherDashboard() {
                     href={`/evaluation?script=${script.id}`}
                     className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-secondary/10 last:border-b-0 items-center hover:bg-background/30 transition-colors"
                   >
-                    {/* Student */}
                     <div className="col-span-3 flex items-center gap-3 min-w-0">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
@@ -507,7 +639,6 @@ export default function TeacherDashboard() {
                       </div>
                     </div>
 
-                    {/* Form / Rubric */}
                     <div className="col-span-3 min-w-0">
                       <p className="text-sm text-primary-dark truncate">
                         {formTitle}
@@ -520,7 +651,6 @@ export default function TeacherDashboard() {
                       )}
                     </div>
 
-                    {/* Status */}
                     <div className="col-span-2">
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
@@ -550,7 +680,6 @@ export default function TeacherDashboard() {
                       </span>
                     </div>
 
-                    {/* Score */}
                     <div className="col-span-2">
                       {script.status === "evaluated" &&
                       script.percentage != null ? (
@@ -575,11 +704,10 @@ export default function TeacherDashboard() {
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted">—</span>
+                        <span className="text-xs text-muted">--</span>
                       )}
                     </div>
 
-                    {/* Time */}
                     <div className="col-span-2 flex items-center justify-between">
                       <span className="text-xs text-muted">
                         {formatSessionTime(script.created_at)}

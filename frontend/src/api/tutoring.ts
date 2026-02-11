@@ -1,15 +1,15 @@
 /**
  * Tutoring API Client
  *
- * API client for tutoring session management.
- * Handles session creation, joining, and status checking.
- * Supports JWT Bearer auth (primary) and X-User-Id header (fallback).
+ * Section-based batch tutoring session management.
+ * Supports JWT Bearer auth via authenticatedFetch.
  */
 
 import { API_BASE_URL } from "@/config/api";
 import { authenticatedFetch } from "@/api/auth";
 
-// Types
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export interface TutoringUser {
   id: string;
   email: string;
@@ -23,9 +23,11 @@ export interface SessionCreateResponse {
   room_id: string;
   token: string;
   status: string;
-  join_url: string;
   livekit_ws_url: string | null;
   teacher_id: string;
+  section_id: number;
+  section_name: string;
+  class_name: string;
 }
 
 export interface SessionJoinResponse {
@@ -35,6 +37,17 @@ export interface SessionJoinResponse {
   teacher_name: string;
   room_id: string;
   livekit_ws_url: string | null;
+  section_name: string;
+  class_name: string;
+  participant_count: number;
+}
+
+export interface Participant {
+  user_id: string;
+  name: string;
+  role: string;
+  joined_at: string;
+  left_at: string | null;
 }
 
 export interface SessionStatus {
@@ -43,10 +56,24 @@ export interface SessionStatus {
   status: "WAITING" | "ACTIVE" | "GRACE" | "ENDED";
   teacher_id: string;
   teacher_name: string;
-  student_id: string | null;
-  student_name: string | null;
+  section_id: number | null;
+  section_name: string | null;
+  class_name: string | null;
+  participants: Participant[];
+  participant_count: number;
   created_at: string;
   ended_at: string | null;
+}
+
+export interface AvailableSession {
+  id: string;
+  room_id: string;
+  status: "WAITING" | "ACTIVE";
+  teacher_name: string;
+  section_name: string | null;
+  class_name: string | null;
+  participant_count: number;
+  created_at: string;
 }
 
 export interface ApiError {
@@ -55,10 +82,12 @@ export interface ApiError {
   code: string;
 }
 
-// API Base URL for tutoring
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const TUTORING_API_URL = `${API_BASE_URL}/tutoring`;
 
-// Utility to get user ID from localStorage
+// ─── Utility ──────────────────────────────────────────────────────────────────
+
 export function getCurrentUserId(): string | null {
   if (typeof window !== "undefined") {
     return localStorage.getItem("tutoring_user_id");
@@ -66,28 +95,22 @@ export function getCurrentUserId(): string | null {
   return null;
 }
 
-// Utility to set user ID in localStorage
 export function setCurrentUserId(userId: string): void {
   if (typeof window !== "undefined") {
     localStorage.setItem("tutoring_user_id", userId);
   }
 }
 
-// Utility to clear user ID from localStorage
 export function clearCurrentUserId(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem("tutoring_user_id");
   }
 }
 
-// Headers helper - Content-Type only; auth is handled by authenticatedFetch
 function getContentHeaders(): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-  };
+  return { "Content-Type": "application/json" };
 }
 
-// Error handler
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData: ApiError = await response.json().catch(() => ({
@@ -100,66 +123,75 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-/**
- * Get all tutoring users (for testing/development)
- */
-export async function getUsers(): Promise<TutoringUser[]> {
-  const response = await authenticatedFetch(`${TUTORING_API_URL}/users/`, {
-    method: "GET",
-    headers: getContentHeaders(),
-  });
-  return handleResponse<TutoringUser[]>(response);
-}
+// ─── API Functions ────────────────────────────────────────────────────────────
 
 /**
- * Create a new tutoring user
+ * Create a new tutoring session for a specific section (Teacher only)
  */
-export async function createUser(
-  email: string,
-  fullName: string,
-  role: "TEACHER" | "STUDENT",
-): Promise<TutoringUser> {
-  const response = await authenticatedFetch(`${TUTORING_API_URL}/users/`, {
-    method: "POST",
-    headers: getContentHeaders(),
-    body: JSON.stringify({
-      email,
-      full_name: fullName,
-      role,
-    }),
-  });
-  return handleResponse<TutoringUser>(response);
-}
-
-/**
- * Create a new tutoring session (Teacher only)
- */
-export async function createSession(): Promise<SessionCreateResponse> {
+export async function createSession(
+  sectionId: number,
+): Promise<SessionCreateResponse> {
   const response = await authenticatedFetch(
     `${TUTORING_API_URL}/sessions/create/`,
     {
       method: "POST",
       headers: getContentHeaders(),
+      body: JSON.stringify({ section_id: sectionId }),
     },
   );
   return handleResponse<SessionCreateResponse>(response);
 }
 
 /**
- * Join an existing tutoring session (Student only)
+ * Join a tutoring session by session_id (Student only)
  */
 export async function joinSession(
-  roomId: string,
+  sessionId: string,
 ): Promise<SessionJoinResponse> {
   const response = await authenticatedFetch(
     `${TUTORING_API_URL}/sessions/join/`,
     {
       method: "POST",
       headers: getContentHeaders(),
-      body: JSON.stringify({ room_id: roomId }),
+      body: JSON.stringify({ session_id: sessionId }),
     },
   );
   return handleResponse<SessionJoinResponse>(response);
+}
+
+/**
+ * Get available sessions for the student's section
+ */
+export async function getAvailableSessions(): Promise<AvailableSession[]> {
+  const response = await authenticatedFetch(
+    `${TUTORING_API_URL}/sessions/available/`,
+    {
+      method: "GET",
+      headers: getContentHeaders(),
+    },
+  );
+  return handleResponse<AvailableSession[]>(response);
+}
+
+/**
+ * Leave a tutoring session (Student only)
+ */
+export async function leaveSession(sessionId: string): Promise<void> {
+  const response = await authenticatedFetch(
+    `${TUTORING_API_URL}/sessions/${sessionId}/leave/`,
+    {
+      method: "POST",
+      headers: getContentHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const errorData: ApiError = await response.json().catch(() => ({
+      error: "Unknown error",
+      detail: "An unexpected error occurred",
+      code: "unknown_error",
+    }));
+    throw errorData;
+  }
 }
 
 /**
@@ -180,13 +212,8 @@ export async function getSessionStatus(
 
 /**
  * End a tutoring session (Teacher only)
- * @param sessionId - The session ID to end
- * @param teacherId - Optional teacher ID to use (overrides localStorage)
  */
-export async function endSession(
-  sessionId: string,
-  teacherId?: string,
-): Promise<SessionStatus> {
+export async function endSession(sessionId: string): Promise<SessionStatus> {
   const response = await authenticatedFetch(
     `${TUTORING_API_URL}/sessions/${sessionId}/end/`,
     {
@@ -200,10 +227,12 @@ export async function endSession(
 /**
  * List sessions for the current user
  */
-export async function listSessions(status?: string): Promise<SessionStatus[]> {
+export async function listSessions(
+  statusFilter?: string,
+): Promise<SessionStatus[]> {
   const url = new URL(`${TUTORING_API_URL}/sessions/`);
-  if (status) {
-    url.searchParams.append("status", status);
+  if (statusFilter) {
+    url.searchParams.append("status", statusFilter);
   }
 
   const response = await authenticatedFetch(url.toString(), {
@@ -219,19 +248,24 @@ export async function listSessions(status?: string): Promise<SessionStatus[]> {
 export function getErrorMessage(error: ApiError): string {
   switch (error.code) {
     case "auth_required":
-      return "Please select a user to continue";
-    case "user_not_found":
-      return "Selected user not found. Please select a different user.";
+      return "Please sign in to continue";
     case "teacher_required":
       return "Only teachers can create tutoring sessions";
     case "student_required":
       return "Only students can join tutoring sessions";
+    case "session_not_found":
     case "room_not_found":
       return "This session doesn't exist";
+    case "section_not_found":
+      return "Section not found";
+    case "not_assigned":
+      return "You are not assigned to this section";
+    case "already_active":
+      return "You already have an active session";
     case "session_ended":
       return "This session has already ended";
-    case "session_full":
-      return "Another student has already joined this session";
+    case "wrong_section":
+      return "This session is not for your section";
     case "already_in_session":
       return "You are already in another active tutoring session";
     case "not_participant":
