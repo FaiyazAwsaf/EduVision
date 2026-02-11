@@ -120,32 +120,35 @@ class SendOTPView(APIView):
         
         code = f"{randbelow(10**6):06d}"
 
-        with transaction.atomic():
+        try:
+            with transaction.atomic():
 
-            EmailOTP.objects.create(
-                user=user,
-                is_used=False,
-            ).update(is_used=True)
+                EmailOTP.objects.create(
+                    user=user,
+                    is_used=False,
+                ).update(is_used=True)
 
-            otp = EmailOTP.objects.create(
-                user=user,
-                otp=make_password(code),
-                expires_at=timezone.now() + timedelta(minutes=10)
-            )
+                otp = EmailOTP.objects.create(
+                    user=user,
+                    otp=make_password(code),
+                    expires_at=timezone.now() + timedelta(minutes=10)
+                )
 
-            send_mail(
-                "Email Verification Code",
-                f"Your verification code is: {code}\n\nThis code expires 10 minutes",
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
-            )
+                send_mail(
+                    "Email Verification Code",
+                    f"Your verification code is: {code}\n\nThis code expires 10 minutes",
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False,
+                )
 
-        response = Response(
-            {"message": "OTP sent to your email"}, 
-            status=status.HTTP_200_OK
-            )
-        return response
+            response = Response(
+                {"message": "OTP sent to your email"}, 
+                status=status.HTTP_200_OK
+                )
+            return response
+        except Exception as e:
+            self.handle_exception(e)
     
 class VerifyOTPView(APIView):
 
@@ -153,24 +156,39 @@ class VerifyOTPView(APIView):
         serializer = VerifyOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = serializer.validated_data["user"]
-        otp = serializer.validated_data["otp"]
+        try:
+            user = serializer.validated_data["user"]
+            otp = serializer.validated_data["otp"]
 
-        otp.is_used = True
-        otp.save()
+            otp.is_used = True
+            otp.save()
 
-        user.is_active = True
-        user.save(update_fields=["is_active"])
+            user.is_active = True
+            user.save(update_fields=["is_active"])
 
-        response = Response(
-            {
-                "message": "Email verified successfully.",
-                "payload": UserSerializer(user).data,
-            },
-            status=status.HTTP_200_OK,
-        )
+            response = Response(
+                {
+                    "message": "Email verified successfully.",
+                    "payload": UserSerializer(user).data,
+                },
+                status=status.HTTP_200_OK,
+            )
 
-        return response
+            return response
+        except Exception as e:
+            self.handle_exception(e)
+
+class LogoutView(APIView):
+    def post(self, request):
+        try:
+            response = Response(
+                {"message": "Logged out successfully"},
+                status=status.HTTP_200_OK,
+            )
+            response.delete_cookie("refresh_token", path="/")
+            return response
+        except Exception as e:
+            self.handle_exception(e)
 
         
 
