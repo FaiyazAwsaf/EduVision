@@ -339,7 +339,9 @@ export default function TeacherDashboardPage() {
   // Role guard: only teachers can access
   useEffect(() => {
     if (isReady && (!isAuthenticated || authUser?.role !== "teacher")) {
-      router.replace(authUser?.role === "student" ? "/student/dashboard" : "/signin");
+      router.replace(
+        authUser?.role === "student" ? "/student/dashboard" : "/signin",
+      );
     }
   }, [isReady, isAuthenticated, authUser, router]);
 

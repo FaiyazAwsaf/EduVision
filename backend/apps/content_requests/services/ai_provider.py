@@ -175,7 +175,9 @@ class AIProvider(ABC):
         elif request.content_type == ContentType.FORMULA_SHEET:
             return self.generate_formula_sheet(request, learning_context=learning_context)
         else:
-            raise ValueError(f"Unsupported content type: {request.content_type}")
+            # Teacher content types (LESSON_PLAN, QUIZ_GENERATOR, WORKSHEET_BUILDER, TOPIC_EXPLANATION)
+            # use the same prompt-builder pipeline as the shared types
+            return self.generate_summary(request, learning_context=learning_context)
     
     def _build_system_prompt(self) -> str:
         """

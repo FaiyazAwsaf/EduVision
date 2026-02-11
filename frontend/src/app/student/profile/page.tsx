@@ -32,7 +32,9 @@ export default function StudentProfilePage() {
   useEffect(() => {
     if (!isReady) return;
     if (!isAuthenticated || !user || user.role !== "student") {
-      router.replace(user?.role === "teacher" ? "/teacher/dashboard" : "/signin");
+      router.replace(
+        user?.role === "teacher" ? "/teacher/dashboard" : "/signin",
+      );
     }
   }, [isReady, isAuthenticated, user, router]);
 

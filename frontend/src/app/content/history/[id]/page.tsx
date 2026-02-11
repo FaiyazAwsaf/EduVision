@@ -71,7 +71,9 @@ export default function ContentHistoryDetailPage() {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-primary-dark">
-                  Request Details
+                  {user.role === "teacher"
+                    ? "Content Details"
+                    : "Study Material"}
                 </h1>
                 <p className="text-sm text-primary">
                   ID: {requestId.slice(0, 8)}...

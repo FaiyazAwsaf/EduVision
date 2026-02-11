@@ -44,6 +44,7 @@ const studentNavItems: NavItem[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
   { label: "Content Request", href: "/content", icon: FileText },
   { label: "My Content", href: "/content/history", icon: History },
+  { label: "Class Materials", href: "/content/shared", icon: BookOpen },
   { label: "Tutoring", href: "/student/tutoring", icon: MessageSquare },
   { label: "Scripts", href: "/evaluation", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },

@@ -41,7 +41,11 @@ export default function StudentTutoringPage() {
   useEffect(() => {
     if (isReady && (!isAuthenticated || user?.role !== "student")) {
       router.replace(
-        !isAuthenticated ? "/signin" : user?.role === "teacher" ? "/teacher/dashboard" : "/signin"
+        !isAuthenticated
+          ? "/signin"
+          : user?.role === "teacher"
+            ? "/teacher/dashboard"
+            : "/signin",
       );
     }
   }, [isReady, isAuthenticated, user, router]);

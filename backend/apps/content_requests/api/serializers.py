@@ -74,16 +74,16 @@ class ContentRequestCreateSerializer(serializers.Serializer):
         help_text="Academic subject (e.g., Mathematics)"
     )
     
-    target_class_id = serializers.UUIDField(
+    target_class_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        help_text="Target class UUID (for teachers)"
+        help_text="Target class ID (for teachers)"
     )
     
-    target_section_id = serializers.UUIDField(
+    target_section_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        help_text="Target section UUID (for teachers)"
+        help_text="Target section ID (for teachers)"
     )
     
     def validate_topic(self, value: str) -> str:
@@ -258,3 +258,45 @@ class ErrorResponseSerializer(serializers.Serializer):
         if details:
             response['details'] = details
         return response
+
+
+class SharedContentListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for content shared with a student's class/section.
+    Shows completed teacher-generated content targeted at the student's class.
+    """
+    teacher_name = serializers.SerializerMethodField()
+    class_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContentRequestModel
+        fields = [
+            'id',
+            'topic',
+            'content_type',
+            'subject',
+            'difficulty',
+            'style',
+            'teacher_name',
+            'class_name',
+            'section_name',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_teacher_name(self, obj):
+        if obj.created_by:
+            name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+            return name or obj.created_by.username
+        return None
+
+    def get_class_name(self, obj):
+        if obj.target_class:
+            return obj.target_class.name
+        return None
+
+    def get_section_name(self, obj):
+        if obj.target_section:
+            return obj.target_section.name
+        return None

@@ -721,3 +721,62 @@ export async function linkRequestToStudyPlanItem(
 
   return response.json();
 }
+
+// ─── Shared Content (for students) ─────────────────────────────────────────
+
+export interface SharedContentItem {
+  id: string;
+  topic: string;
+  content_type: string;
+  subject: string | null;
+  difficulty: string | null;
+  style: string;
+  teacher_name: string | null;
+  class_name: string | null;
+  section_name: string | null;
+  created_at: string;
+}
+
+export interface SharedContentListResponse {
+  results: SharedContentItem[];
+  total: number;
+  count: number;
+}
+
+export interface SharedContentFilters {
+  content_type?: string;
+  subject?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * List content shared with the student's class/section by teachers.
+ */
+export async function listSharedContent(
+  filters?: SharedContentFilters,
+): Promise<SharedContentListResponse> {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== "" && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+  }
+
+  const base = `${API_ENDPOINTS.CONTENT_REQUESTS}shared/`;
+  const url = params.toString() ? `${base}?${params.toString()}` : base;
+
+  const response = await authenticatedFetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch shared content");
+  }
+
+  return response.json();
+}

@@ -28,6 +28,7 @@ from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer, BaseRenderer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes as perm_classes_decorator
+from django.db import models
 from django.http import Http404, HttpResponse
 
 class BinaryFileRenderer(BaseRenderer):
@@ -56,6 +57,52 @@ from .serializers import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _user_can_view_request(user, model_instance) -> bool:
+    """
+    Return True if ``user`` is allowed to view ``model_instance``.
+
+    Access is granted when the user:
+      1. is the creator of the request, OR
+      2. is a student whose class (and optionally section) is the target of the request
+         and the request is COMPLETED teacher content.
+    """
+    # Owner always has access
+    if model_instance.created_by_id and model_instance.created_by_id == user.id:
+        return True
+
+    # Shared-content visibility for students
+    if (
+        getattr(user, 'role', None) == 'student'
+        and model_instance.role == 'teacher'
+        and model_instance.status == 'COMPLETED'
+        and model_instance.target_class_id is not None
+    ):
+        from apps.students.models import StudentProfile
+        try:
+            profile = StudentProfile.objects.select_related(
+                'section', 'section__class_ref'
+            ).get(user=user)
+        except StudentProfile.DoesNotExist:
+            return False
+
+        if not profile.section or not profile.section.class_ref:
+            return False
+
+        if profile.section.class_ref_id != model_instance.target_class_id:
+            return False
+
+        # Section-specific content: only that section can see it
+        if (
+            model_instance.target_section_id is not None
+            and model_instance.target_section_id != profile.section_id
+        ):
+            return False
+
+        return True
+
+    return False
 
 
 class ContentRequestListCreateView(APIView):
@@ -292,9 +339,9 @@ class ContentRequestDetailView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Verify ownership
+            # Verify access (owner or shared-content student)
             model_instance = ContentRequestModel.objects.get(id=uuid_obj)
-            if model_instance.created_by_id and model_instance.created_by_id != request.user.id:
+            if not _user_can_view_request(request.user, model_instance):
                 return Response(
                     {'error': 'Not found', 'detail': f'Content request {request_id} does not exist'},
                     status=status.HTTP_404_NOT_FOUND
@@ -370,9 +417,9 @@ class GeneratedContentView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Verify ownership
+            # Verify access (owner or shared-content student)
             model_instance = ContentRequestModel.objects.get(id=uuid_obj)
-            if model_instance.created_by_id and model_instance.created_by_id != request.user.id:
+            if not _user_can_view_request(request.user, model_instance):
                 return Response(
                     {'error': 'Not found', 'detail': f'Content request {request_id} does not exist'},
                     status=status.HTTP_404_NOT_FOUND
@@ -630,3 +677,92 @@ class RegenerateContentView(APIView):
         
         response_serializer = ContentRequestResponseSerializer(new_request)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class SharedContentListView(APIView):
+    """
+    GET /api/content-requests/shared/
+
+    Returns completed teacher-generated content targeted at the
+    authenticated student's class (and optionally section).
+    Only students can access this endpoint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Must be a student
+        if getattr(request.user, 'role', None) != 'student':
+            return Response(
+                {'error': 'Only students can view shared content'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Find the student's class & section via their profile
+        from apps.students.models import StudentProfile
+        try:
+            profile = StudentProfile.objects.select_related(
+                'section', 'section__class_ref'
+            ).get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response(
+                {'results': [], 'total': 0},
+                status=status.HTTP_200_OK,
+            )
+
+        if not profile.section or not profile.section.class_ref:
+            return Response(
+                {'results': [], 'total': 0},
+                status=status.HTTP_200_OK,
+            )
+
+        student_class = profile.section.class_ref
+        student_section = profile.section
+
+        # Query params
+        content_type_filter = request.query_params.get('content_type')
+        subject_filter = request.query_params.get('subject')
+        search_filter = request.query_params.get('search')
+        limit = min(int(request.query_params.get('limit', 100)), 1000)
+        offset = int(request.query_params.get('offset', 0))
+
+        # Base queryset: completed, teacher-created, targeted at this class
+        qs = (
+            ContentRequestModel.objects
+            .filter(
+                role='teacher',
+                status='COMPLETED',
+                target_class=student_class,
+            )
+            .select_related('created_by', 'target_class', 'target_section')
+            .order_by('-created_at')
+        )
+
+        # Content targeted at a specific section should only show to that section
+        # Content with no section (class-wide) shows to all sections in the class
+        qs = qs.filter(
+            models.Q(target_section__isnull=True) |
+            models.Q(target_section=student_section)
+        )
+
+        # Optional filters
+        if content_type_filter:
+            qs = qs.filter(content_type=content_type_filter.upper())
+        if subject_filter:
+            qs = qs.filter(subject__icontains=subject_filter)
+        if search_filter:
+            qs = qs.filter(topic__icontains=search_filter)
+
+        total = qs.count()
+        results = qs[offset:offset + limit]
+
+        from .serializers import SharedContentListSerializer
+        serializer = SharedContentListSerializer(results, many=True)
+
+        return Response(
+            {
+                'results': serializer.data,
+                'total': total,
+                'count': len(serializer.data),
+            },
+            status=status.HTTP_200_OK,
+        )

@@ -33,6 +33,7 @@ from .views import (
     ContentRequestDetailView,
     GeneratedContentView,
     RegenerateContentView,
+    SharedContentListView,
     download_generated_content_view
 )
 from .views_feedback import FeedbackView
@@ -47,6 +48,13 @@ urlpatterns = [
         '',
         ContentRequestListCreateView.as_view(),
         name='content-request-list-create'
+    ),
+    
+    # Shared content for students (must be before <str:request_id>/ catch-all)
+    path(
+        'shared/',
+        SharedContentListView.as_view(),
+        name='shared-content-list'
     ),
     
     # Retrieve content request details

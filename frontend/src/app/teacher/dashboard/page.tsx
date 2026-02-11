@@ -374,9 +374,7 @@ export default function TeacherDashboard() {
                             <p className="text-xs font-medium text-primary-dark truncate">
                               {session.student_name}
                             </p>
-                            <p className="text-[10px] text-muted">
-                              Student
-                            </p>
+                            <p className="text-[10px] text-muted">Student</p>
                           </div>
                         </div>
                       ) : (

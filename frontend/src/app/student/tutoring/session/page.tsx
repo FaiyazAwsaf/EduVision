@@ -211,7 +211,9 @@ export default function StudentSessionPage() {
   // Role guard: only students can access
   useEffect(() => {
     if (isReady && (!isAuthenticated || authUser?.role !== "student")) {
-      router.replace(authUser?.role === "teacher" ? "/teacher/dashboard" : "/signin");
+      router.replace(
+        authUser?.role === "teacher" ? "/teacher/dashboard" : "/signin",
+      );
     }
   }, [isReady, isAuthenticated, authUser, router]);
 

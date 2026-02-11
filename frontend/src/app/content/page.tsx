@@ -50,6 +50,8 @@ export default function ContentPage() {
     setViewState("form");
   };
 
+  const isTeacher = user.role === "teacher";
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar role={user.role} />
@@ -59,10 +61,12 @@ export default function ContentPage() {
           <div className="flex items-center justify-between px-8 py-4">
             <div>
               <h1 className="text-2xl font-bold text-primary-dark">
-                AI Content Generator
+                {isTeacher ? "Content Generator" : "Study Content"}
               </h1>
               <p className="text-sm text-primary">
-                Generate educational content powered by AI
+                {isTeacher
+                  ? "Create lesson plans, quizzes, worksheets and more"
+                  : "Generate summaries, worked examples and formula sheets"}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -70,36 +74,31 @@ export default function ContentPage() {
                 href="/content/history"
                 className="text-primary hover:text-primary-dark transition-colors text-sm font-medium flex items-center gap-2"
               >
-                <History className="w-4 h-4" /> History
+                <History className="w-4 h-4" />{" "}
+                {isTeacher ? "History" : "My Content"}
               </Link>
-              <Link
-                href="/study-plans"
-                className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium flex items-center gap-2"
-              >
-                <BookOpen className="w-4 h-4" /> Study Plans
-              </Link>
+              {!isTeacher && (
+                <Link
+                  href="/study-plans"
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium flex items-center gap-2"
+                >
+                  <BookOpen className="w-4 h-4" /> Study Plans
+                </Link>
+              )}
             </div>
           </div>
         </header>
 
         {/* Main Content */}
         <main className="flex-1 px-8 py-8">
-          <div className="max-w-4xl">
-            <div className="bg-white rounded-lg border border-secondary p-6">
+          <div className={isTeacher ? "max-w-5xl" : "max-w-4xl"}>
+            <div className="bg-white rounded-xl border border-secondary p-6 sm:p-8">
               {viewState === "form" ? (
                 <div>
-                  <div className="mb-6">
-                    <h2 className="text-xl font-semibold text-primary-dark">
-                      Create Content Request
-                    </h2>
-                    <p className="mt-1 text-sm text-primary">
-                      Fill in the details below to generate AI-powered educational
-                      content.
-                    </p>
-                  </div>
                   <ContentRequestForm
                     onSuccess={handleRequestCreated}
-                    userRole={user?.role as "student" | "teacher" | undefined}
+                    userRole={user.role}
+                    userId={user.id}
                   />
                 </div>
               ) : currentRequestId ? (
