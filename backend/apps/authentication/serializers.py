@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomUser
+from .models import CustomUser, EmailOTP
 
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=20)
@@ -47,6 +47,40 @@ class LoginSerializer(serializers.Serializer):
         attrs["user"] = user
         return attrs
     
+class SendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, email):
+        try:
+            CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("User with this email does not exist")
+        return email
+    
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6, min_length=6)
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        code = attrs.get("code")
+
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+
+        email_otp = EmailOTP.objects.filter(user=user, otp=code).order_by("-created_at").first()
+
+        if not email_otp or email_otp.is_valid():
+            raise serializers.ValidationError("Invalid OTP")
+        
+        attrs["user"] = user
+        attrs["email_otp"] = email_otp
+
+        return attrs
+        
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser

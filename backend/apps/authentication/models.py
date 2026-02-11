@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 from uuid import uuid4
+from django.utils import timezone
+from datetime import timedelta
 
 # Create your models here.
 class UserRole(models.TextChoices):
@@ -31,3 +33,25 @@ class CustomUser(models.Model):
     class Meta:
         db_table = "authentication_user"
 
+class EmailOTP(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="otps")
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=10)
+        return super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        valid = (not self.is_used) and (self.expires_at > timezone.now())
+        return valid
+    
+    def __str__(self):
+        return f"OTP for {self.user.email} ({self.created_at})"
