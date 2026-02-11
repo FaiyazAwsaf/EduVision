@@ -87,6 +87,29 @@ class TeacherProfileSerializer(serializers.ModelSerializer):
 # ─── Student Profile ─────────────────────────────────────────────────────────
 
 
+class MyClassSerializer(serializers.ModelSerializer):
+    """Section info + student count for the class teacher dashboard."""
+
+    class_name = serializers.CharField(source="class_ref.name", read_only=True)
+    stream = serializers.CharField(source="class_ref.stream", read_only=True)
+    academic_year = serializers.CharField(
+        source="class_ref.academic_year", read_only=True
+    )
+    student_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Section
+        fields = [
+            "id",
+            "name",
+            "class_name",
+            "stream",
+            "academic_year",
+            "capacity",
+            "student_count",
+        ]
+
+
 class StudentProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     first_name = serializers.CharField(source="user.first_name", read_only=True)

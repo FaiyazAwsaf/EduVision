@@ -145,3 +145,33 @@ export async function getSections(classId?: number): Promise<SchoolSection[]> {
   >(`/sections/${params}`);
   return Array.isArray(data) ? data : (data.results ?? []);
 }
+
+// ─── Class Teacher Scoped ───────────────────────────────────────────────────
+
+export interface MyClassInfo {
+  id: number;
+  name: string;
+  class_name: string;
+  stream: string;
+  academic_year: string;
+  capacity: number;
+  student_count: number;
+}
+
+/** Get the logged-in teacher's assigned class/section info + student count. */
+export async function getMyClass(): Promise<MyClassInfo> {
+  return schoolFetch<MyClassInfo>("/my-class/");
+}
+
+/** List all students in the logged-in teacher's assigned section. */
+export async function getMyStudents(search?: string): Promise<StudentProfile[]> {
+  const params = search ? `?search=${encodeURIComponent(search)}` : "";
+  return schoolFetch<StudentProfile[]>(`/my-students/${params}`);
+}
+
+/** Get a single student's profile (must belong to teacher's section). */
+export async function getMyStudentDetail(
+  userId: string,
+): Promise<StudentProfile> {
+  return schoolFetch<StudentProfile>(`/my-students/${userId}/`);
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -17,6 +17,10 @@ import {
   BookOpen,
   LogOut,
   History,
+  ChevronDown,
+  ChevronUp,
+  LibraryBig,
+  KeyRound,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -26,25 +30,55 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const teacherNavItems: NavItem[] = [
+interface NavGroup {
+  label: string;
+  icon: LucideIcon;
+  children: NavItem[];
+}
+
+type NavEntry = NavItem | NavGroup;
+
+function isNavGroup(entry: NavEntry): entry is NavGroup {
+  return "children" in entry;
+}
+
+const teacherNavItems: NavEntry[] = [
   {
     label: "Class Overview",
     href: "/teacher/dashboard",
     icon: LayoutDashboard,
   },
   { label: "Students", href: "/teacher/students", icon: Users },
-  { label: "Script Engine", href: "/evaluation", icon: ScrollText },
-  { label: "Content Generation", href: "/content", icon: FileText },
-  { label: "Content History", href: "/content/history", icon: History },
-  { label: "Rubrics", href: "/rubrics", icon: ClipboardCheck },
+  {
+    label: "Evaluation",
+    icon: ScrollText,
+    children: [
+      { label: "Script Evaluation", href: "/evaluation", icon: ClipboardCheck },
+      { label: "Rubrics", href: "/rubrics", icon: FileText },
+    ],
+  },
+  {
+    label: "Content",
+    icon: LibraryBig,
+    children: [
+      { label: "Content Generation", href: "/content", icon: FileText },
+      { label: "Content History", href: "/content/history", icon: History },
+    ],
+  },
   { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
 ];
 
-const studentNavItems: NavItem[] = [
+const studentNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
-  { label: "Content Request", href: "/content", icon: FileText },
-  { label: "My Content", href: "/content/history", icon: History },
-  { label: "Class Materials", href: "/content/shared", icon: BookOpen },
+  {
+    label: "Content",
+    icon: LibraryBig,
+    children: [
+      { label: "Content Request", href: "/content", icon: FileText },
+      { label: "My Content", href: "/content/history", icon: History },
+      { label: "Class Materials", href: "/content/shared", icon: BookOpen },
+    ],
+  },
   { label: "Tutoring", href: "/student/tutoring", icon: MessageSquare },
   { label: "Scripts", href: "/evaluation", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
@@ -63,7 +97,139 @@ const roleConfig = {
     settingsHref: "/student/settings",
     roleLabel: "Student",
   },
-} as const;
+};
+
+/* ── Collapsible nav group ─────────────────────────────── */
+function NavGroupItem({
+  group,
+  pathname,
+}: {
+  group: NavGroup;
+  pathname: string;
+}) {
+  const isChildActive = group.children.some(
+    (child) =>
+      pathname === child.href || pathname?.startsWith(child.href + "/")
+  );
+
+  const [open, setOpen] = useState(isChildActive);
+
+  // Keep group open when navigating to a child route
+  useEffect(() => {
+    if (isChildActive) setOpen(true);
+  }, [isChildActive]);
+
+  return (
+    <div>
+      {/* Group toggle button */}
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          isChildActive
+            ? "bg-primary/10 text-primary-dark"
+            : "text-muted hover:bg-background hover:text-primary-dark"
+        }`}
+      >
+        <group.icon
+          className={`w-[18px] h-[18px] ${isChildActive ? "text-primary" : ""}`}
+        />
+        <span className="flex-1 text-left">{group.label}</span>
+        <ChevronDown
+          className={`w-4 h-4 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {/* Collapsible children */}
+      <div
+        className={`overflow-hidden transition-all duration-200 ${
+          open ? "max-h-48 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="ml-3 pl-3 border-l-2 border-secondary/40 mt-1 space-y-0.5">
+          {group.children.map((child) => {
+            const isActive =
+              pathname === child.href ||
+              pathname?.startsWith(child.href + "/");
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                  isActive
+                    ? "bg-primary/10 text-primary-dark"
+                    : "text-muted hover:bg-background hover:text-primary-dark"
+                }`}
+              >
+                <child.icon
+                  className={`w-4 h-4 ${isActive ? "text-primary" : ""}`}
+                />
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Settings expandable with links ────────────────────── */
+function SettingsExpander({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+
+  const isChangePasswordActive = pathname === "/change-password";
+
+  useEffect(() => {
+    if (isChangePasswordActive) setOpen(true);
+  }, [isChangePasswordActive]);
+
+  return (
+    <div>
+      {/* Collapsible options — expand upward */}
+      <div
+        className={`overflow-hidden transition-all duration-200 ${
+          open ? "max-h-24 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="ml-3 pl-3 border-l-2 border-secondary/40 mb-1 space-y-0.5">
+          <Link
+            href="/change-password"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
+              isChangePasswordActive
+                ? "bg-primary/10 text-primary-dark"
+                : "text-muted hover:bg-background hover:text-primary-dark"
+            }`}
+          >
+            <KeyRound
+              className={`w-4 h-4 ${isChangePasswordActive ? "text-primary" : ""}`}
+            />
+            Change Password
+          </Link>
+        </div>
+      </div>
+
+      {/* Settings toggle button */}
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          open || isChangePasswordActive
+            ? "bg-primary/10 text-primary-dark"
+            : "text-muted hover:bg-background hover:text-primary-dark"
+        }`}
+      >
+        <Settings className="w-[18px] h-[18px]" />
+        <span className="flex-1 text-left">Settings</span>
+        <ChevronUp
+          className={`w-4 h-4 transition-transform duration-200 ${
+            open ? "" : "rotate-180"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
 
 interface SidebarProps {
   role: "teacher" | "student";
@@ -99,7 +265,18 @@ export default function Sidebar({ role }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 mt-2 space-y-1">
-        {config.navItems.map((item) => {
+        {config.navItems.map((entry) => {
+          if (isNavGroup(entry)) {
+            return (
+              <NavGroupItem
+                key={entry.label}
+                group={entry}
+                pathname={pathname}
+              />
+            );
+          }
+
+          const item = entry;
           const isActive =
             pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
@@ -125,13 +302,7 @@ export default function Sidebar({ role }: SidebarProps) {
 
       {/* Bottom */}
       <div className="px-3 pb-4 mt-auto space-y-1">
-        <Link
-          href={config.settingsHref}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-background hover:text-primary-dark transition-all"
-        >
-          <Settings className="w-[18px] h-[18px]" />
-          Settings
-        </Link>
+        <SettingsExpander pathname={pathname} />
         <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:bg-red-50 hover:text-red-600 transition-all"

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Plus,
-  Bell,
   Eye,
   Pencil,
   ArrowRight,
@@ -13,6 +12,8 @@ import {
   Users,
   Clock,
   Video,
+  GraduationCap,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -20,6 +21,7 @@ import {
   createSession,
   type SessionStatus,
 } from "@/api/tutoring";
+import { getMyClass, type MyClassInfo } from "@/api/school";
 
 /* ─── Dummy data (submissions – keep for now) ────────────────────────────── */
 
@@ -114,6 +116,7 @@ export default function TeacherDashboard() {
   const [activeSessions, setActiveSessions] = useState<SessionStatus[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [myClass, setMyClass] = useState<MyClassInfo | null>(null);
 
   // Authorization check
   useEffect(() => {
@@ -150,6 +153,15 @@ export default function TeacherDashboard() {
       return () => clearInterval(interval);
     }
   }, [isReady, isAuthenticated, fetchSessions]);
+
+  // Fetch class-teacher info (once)
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      getMyClass()
+        .then(setMyClass)
+        .catch(() => setMyClass(null)); // silently ignore if not a class teacher
+    }
+  }, [isReady, isAuthenticated]);
 
   // Create a new session and redirect to the session page
   const handleNewClass = async () => {
@@ -206,21 +218,6 @@ export default function TeacherDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Live badge */}
-            <div className="flex items-center gap-2 text-sm font-medium text-primary-dark">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
-              </span>
-              LIVE SYSTEM ACTIVE
-            </div>
-
-            {/* Notification bell */}
-            <button className="relative p-2 rounded-lg hover:bg-background transition">
-              <Bell className="w-5 h-5 text-primary-dark" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-
             {/* New Class button */}
             <button
               onClick={handleNewClass}
@@ -240,6 +237,54 @@ export default function TeacherDashboard() {
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <main className="px-8 py-6 max-w-6xl">
+        {/* My Class card */}
+        {myClass && (
+          <div className="mb-8">
+            <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-0.5">
+                      <h2 className="text-lg font-semibold text-primary-dark">
+                        Class {myClass.class_name}
+                        {myClass.stream && ` — ${myClass.stream}`}, Section{" "}
+                        {myClass.name}
+                      </h2>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
+                        <GraduationCap className="w-3 h-3" />
+                        Class Teacher
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted">
+                      {myClass.academic_year} &middot; Capacity:{" "}
+                      {myClass.capacity}
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  href="/teacher/students"
+                  className="flex items-center gap-3 bg-background hover:bg-primary/5 rounded-xl px-5 py-3 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-primary-dark leading-tight">
+                      {myClass.student_count}
+                    </p>
+                    <p className="text-xs text-muted">Students</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted group-hover:text-primary ml-2 transition-colors" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Active Sessions */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-primary-dark mb-4">

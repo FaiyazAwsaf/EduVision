@@ -10,6 +10,9 @@ from .views import (
     StudentProfileCreateView,
     StudentProfileDetailView,
     StudentProfileListView,
+    MyClassView,
+    MyStudentsListView,
+    MyStudentDetailView,
 )
 
 app_name = "students"
@@ -36,5 +39,13 @@ urlpatterns = [
         "students/<uuid:user_id>/",
         StudentProfileDetailView.as_view(),
         name="student-detail",
+    ),
+    # ── Class-teacher-scoped ─────────────────────────────────────────────────
+    path("my-class/", MyClassView.as_view(), name="my-class"),
+    path("my-students/", MyStudentsListView.as_view(), name="my-students-list"),
+    path(
+        "my-students/<uuid:user_id>/",
+        MyStudentDetailView.as_view(),
+        name="my-student-detail",
     ),
 ]

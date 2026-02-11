@@ -135,6 +135,35 @@ export function logout(): void {
   clearTokens();
 }
 
+// ─── Change password ──────────────────────────────────────────────────────────
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
+export async function changePassword(
+  payload: ChangePasswordPayload,
+): Promise<{ message: string }> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE_URL}/auth/change-password/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const message = await parseApiError(res, "Failed to change password");
+    throw new Error(message);
+  }
+
+  return res.json();
+}
+
 /**
  * Helper: returns headers with Bearer token attached.
  * Use this for authenticated API requests.

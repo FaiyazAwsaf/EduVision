@@ -153,12 +153,6 @@ export default function StudentDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Notification bell */}
-            <button className="relative p-2 rounded-lg hover:bg-background transition">
-              <Bell className="w-5 h-5 text-primary-dark" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-
             {/* Date badge */}
             <div className="flex items-center gap-2 bg-white border border-secondary/40 rounded-lg px-3 py-1.5 text-sm text-primary-dark font-medium shadow-sm">
               <Calendar className="w-4 h-4 text-primary" />

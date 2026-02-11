@@ -108,7 +108,12 @@ export async function listRubricSets(filters?: {
   if (filters?.subject) params.append("subject", filters.subject);
 
   const query = params.toString() ? `?${params.toString()}` : "";
-  return rubricsFetch<RubricSetListItem[]>(`${RUBRICS_URL}/${query}`);
+  const data = await rubricsFetch<
+    RubricSetListItem[] | { results: RubricSetListItem[] }
+  >(`${RUBRICS_URL}/${query}`);
+
+  // Handle both paginated ({ results: [...] }) and plain array responses
+  return Array.isArray(data) ? data : data.results;
 }
 
 export async function deleteRubricSet(id: string): Promise<void> {

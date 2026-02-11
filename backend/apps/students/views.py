@@ -1,12 +1,17 @@
+from django.db.models import Count, Q
 from rest_framework import generics, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from apps.authentication.models import CustomUser
+from apps.authentication.backends import CustomUserJWTAuthentication
 from .models import Class, Section, TeacherProfile, StudentProfile
 from .serializers import (
     ClassSerializer,
     SectionSerializer,
     TeacherProfileSerializer,
     StudentProfileSerializer,
+    MyClassSerializer,
 )
 
 
@@ -232,3 +237,98 @@ class StudentProfileListView(generics.ListAPIView):
             qs = qs.filter(section__class_ref_id=class_id)
 
         return qs
+
+
+# ─── Class-teacher-scoped views ──────────────────────────────────────────────
+
+
+def _get_teacher_section(user):
+    """Return the Section the authenticated teacher is class-teacher of, or None."""
+    try:
+        profile = TeacherProfile.objects.select_related(
+            "class_teacher_of__class_ref"
+        ).get(user=user)
+        return profile.class_teacher_of
+    except TeacherProfile.DoesNotExist:
+        return None
+
+
+class MyClassView(APIView):
+    """
+    GET /api/school/my-class/
+    Returns section info + student count for the logged-in teacher's assigned section.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        section = _get_teacher_section(request.user)
+        if section is None:
+            return Response(
+                {"detail": "You are not assigned as a class teacher."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Annotate with student count
+        section_qs = Section.objects.filter(pk=section.pk).select_related(
+            "class_ref"
+        ).annotate(student_count=Count("students"))
+        section_obj = section_qs.first()
+
+        serializer = MyClassSerializer(section_obj)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MyStudentsListView(generics.ListAPIView):
+    """
+    GET /api/school/my-students/
+    Lists all students in the logged-in teacher's assigned section.
+    Supports ?search= to filter by name or roll number.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = StudentProfileSerializer
+    pagination_class = None  # Return all students (sections are small)
+
+    def get_queryset(self):
+        section = _get_teacher_section(self.request.user)
+        if section is None:
+            return StudentProfile.objects.none()
+
+        qs = StudentProfile.objects.filter(
+            section=section
+        ).select_related("user", "section__class_ref").order_by("roll_number")
+
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            qs = qs.filter(
+                Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+                | Q(roll_number__icontains=search)
+            )
+
+        return qs
+
+
+class MyStudentDetailView(generics.RetrieveAPIView):
+    """
+    GET /api/school/my-students/<user_id>/
+    Returns full student profile, but only if the student belongs to
+    the logged-in teacher's assigned section.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = StudentProfileSerializer
+    lookup_field = "user_id"
+
+    def get_queryset(self):
+        section = _get_teacher_section(self.request.user)
+        if section is None:
+            return StudentProfile.objects.none()
+
+        return StudentProfile.objects.filter(
+            section=section
+        ).select_related("user", "section__class_ref")
