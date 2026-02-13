@@ -1,16 +1,12 @@
 from django.shortcuts import render
 from django.db import transaction
-from django.contrib.auth.hashers import make_password
-from django.core.mail import send_mail
-from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, SendOTPSerializer, VerifyOTPSerializer
-from .models import CustomUser, EmailOTP
-from datetime import timedelta
-from django.utils import timezone
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 from secrets import randbelow
 
 # Create your views here.
@@ -32,15 +28,17 @@ class RegisterView(APIView):
             return response
 
         except Exception as e:
-            self.handle_exception(e)
+            return self.handle_exception(e)
 
 class LoginView(APIView):
 
     def post(self, request):
-        try:
-            user_serialized = LoginSerializer(data=request.data)
-            user_serialized.is_valid(raise_exception=True)
+        
+        user_serialized = LoginSerializer(data=request.data)
+        if not user_serialized.is_valid():
+            return Response(user_serialized.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
             user = user_serialized.validated_data["user"]
             refresh = RefreshToken.for_user(user)
 
@@ -64,9 +62,8 @@ class LoginView(APIView):
             )
 
             return response
-
         except Exception as e:
-            self.handle_exception(e)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
 class RefreshView(APIView):
 
@@ -85,6 +82,8 @@ class RefreshView(APIView):
         try:
             token = RefreshToken(refresh_token)
             access = str(token.access_token)
+
+            new_refresh = str(token)
         
             response = Response(
                 {
@@ -93,90 +92,37 @@ class RefreshView(APIView):
                 },
                 status=status.HTTP_200_OK
             )
+
+            response.set_cookie(
+                key="refresh_token",
+                value=new_refresh,
+                httponly=True,
+                secure=False,
+                samesite="Strict",
+                path="/"
+            )
             
             return response
         except Exception as e :
             self.handle_exception(e)
 
-class SendOTPView(APIView):
+class MeView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        serializer = SendOTPSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    def get(self, request):
+        user = request.user
+        data = UserSerializer(user).data
 
-        email = serializer.validated_data["email"]
-        user = CustomUser.objects.get(email=email)
+        response = Response(
+            {
+                "message": "Successfully retrieved user profile",
+                "payload": data,
+            },
+            status=status.HTTP_200_OK
+        )
 
-        if EmailOTP.objects.filter(
-            user=user, 
-            created_at__gte=timezone.now() - timedelta(minutes=1)
-        ).exists():
-            response = Response(
-                {"error": "Too many requests"}, 
-                status=status.HTTP_429_TOO_MANY_REQUESTS
-            )
-
-            return response
-        
-        code = f"{randbelow(10**6):06d}"
-
-        try:
-            with transaction.atomic():
-
-                EmailOTP.objects.create(
-                    user=user,
-                    is_used=False,
-                ).update(is_used=True)
-
-                otp = EmailOTP.objects.create(
-                    user=user,
-                    otp=make_password(code),
-                    expires_at=timezone.now() + timedelta(minutes=10)
-                )
-
-                send_mail(
-                    "Email Verification Code",
-                    f"Your verification code is: {code}\n\nThis code expires 10 minutes",
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                    fail_silently=False,
-                )
-
-            response = Response(
-                {"message": "OTP sent to your email"}, 
-                status=status.HTTP_200_OK
-                )
-            return response
-        except Exception as e:
-            self.handle_exception(e)
-    
-class VerifyOTPView(APIView):
-
-    def post(self, request):
-        serializer = VerifyOTPSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            user = serializer.validated_data["user"]
-            otp = serializer.validated_data["otp"]
-
-            otp.is_used = True
-            otp.save()
-
-            user.is_active = True
-            user.save(update_fields=["is_active"])
-
-            response = Response(
-                {
-                    "message": "Email verified successfully.",
-                    "payload": UserSerializer(user).data,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-            return response
-        except Exception as e:
-            self.handle_exception(e)
+        return response
 
 class LogoutView(APIView):
     def post(self, request):
@@ -188,7 +134,7 @@ class LogoutView(APIView):
             response.delete_cookie("refresh_token", path="/")
             return response
         except Exception as e:
-            self.handle_exception(e)
+            return self.handle_exception(e)
 
         
 
