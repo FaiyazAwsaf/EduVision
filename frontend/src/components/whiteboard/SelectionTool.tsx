@@ -11,8 +11,8 @@ export type SelectionBounds = {
 export type SelectionToolProps = {
   canvas: fabric.Canvas | null;
   isActive: boolean;
-  onSelectionComplete: (imageData: string, bounds: SelectionBounds) => void;
-  onCancel: () => void;
+  onSelectionReady: (imageData: string, bounds: SelectionBounds) => void;
+  onSelectionCleared: () => void;
 };
 
 type Point = { x: number; y: number };
@@ -31,22 +31,18 @@ const SELECTION_STYLE = {
 export default function SelectionTool({
   canvas,
   isActive,
-  onSelectionComplete,
-  onCancel,
+  onSelectionReady,
+  onSelectionCleared,
 }: SelectionToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [selectionComplete, setSelectionComplete] = useState(false);
-  const [currentBounds, setCurrentBounds] = useState<SelectionBounds | null>(null);
-  const [buttonPosition, setButtonPosition] = useState<Point | null>(null);
   const selectionRectRef = useRef<fabric.Rect | null>(null);
 
   const resetState = useCallback(() => {
     setSelectionComplete(false);
-    setCurrentBounds(null);
     setIsSelecting(false);
     setStartPoint(null);
-    setButtonPosition(null);
   }, []);
 
   const removeSelectionRect = useCallback(() => {
@@ -74,58 +70,45 @@ export default function SelectionTool({
     [canvas]
   );
 
-  const calculateButtonPosition = useCallback(
-    (bounds: SelectionBounds): Point => {
-      if (!canvas) throw new Error("Canvas not available");
-
-      const canvasEl = canvas.getElement();
-      const canvasRect = canvasEl.getBoundingClientRect();
-      const scaleX = canvasRect.width / canvas.getWidth();
-      const scaleY = canvasRect.height / canvas.getHeight();
-
-      return {
-        x: canvasRect.left + (bounds.left + bounds.width / 2) * scaleX,
-        y: canvasRect.top + (bounds.top + bounds.height) * scaleY + 10,
-      };
-    },
-    [canvas]
-  );
-
-  const handleConvert = useCallback(() => {
-    if (!canvas || !currentBounds || !selectionRectRef.current) return;
-
-    const imageData = extractImageFromBounds(canvas, currentBounds);
-    removeSelectionRect();
-    resetState();
-    onSelectionComplete(imageData, currentBounds);
-  }, [canvas, currentBounds, onSelectionComplete, removeSelectionRect, resetState]);
-
   const handleCancel = useCallback(() => {
     removeSelectionRect();
     resetState();
-    onCancel();
-  }, [removeSelectionRect, resetState, onCancel]);
+    onSelectionCleared();
+  }, [removeSelectionRect, resetState, onSelectionCleared]);
 
   useEffect(() => {
     if (!isActive) {
+      removeSelectionRect();
       resetState();
+      onSelectionCleared();
     }
-  }, [isActive, resetState]);
+  }, [isActive, removeSelectionRect, resetState, onSelectionCleared]);
 
   useEffect(() => {
-    if (!canvas || !isActive || selectionComplete) {
-      if (!isActive) removeSelectionRect();
+    if (!canvas || !isActive) {
       return;
     }
 
     const handleMouseDown = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+      const mouseEvent = event.e as MouseEvent;
+      if (mouseEvent.button === 2) {
+        mouseEvent.preventDefault();
+        handleCancel();
+        return;
+      }
+
+      if (selectionComplete) {
+        removeSelectionRect();
+        resetState();
+        onSelectionCleared();
+      }
+
       removeSelectionRect();
       
       const coords = getCoordinates(event);
       setStartPoint({ x: coords.x, y: coords.y });
       setIsSelecting(true);
       setSelectionComplete(false);
-      setCurrentBounds(null);
 
       const rect = new fabric.Rect({
         left: coords.x,
@@ -175,11 +158,15 @@ export default function SelectionTool({
 
       if (bounds.width < MIN_SELECTION_SIZE || bounds.height < MIN_SELECTION_SIZE) {
         removeSelectionRect();
+        onSelectionCleared();
         return;
       }
 
-      setButtonPosition(calculateButtonPosition(bounds));
-      setCurrentBounds(bounds);
+      if (canvas) {
+        const imageData = extractImageFromBounds(canvas, bounds);
+        onSelectionReady(imageData, bounds);
+      }
+
       setSelectionComplete(true);
     };
 
@@ -200,7 +187,10 @@ export default function SelectionTool({
     selectionComplete,
     getCoordinates,
     removeSelectionRect,
-    calculateButtonPosition,
+    resetState,
+    handleCancel,
+    onSelectionReady,
+    onSelectionCleared,
   ]);
 
   useEffect(() => {
@@ -214,36 +204,15 @@ export default function SelectionTool({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isActive, handleCancel]);
 
-  if (!isActive || !selectionComplete || !currentBounds || !buttonPosition) {
-    return null;
-  }
+  useEffect(() => {
+    return () => {
+      removeSelectionRect();
+      resetState();
+      onSelectionCleared();
+    };
+  }, [removeSelectionRect, resetState, onSelectionCleared]);
 
-  return (
-    <div
-      style={{
-        position: "fixed",
-        left: `${buttonPosition.x}px`,
-        top: `${buttonPosition.y}px`,
-        transform: "translateX(-50%)",
-        zIndex: 2000,
-      }}
-      className="flex gap-2"
-    >
-      <button
-        onClick={handleConvert}
-        className="px-4 py-2 bg-[#48A6A7] text-white rounded-lg shadow-lg hover:bg-[#006A71] transition-colors font-medium flex items-center gap-2"
-      >
-        <span>📝</span>
-        Convert to Notation
-      </button>
-      <button
-        onClick={handleCancel}
-        className="px-4 py-2 bg-[#9ACBD0] text-[#006A71] rounded-lg shadow-lg hover:bg-[#F2EFE7] transition-colors font-medium"
-      >
-        Cancel
-      </button>
-    </div>
-  );
+  return null;
 }
 
 function extractImageFromBounds(

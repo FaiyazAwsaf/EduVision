@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
 import SelectionTool, { SelectionBounds } from "./SelectionTool";
 import LatexRenderer, { LatexObject } from "./LatexRenderer";
@@ -34,6 +34,23 @@ export type WhiteboardProps = {
  */
 type CanvasPath = fabric.Path;
 
+type HistoryEntry = {
+  canvas: ReturnType<WhiteboardCanvasHandle["exportToJSON"]>;
+  latex: LatexObject[];
+};
+
+function isLatexIntersecting(
+  obj: LatexObject,
+  bounds: SelectionBounds,
+): boolean {
+  return !(
+    obj.left > bounds.left + bounds.width ||
+    obj.left + obj.width < bounds.left ||
+    obj.top > bounds.top + bounds.height ||
+    obj.top + obj.height < bounds.top
+  );
+}
+
 /**
  * main whiteboard component
  * coordinates drawing canvas, toolbar controls, and real-time collaboration
@@ -56,6 +73,29 @@ export default function Whiteboard({
   const [isDrawingLocked, setIsDrawingLocked] = useState(false);
   const [latexObjects, setLatexObjects] = useState<LatexObject[]>([]);
   const [isConverting, setIsConverting] = useState(false);
+  const [selectionData, setSelectionData] = useState<{
+    imageData: string;
+    bounds: SelectionBounds;
+  } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const selectionBounds = useMemo(
+    () => selectionData?.bounds ?? null,
+    [selectionData],
+  );
+
+  const historyRef = useRef<{ undo: HistoryEntry[]; redo: HistoryEntry[] }>({
+    undo: [],
+    redo: [],
+  });
+  const isApplyingHistoryRef = useRef(false);
+  const lastSnapshotRef = useRef<string>("");
+  const latexObjectsRef = useRef<LatexObject[]>([]);
+
+  useEffect(() => {
+    latexObjectsRef.current = latexObjects;
+  }, [latexObjects]);
 
   // ============================================================
   // websocket handlers
@@ -147,6 +187,101 @@ export default function Whiteboard({
 
   const canDraw = role === "teacher" || !isDrawingLocked;
 
+  useEffect(() => {
+    if (currentTool !== "select") {
+      setSelectionData(null);
+    }
+  }, [currentTool]);
+
+  const updateHistoryAvailability = useCallback(() => {
+    const { undo, redo } = historyRef.current;
+    setCanUndo(undo.length > 1);
+    setCanRedo(redo.length > 0);
+  }, []);
+
+  const captureHistory = useCallback(
+    (nextLatex?: LatexObject[]) => {
+      if (isApplyingHistoryRef.current) return;
+      const canvasState = canvasRef.current?.exportToJSON();
+      if (!canvasState) return;
+
+      const latex = nextLatex ?? latexObjectsRef.current;
+      const snapshot: HistoryEntry = { canvas: canvasState, latex };
+      const snapshotKey = JSON.stringify(snapshot);
+
+      if (snapshotKey === lastSnapshotRef.current) return;
+
+      lastSnapshotRef.current = snapshotKey;
+      historyRef.current.undo.push(snapshot);
+      historyRef.current.redo = [];
+
+      if (historyRef.current.undo.length > 50) {
+        historyRef.current.undo.shift();
+      }
+
+      updateHistoryAvailability();
+    },
+    [updateHistoryAvailability],
+  );
+
+  const applySnapshot = useCallback(
+    async (snapshot: HistoryEntry) => {
+      if (!canvasRef.current) return;
+      isApplyingHistoryRef.current = true;
+      await canvasRef.current.loadFromJSON(snapshot.canvas);
+      setLatexObjects(snapshot.latex);
+      latexObjectsRef.current = snapshot.latex;
+      lastSnapshotRef.current = JSON.stringify(snapshot);
+      isApplyingHistoryRef.current = false;
+      updateHistoryAvailability();
+    },
+    [updateHistoryAvailability],
+  );
+
+  const handleUndo = useCallback(() => {
+    const { undo, redo } = historyRef.current;
+    if (undo.length <= 1) return;
+    const current = undo.pop();
+    if (current) {
+      redo.push(current);
+    }
+    const previous = undo[undo.length - 1];
+    if (previous) {
+      void applySnapshot(previous);
+    }
+  }, [applySnapshot]);
+
+  const handleRedo = useCallback(() => {
+    const { undo, redo } = historyRef.current;
+    if (redo.length === 0) return;
+    const next = redo.pop();
+    if (!next) return;
+    undo.push(next);
+    void applySnapshot(next);
+  }, [applySnapshot]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isModifier = e.ctrlKey || e.metaKey;
+      if (!isModifier) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if (key === "y" || (key === "z" && e.shiftKey)) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleUndo, handleRedo]);
+
   // ============================================================
   // canvas event handlers
   // ============================================================
@@ -180,7 +315,8 @@ export default function Whiteboard({
           };
 
           // add to state
-          setLatexObjects((prev) => [...prev, newLatexObject]);
+          const nextLatex = [...latexObjectsRef.current, newLatexObject];
+          setLatexObjects(nextLatex);
 
           // broadcast to other users
           if (websocket.isConnected) {
@@ -189,6 +325,8 @@ export default function Whiteboard({
               data: { latexObject: newLatexObject },
             });
           }
+
+          captureHistory(nextLatex);
 
           console.log(
             "[Whiteboard] LaTeX conversion successful:",
@@ -206,8 +344,26 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     },
-    [websocket],
+    [websocket, captureHistory],
   );
+
+  const handleSelectionReady = useCallback(
+    (imageData: string, bounds: SelectionBounds) => {
+      setSelectionData({ imageData, bounds });
+    },
+    [],
+  );
+
+  const handleSelectionCleared = useCallback(() => {
+    setSelectionData(null);
+  }, []);
+
+  const handleConvertSelection = useCallback(() => {
+    if (!selectionData) return;
+    const { imageData, bounds } = selectionData;
+    setSelectionData(null);
+    handleSelectionComplete(imageData, bounds);
+  }, [selectionData, handleSelectionComplete]);
 
   /**
    * handle local drawing events
@@ -215,6 +371,7 @@ export default function Whiteboard({
    */
   const handlePathCreated = useCallback(
     (path: CanvasPath) => {
+      if (isApplyingHistoryRef.current) return;
       const pathData = path.toObject();
 
       if (!websocket.isConnected) {
@@ -233,8 +390,9 @@ export default function Whiteboard({
       });
 
       console.log("[Whiteboard] Broadcasted path to peers");
+      captureHistory();
     },
-    [websocket, canDraw],
+    [websocket, canDraw, captureHistory],
   );
 
   /**
@@ -244,7 +402,20 @@ export default function Whiteboard({
   const handleClear = useCallback(() => {
     if (role !== "teacher") return;
 
+    if (selectionBounds) {
+      canvasRef.current?.clearRegion(selectionBounds);
+      const nextLatex = latexObjectsRef.current.filter(
+        (obj) => !isLatexIntersecting(obj, selectionBounds),
+      );
+      setLatexObjects(nextLatex);
+      setSelectionData(null);
+      captureHistory(nextLatex);
+      return;
+    }
+
     canvasRef.current?.clearCanvas();
+    setLatexObjects([]);
+    captureHistory([]);
 
     if (!websocket.isConnected) {
       return;
@@ -256,7 +427,17 @@ export default function Whiteboard({
     });
 
     console.log("[Whiteboard] Cleared canvas");
-  }, [role, websocket]);
+  }, [role, selectionBounds, websocket, captureHistory]);
+
+  const handleLatexObjectClick = useCallback(
+    (id: string) => {
+      if (currentTool !== "eraser") return;
+      const nextLatex = latexObjectsRef.current.filter((obj) => obj.id !== id);
+      setLatexObjects(nextLatex);
+      captureHistory(nextLatex);
+    },
+    [currentTool, captureHistory],
+  );
 
   /**
    * export canvas to json file
@@ -316,6 +497,12 @@ export default function Whiteboard({
         eraserWidth={eraserWidth}
         isDrawingLocked={isDrawingLocked}
         isConnected={websocket.isConnected}
+        selectionReady={!!selectionData}
+        onConvertSelection={handleConvertSelection}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
         onToolChange={setCurrentTool}
         onColorChange={setPenColor}
         onStrokeWidthChange={setStrokeWidth}
@@ -335,16 +522,19 @@ export default function Whiteboard({
           eraserWidth={eraserWidth}
           tool={currentTool}
           onPathCreated={handlePathCreated}
+          onCanvasReady={() => {
+            historyRef.current.undo = [];
+            historyRef.current.redo = [];
+            lastSnapshotRef.current = "";
+            captureHistory([]);
+          }}
         />
       </div>
 
       {/* latex overlay */}
       <LatexRenderer
         objects={latexObjects}
-        onObjectClick={(id) => {
-          console.log("[Whiteboard] LaTeX object clicked:", id);
-          // Optional: implement editing/deletion
-        }}
+        onObjectClick={handleLatexObjectClick}
       />
 
       {/* selection tool */}
@@ -352,8 +542,8 @@ export default function Whiteboard({
         <SelectionTool
           canvas={canvasRef.current?.getCanvas() || null}
           isActive={currentTool === "select"}
-          onSelectionComplete={handleSelectionComplete}
-          onCancel={() => setCurrentTool("pen")}
+          onSelectionReady={handleSelectionReady}
+          onSelectionCleared={handleSelectionCleared}
         />
       )}
 
