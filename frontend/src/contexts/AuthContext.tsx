@@ -11,7 +11,6 @@ import {
   login as apiLogin,
   logout as apiLogout,
   getAccessToken,
-  getRefreshToken,
   getUserData,
   refreshAccessToken,
   type LoginPayload,
@@ -42,29 +41,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
 
-  // On mount: check if we have a stored token, try to refresh it
+  // On mount: restore session from sessionStorage, then try to refresh the cookie-based token
   useEffect(() => {
     async function bootstrap() {
       const access = getAccessToken();
-      const refresh = getRefreshToken();
       const userData = getUserData();
 
       if (access && userData) {
-        // We have an access token — set user, then proactively refresh
-        // so the token is fresh for upcoming API calls
+        // Restore user immediately, then proactively refresh in background
         setIsAuthenticated(true);
         setUser(userData);
-
-        if (refresh) {
-          // Fire-and-forget refresh to ensure fresh token
-          refreshAccessToken().catch(() => {});
-        }
-      } else if (refresh) {
-        // No access token but have a refresh token — try to get a new one
+        refreshAccessToken().catch(() => {});
+      } else {
+        // No access token cached — try to get one via the httpOnly refresh cookie
         const newAccess = await refreshAccessToken();
-        if (newAccess && userData) {
-          setIsAuthenticated(true);
-          setUser(userData);
+        if (newAccess) {
+          const restoredUser = getUserData();
+          if (restoredUser) {
+            setIsAuthenticated(true);
+            setUser(restoredUser);
+          }
         }
       }
 

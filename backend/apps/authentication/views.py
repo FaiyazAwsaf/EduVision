@@ -47,6 +47,7 @@ class LoginView(APIView):
                     "message": "Successfully logged in",
                     "payload": {
                         "access_token": str(refresh.access_token),
+                        "user": UserSerializer(user).data,
                     }
                 },
                 status=status.HTTP_200_OK

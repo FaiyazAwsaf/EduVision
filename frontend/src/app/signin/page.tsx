@@ -8,7 +8,7 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
-  Mail,
+  User,
   ArrowLeft,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,7 @@ export default function SignInPage() {
   const router = useRouter();
   const { isReady, isAuthenticated, user, login } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -41,14 +41,14 @@ export default function SignInPage() {
     e.preventDefault();
     setError("");
 
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter both email and password");
+    if (!username.trim() || !password.trim()) {
+      setError("Please enter both username and password");
       return;
     }
 
     setLoading(true);
     try {
-      const user = await login({ email: email.trim(), password });
+      const user = await login({ username: username.trim(), password });
 
       // Redirect based on user role
       if (user.role === "teacher") {
@@ -136,26 +136,26 @@ export default function SignInPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
+            {/* Username */}
             <div>
               <label
-                htmlFor="email"
+                htmlFor="username"
                 className="block text-sm font-medium text-primary-dark mb-2"
               >
-                Email Address
+                Username
               </label>
               <div className="relative">
                 <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
+                  id="username"
+                  type="text"
+                  autoComplete="username"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@university.edu"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
                   className="w-full rounded-xl border border-secondary bg-white px-4 py-3 pr-11 text-primary-dark placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition shadow-sm"
                 />
-                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
+                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
               </div>
             </div>
 

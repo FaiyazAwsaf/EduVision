@@ -3,7 +3,7 @@
  *
  * Handles login, token refresh, and token management.
  * Built to match the backend authentication module's contract:
- *   POST /api/auth/login/    → { email, password }  → { message, payload: { access_token, refresh_token, user } }
+ *   POST /api/auth/login/    → { username, password }  → { message, payload: { access_token, refresh_token, user } }
  *   POST /api/auth/refresh/  → { refresh_token }     → { message, payload: <access_token> }
  */
 
@@ -12,7 +12,7 @@ import { API_BASE_URL, parseApiError } from "@/api/client";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface LoginPayload {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -29,7 +29,6 @@ export interface User {
 
 export interface AuthTokens {
   access_token: string;
-  refresh_token: string;
   user: User;
 }
 
@@ -70,9 +69,8 @@ export function getUserData(): User | null {
   }
 }
 
-export function setTokens(access: string, refresh: string, user: User): void {
+export function setTokens(access: string, user: User): void {
   sessionStorage.setItem(ACCESS_TOKEN_KEY, access);
-  sessionStorage.setItem(REFRESH_TOKEN_KEY, refresh);
   sessionStorage.setItem(USER_DATA_KEY, JSON.stringify(user));
 }
 
@@ -88,6 +86,7 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE_URL}/auth/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",  // store the httpOnly refresh_token cookie
     body: JSON.stringify(payload),
   });
 
@@ -97,23 +96,16 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   }
 
   const data: LoginResponse = await res.json();
-  setTokens(
-    data.payload.access_token,
-    data.payload.refresh_token,
-    data.payload.user,
-  );
+  setTokens(data.payload.access_token, data.payload.user);
   return data;
 }
 
 export async function refreshAccessToken(): Promise<string | null> {
-  const refresh = getRefreshToken();
-  if (!refresh) return null;
-
   try {
     const res = await fetch(`${API_BASE_URL}/auth/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refresh }),
+      credentials: "include",  // send the httpOnly refresh_token cookie
     });
 
     if (!res.ok) {
@@ -133,6 +125,11 @@ export async function refreshAccessToken(): Promise<string | null> {
 
 export function logout(): void {
   clearTokens();
+  // Also tell the backend to clear the httpOnly refresh cookie
+  fetch(`${API_BASE_URL}/auth/logout/`, {
+    method: "POST",
+    credentials: "include",
+  }).catch(() => {});
 }
 
 // ─── Change password ──────────────────────────────────────────────────────────

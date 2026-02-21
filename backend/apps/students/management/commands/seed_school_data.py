@@ -102,8 +102,17 @@ class Command(BaseCommand):
             StudentProfile.objects.all().delete()
             Section.objects.all().delete()
             Class.objects.all().delete()
-            # Delete users whose username starts with seed_
-            CustomUser.objects.filter(username__startswith="seed_").delete()
+            # Use raw SQL to bypass Django's ORM cascade which fails on PG
+            # because django_admin_log.user_id is integer but CustomUser.id is UUID
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM django_admin_log")
+                cursor.execute("DELETE FROM authentication_user WHERE username LIKE 'seed_%%'")
+            # Reset passwords for all remaining users to pass1234
+            for u in CustomUser.objects.all():
+                u.set_password("pass1234")
+                u.save(update_fields=["password"])
+                self.stdout.write(f"  reset password: {u.username}")
 
         self._create_classes_and_sections()
         self._create_subjects()
@@ -210,13 +219,11 @@ class Command(BaseCommand):
                 last_name=last,
                 role="teacher",
             )
-            user.set_password("teacher123")
+            user.set_password("pass1234")
             user.save()
 
-            # Optionally assign class teacher to a section
-            ct_section = None
-            if sections and random.random() < 0.5:
-                ct_section = random.choice(sections)
+            # Assign class teacher to a section (round-robin, one teacher → one section)
+            ct_section = sections[i % len(sections)] if sections else None
 
             TeacherProfile.objects.create(
                 user=user,
@@ -274,7 +281,7 @@ class Command(BaseCommand):
                     last_name=last,
                     role="student",
                 )
-                user.set_password("student123")
+                user.set_password("pass1234")
                 user.save()
 
                 roll_prefix = section.class_ref.name + section.name
@@ -301,7 +308,7 @@ class Command(BaseCommand):
                 )
 
             self.stdout.write(
-                f"  + {section} → {num_students} students"
+                f"  + {section} -> {num_students} students"
             )
 
         self.stdout.write(f"  Created {student_count} students total")
@@ -310,31 +317,52 @@ class Command(BaseCommand):
 
     def _create_teaching_assignments(self):
         """
-        Assign each seed teacher to 2-3 sections for the subject matching
-        their department.  This populates TeacherSubjectAssignment.
+        Assign each seed teacher to all eligible sections for their department.
+        Science/Commerce/Arts teachers are scoped to correct streams.
         """
-        self.stdout.write("Creating teaching assignments …")
+        self.stdout.write("Creating teaching assignments...")
 
-        # Map department name → Subject
         subject_map = {s.name: s for s in Subject.objects.all()}
+
+        general = list(Section.objects.filter(
+            class_ref__name__in=["9", "10"]
+        ).select_related("class_ref"))
+        science = list(Section.objects.filter(
+            class_ref__name__in=["11", "12"], class_ref__stream="Science"
+        ).select_related("class_ref"))
+        commerce = list(Section.objects.filter(
+            class_ref__name__in=["11", "12"], class_ref__stream="Commerce"
+        ).select_related("class_ref"))
+        arts = list(Section.objects.filter(
+            class_ref__name__in=["11", "12"], class_ref__stream="Arts"
+        ).select_related("class_ref"))
+
+        dept_sections = {
+            "Mathematics":      general + science + commerce + arts,
+            "English":          general + science + commerce + arts,
+            "Bengali":          general + science + commerce + arts,
+            "ICT":              general + science + commerce + arts,
+            "Islamic Studies":  general + science + commerce + arts,
+            "Physics":          general + science,
+            "Chemistry":        general + science,
+            "Biology":          general + science,
+            "History":          general + arts,
+            "Geography":        general + arts,
+            "Accounting":       commerce,
+            "Business Studies": commerce,
+        }
 
         teachers = TeacherProfile.objects.filter(
             user__username__startswith="seed_teacher_"
         ).select_related("user")
 
-        sections = list(Section.objects.select_related("class_ref").all())
         assignment_count = 0
-
         for tp in teachers:
             subject = subject_map.get(tp.department)
             if not subject:
                 continue
-
-            # Pick 2-3 random sections for this teacher
-            num = min(random.randint(2, 3), len(sections))
-            chosen = random.sample(sections, num)
-
-            for sec in chosen:
+            eligible = dept_sections.get(tp.department, [])
+            for sec in eligible:
                 _, created = TeacherSubjectAssignment.objects.get_or_create(
                     teacher=tp.user,
                     subject=subject,
@@ -342,5 +370,10 @@ class Command(BaseCommand):
                 )
                 if created:
                     assignment_count += 1
+            self.stdout.write(
+                f"  {tp.user.first_name} {tp.user.last_name} ({tp.department})"
+                f" -> {len(eligible)} sections"
+            )
 
         self.stdout.write(f"  Created {assignment_count} teaching assignments")
+
