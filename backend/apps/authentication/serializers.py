@@ -3,16 +3,18 @@ from django.contrib.auth import authenticate
 from .models import CustomUser
 
 class RegisterSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=20)
+    username = serializers.CharField()
     email = serializers.EmailField()
-    first_name = serializers.CharField(max_length=30)
-    last_name = serializers.CharField(max_length=30)
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True, min_length=8)
-
+    
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
-            raise serializers.ValidationError({"passsword": "Passwords do not match"})
+            raise serializers.ValidationError(
+                {"passsword": "Passwords do not match"}
+                )
         return attrs
 
     def create(self, payload):
@@ -26,27 +28,24 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.CharField()
+    username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        email = attrs.get("email")
+        username = attrs.get("username")
         password = attrs.get("password")
 
-        try:
-            user = CustomUser.objects.get(email=email)
-        except CustomUser.DoesNotExist:
-            raise serializers.ValidationError("Invalid email or password")
-        
-        if not user.verify_password(password):
-            raise serializers.ValidationError("Invalid email or password")
+        user = authenticate(username=username, password=password)
+
+        if not user:
+            raise serializers.ValidationError("Invalid username or password")
         
         if not user.is_active:
             raise serializers.ValidationError("User account is not active")
         
         attrs["user"] = user
         return attrs
-    
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser

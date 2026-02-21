@@ -331,6 +331,7 @@ const WhiteboardCanvas = forwardRef<
             version: fabric.version,
             objects: state.objects,
           });
+          canvasRef.current.backgroundColor = "#ffffff";
           canvasRef.current.renderAll();
           console.log("[Canvas] loaded canvas state from json");
         } catch (error) {

@@ -8,15 +8,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Pen,
-  Eraser,
-  SquareDashedMousePointer,
-  Trash2,
-  Download,
-  Lock,
-  Unlock,
-} from "lucide-react";
 
 export type Tool = "pen" | "eraser" | "select";
 
@@ -28,6 +19,12 @@ export type ToolbarProps = {
   eraserWidth: number;
   isDrawingLocked: boolean;
   isConnected: boolean;
+  selectionReady?: boolean;
+  onConvertSelection?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   onToolChange: (tool: Tool) => void;
   onColorChange: (color: string) => void;
   onStrokeWidthChange: (width: number) => void;
@@ -62,6 +59,12 @@ export default function Toolbar(props: ToolbarProps) {
     eraserWidth,
     isDrawingLocked,
     isConnected,
+    selectionReady = false,
+    onConvertSelection,
+    canUndo = false,
+    canRedo = false,
+    onUndo,
+    onRedo,
     onToolChange,
     onColorChange,
     onStrokeWidthChange,
@@ -86,28 +89,28 @@ export default function Toolbar(props: ToolbarProps) {
   }, [currentTool]);
 
   return (
-    <div className="fixed top-2.5 left-2.5 bg-background p-3 rounded-lg shadow-lg border border-secondary z-[1000] flex flex-col gap-2 min-w-[180px] max-h-[90vh] overflow-y-auto">
+    <div className="fixed top-2.5 left-2.5 bg-[#F2EFE7] p-3 rounded-lg shadow-lg border border-[#9ACBD0] z-[1000] flex flex-col gap-2 min-w-[180px] w-[220px] max-w-[220px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
       {/* connection Status */}
       <div className="flex flex-col gap-1.5">
         <div
-          className={`px-2 py-1.5 rounded text-center text-sm font-bold text-background ${
+          className={`px-2 py-1.5 rounded text-center text-sm font-bold text-[#F2EFE7] ${
             isConnected ? "bg-green-500" : "bg-red-500"
           }`}
         >
-          {isConnected ? "Connected" : "Offline"}
+          {isConnected ? "🟢" : "🔴"}
         </div>
-        <span className="text-primary-dark text-xs text-center">
+        <span className="text-[#006A71] text-xs text-center">
           {isConnected ? "Connected" : "Disconnected"}
         </span>
       </div>
 
-      <div className="h-px bg-secondary my-1" />
+      <div className="h-px bg-[#9ACBD0] my-1" />
 
       {/* Drawing Tools */}
       {canDraw && (
         <>
           <div className="flex flex-col gap-1.5">
-            <span className="text-primary-dark text-xs font-bold uppercase">
+            <span className="text-[#006A71] text-xs font-bold uppercase">
               Drawing
             </span>
 
@@ -120,19 +123,17 @@ export default function Toolbar(props: ToolbarProps) {
                 className={`px-3 py-2 border rounded text-sm flex items-center gap-1.5 transition-all
                   ${
                     currentTool === tool
-                      ? "bg-primary text-background font-bold border-primary"
-                      : "bg-background text-primary-dark border-secondary"
+                      ? "bg-[#48A6A7] text-[#F2EFE7] font-bold border-[#48A6A7]"
+                      : "bg-[#F2EFE7] text-[#006A71] border-[#9ACBD0]"
                   }
                   ${isDisabled && tool !== "select" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                {tool === "pen" ? (
-                  <><Pen className="w-4 h-4" /> Pen</>
-                ) : tool === "eraser" ? (
-                  <><Eraser className="w-4 h-4" /> Eraser</>
-                ) : (
-                  <><SquareDashedMousePointer className="w-4 h-4" /> Select</>
-                )}
+                {tool === "pen"
+                  ? "✏️ Pen"
+                  : tool === "eraser"
+                    ? "🧹 Eraser"
+                    : "🔲 Select"}
               </button>
             ))}
           </div>
@@ -146,10 +147,10 @@ export default function Toolbar(props: ToolbarProps) {
                   type="button"
                   disabled={isDisabled}
                   onClick={() => setShowColorPicker((v) => !v)}
-                  className="px-3 py-2 border border-secondary rounded bg-background text-primary-dark text-sm flex items-center gap-2"
+                  className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm flex items-center gap-2"
                 >
                   <span
-                    className="w-4 h-4 rounded-full border-2 border-primary-dark"
+                    className="w-4 h-4 rounded-full border-2 border-[#006A71]"
                     style={{ backgroundColor: penColor }}
                   />
                   Color
@@ -185,7 +186,7 @@ export default function Toolbar(props: ToolbarProps) {
                   type="button"
                   disabled={isDisabled}
                   onClick={() => setShowStrokePicker((v) => !v)}
-                  className="px-3 py-2 border border-secondary rounded bg-background text-primary-dark text-sm"
+                  className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
                 >
                   Width: {strokeWidth}px
                 </button>
@@ -202,8 +203,8 @@ export default function Toolbar(props: ToolbarProps) {
                         }}
                         className={`px-2 py-1 rounded text-xs ${
                           width === strokeWidth
-                            ? "bg-primary text-white"
-                            : "bg-background text-primary-dark"
+                            ? "bg-[#48A6A7] text-white"
+                            : "bg-[#F2EFE7] text-[#006A71]"
                         }`}
                       >
                         {width}px
@@ -222,7 +223,7 @@ export default function Toolbar(props: ToolbarProps) {
                 type="button"
                 disabled={isDisabled}
                 onClick={() => setShowEraserPicker((v) => !v)}
-                className="px-3 py-2 border border-secondary rounded bg-background text-primary-dark text-sm"
+                className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
               >
                 Eraser: {eraserWidth}px
               </button>
@@ -239,8 +240,8 @@ export default function Toolbar(props: ToolbarProps) {
                       }}
                       className={`px-2 py-1 rounded text-xs ${
                         width === eraserWidth
-                          ? "bg-primary text-white"
-                          : "bg-background text-primary-dark"
+                          ? "bg-[#48A6A7] text-white"
+                          : "bg-[#F2EFE7] text-[#006A71]"
                       }`}
                     >
                       {width}px
@@ -253,49 +254,86 @@ export default function Toolbar(props: ToolbarProps) {
 
           {/* select tool info */}
           {currentTool === "select" && (
-            <div className="text-xs text-primary p-2 bg-secondary/20 rounded">
-              Draw a rectangle to select an area, then click "Convert to
-              Notation"
+            <div className="flex flex-col gap-2">
+              <div className="text-xs text-[#48A6A7] p-2 bg-[#9ACBD0]/20 rounded break-words whitespace-normal">
+                Draw a rectangle to select an area, then click "Convert to
+                Notation"
+              </div>
+              <button
+                type="button"
+                onClick={onConvertSelection}
+                disabled={!selectionReady || isDisabled}
+                className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  selectionReady && !isDisabled
+                    ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                    : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+                }`}
+              >
+                📝 Convert to Notation
+              </button>
             </div>
           )}
 
-          <div className="h-px bg-secondary my-1" />
+          <div className="h-px bg-[#9ACBD0] my-1" />
         </>
       )}
 
       {/* canvas actions */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-primary-dark text-xs font-bold uppercase">
+        <span className="text-[#006A71] text-xs font-bold uppercase">
           Canvas
         </span>
 
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+              canUndo
+                ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+            }`}
+          >
+            ↩️ Undo
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+              canRedo
+                ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+            }`}
+          >
+            ↪️ Redo
+          </button>
+        </div>
+
         {role === "teacher" && (
-          <button type="button" onClick={onClear} className="toolbar-btn flex items-center gap-1.5">
-            <Trash2 className="w-4 h-4" /> Clear
+          <button type="button" onClick={onClear} className="toolbar-btn">
+            🗑️ Clear
           </button>
         )}
 
-        <button type="button" onClick={onExport} className="toolbar-btn flex items-center gap-1.5">
-          <Download className="w-4 h-4" /> Export
+        <button type="button" onClick={onExport} className="toolbar-btn">
+          💾 Export
         </button>
       </div>
 
       {/* permissions */}
       {role === "teacher" && onToggleLock && (
         <>
-          <div className="h-px bg-secondary my-1" />
+          <div className="h-px bg-[#9ACBD0] my-1" />
           <button
             type="button"
             onClick={onToggleLock}
             className={`px-3 py-2 rounded text-sm text-white ${
-              isDrawingLocked ? "bg-primary-dark" : "bg-primary"
+              isDrawingLocked ? "bg-[#006A71]" : "bg-[#48A6A7]"
             }`}
           >
-            {isDrawingLocked ? (
-              <span className="flex items-center gap-1.5"><Lock className="w-4 h-4" /> Locked</span>
-            ) : (
-              <span className="flex items-center gap-1.5"><Unlock className="w-4 h-4" /> Unlocked</span>
-            )}
+            {isDrawingLocked ? "🔒 Locked" : "🔓 Unlocked"}
           </button>
         </>
       )}
