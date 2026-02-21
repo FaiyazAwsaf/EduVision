@@ -12,12 +12,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
-import SelectionTool, { SelectionBounds } from "./SelectionTool";
 import LatexRenderer, { LatexObject } from "./LatexRenderer";
 import { convertHandwritingToLatex } from "@/api/geminiService";
 import Toolbar, { Tool } from "./Toolbar";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
 import * as fabric from "fabric";
+
+/**
+ * Selection bounds type
+ */
+type SelectionBounds = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
 
 /**
  * props for whiteboard component
@@ -96,6 +105,37 @@ export default function Whiteboard({
   useEffect(() => {
     latexObjectsRef.current = latexObjects;
   }, [latexObjects]);
+
+  const updateHistoryAvailability = useCallback(() => {
+    const { undo, redo } = historyRef.current;
+    setCanUndo(undo.length > 1);
+    setCanRedo(redo.length > 0);
+  }, []);
+
+  const captureHistory = useCallback(
+    (nextLatex?: LatexObject[]) => {
+      if (isApplyingHistoryRef.current) return;
+      const canvasState = canvasRef.current?.exportToJSON();
+      if (!canvasState) return;
+
+      const latex = nextLatex ?? latexObjectsRef.current;
+      const snapshot: HistoryEntry = { canvas: canvasState, latex };
+      const snapshotKey = JSON.stringify(snapshot);
+
+      if (snapshotKey === lastSnapshotRef.current) return;
+
+      lastSnapshotRef.current = snapshotKey;
+      historyRef.current.undo.push(snapshot);
+      historyRef.current.redo = [];
+
+      if (historyRef.current.undo.length > 50) {
+        historyRef.current.undo.shift();
+      }
+
+      updateHistoryAvailability();
+    },
+    [updateHistoryAvailability],
+  );
 
   // ============================================================
   // websocket handlers
@@ -193,37 +233,6 @@ export default function Whiteboard({
     }
   }, [currentTool]);
 
-  const updateHistoryAvailability = useCallback(() => {
-    const { undo, redo } = historyRef.current;
-    setCanUndo(undo.length > 1);
-    setCanRedo(redo.length > 0);
-  }, []);
-
-  const captureHistory = useCallback(
-    (nextLatex?: LatexObject[]) => {
-      if (isApplyingHistoryRef.current) return;
-      const canvasState = canvasRef.current?.exportToJSON();
-      if (!canvasState) return;
-
-      const latex = nextLatex ?? latexObjectsRef.current;
-      const snapshot: HistoryEntry = { canvas: canvasState, latex };
-      const snapshotKey = JSON.stringify(snapshot);
-
-      if (snapshotKey === lastSnapshotRef.current) return;
-
-      lastSnapshotRef.current = snapshotKey;
-      historyRef.current.undo.push(snapshot);
-      historyRef.current.redo = [];
-
-      if (historyRef.current.undo.length > 50) {
-        historyRef.current.undo.shift();
-      }
-
-      updateHistoryAvailability();
-    },
-    [updateHistoryAvailability],
-  );
-
   const applySnapshot = useCallback(
     async (snapshot: HistoryEntry) => {
       if (!canvasRef.current) return;
@@ -263,24 +272,47 @@ export default function Whiteboard({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isModifier = e.ctrlKey || e.metaKey;
-      if (!isModifier) return;
+      if (!isModifier && e.key !== "Delete") return;
 
-      const key = e.key.toLowerCase();
-      if (key === "z" && !e.shiftKey) {
+      if (e.key.toLowerCase() === "z" && !e.shiftKey && isModifier) {
         e.preventDefault();
         handleUndo();
         return;
       }
 
-      if (key === "y" || (key === "z" && e.shiftKey)) {
+      if ((e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey)) && isModifier) {
         e.preventDefault();
         handleRedo();
+        return;
+      }
+
+      // Handle Delete key
+      if (e.key === "Delete") {
+        e.preventDefault();
+        const canvas = canvasRef.current?.getCanvas();
+        if (!canvas) return;
+
+        const activeObject = canvas.getActiveObject();
+        if (activeObject) {
+          // If there's an active selection or object, delete it
+          if (activeObject instanceof fabric.ActiveSelection) {
+            // Delete all selected objects
+            const objects = activeObject.getObjects();
+            objects.forEach((obj) => canvas.remove(obj));
+          } else {
+            // Delete single object
+            canvas.remove(activeObject);
+          }
+          canvas.discardActiveObject();
+          canvas.renderAll();
+          captureHistory();
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, captureHistory]);
 
   // ============================================================
   // canvas event handlers
@@ -344,7 +376,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     },
-    [websocket, captureHistory],
+    [websocket],
   );
 
   const handleSelectionReady = useCallback(
@@ -402,6 +434,8 @@ export default function Whiteboard({
   const handleClear = useCallback(() => {
     if (role !== "teacher") return;
 
+    const canvas = canvasRef.current?.getCanvas();
+
     if (selectionBounds) {
       canvasRef.current?.clearRegion(selectionBounds);
       const nextLatex = latexObjectsRef.current.filter(
@@ -409,12 +443,20 @@ export default function Whiteboard({
       );
       setLatexObjects(nextLatex);
       setSelectionData(null);
+      if (canvas) {
+        canvas.discardActiveObject();
+        canvas.renderAll();
+      }
       captureHistory(nextLatex);
       return;
     }
 
     canvasRef.current?.clearCanvas();
     setLatexObjects([]);
+    if (canvas) {
+      canvas.discardActiveObject();
+      canvas.renderAll();
+    }
     captureHistory([]);
 
     if (!websocket.isConnected) {
@@ -427,7 +469,7 @@ export default function Whiteboard({
     });
 
     console.log("[Whiteboard] Cleared canvas");
-  }, [role, selectionBounds, websocket, captureHistory]);
+  }, [role, selectionBounds, websocket]);
 
   const handleLatexObjectClick = useCallback(
     (id: string) => {
@@ -522,6 +564,7 @@ export default function Whiteboard({
           eraserWidth={eraserWidth}
           tool={currentTool}
           onPathCreated={handlePathCreated}
+          onSelectionReady={handleSelectionReady}
           onCanvasReady={() => {
             historyRef.current.undo = [];
             historyRef.current.redo = [];
@@ -536,16 +579,6 @@ export default function Whiteboard({
         objects={latexObjects}
         onObjectClick={handleLatexObjectClick}
       />
-
-      {/* selection tool */}
-      {currentTool === "select" && (
-        <SelectionTool
-          canvas={canvasRef.current?.getCanvas() || null}
-          isActive={currentTool === "select"}
-          onSelectionReady={handleSelectionReady}
-          onSelectionCleared={handleSelectionCleared}
-        />
-      )}
 
       {/* loading indicator */}
       {isConverting && (

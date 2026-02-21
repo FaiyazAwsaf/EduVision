@@ -41,9 +41,10 @@ export type WhiteboardCanvasProps = {
   penColor?: string;
   strokeWidth?: number;
   eraserWidth?: number;
-  tool?: "pen" | "eraser" | "select";
+  tool?: "pencil" | "pen" | "fountain" | "marker" | "eraser" | "select";
   onCanvasReady?: (canvas: fabric.Canvas) => void;
   onPathCreated?: (path: fabric.Path) => void;
+  onSelectionReady?: (imageData: string, bounds: { left: number; top: number; width: number; height: number }) => void;
 };
 
 /**
@@ -71,6 +72,107 @@ export type WhiteboardCanvasHandle = {
  * whiteboard canvas component using fabric.js
  * manages drawing surface and path synchronization
  */
+
+/**
+ * configure brush settings based on tool type
+ * centralizes brush behavior logic
+ */
+function configureBrush(
+  canvas: fabric.Canvas,
+  tool: "pencil" | "pen" | "fountain" | "marker" | "eraser" | "select",
+  penColor: string,
+  strokeWidth: number,
+  eraserWidth: number,
+) {
+  if (!canvas.freeDrawingBrush) return;
+
+  const brush = canvas.freeDrawingBrush;
+
+  switch (tool) {
+    case "pencil": {
+      // ✏️ Pencil Tool: soft graphite look
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      brush.color = penColor;
+      brush.width = strokeWidth;
+      (brush as any).opacity = 0.7;
+      console.log(
+        `[Canvas] tool: pencil, color: ${penColor}, width: ${strokeWidth}, opacity: 0.7`,
+      );
+      break;
+    }
+
+    case "fountain": {
+      // 🖋 Fountain Pen Tool: calligraphic with pressure simulation
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      brush.color = penColor;
+      brush.width = strokeWidth * 1.5;
+      (brush as any).opacity = 1;
+      // Enable decimate for smoother strokes
+      if ("decimate" in brush) {
+        (brush as any).decimate = 0.4;
+      }
+      console.log(
+        `[Canvas] tool: fountain, color: ${penColor}, width: ${strokeWidth * 1.5}, opacity: 1, decimate: 0.4`,
+      );
+      break;
+    }
+
+    case "marker": {
+      // 🟨 Marker / Highlighter Tool: translucent overlay
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      brush.color = penColor;
+      brush.width = strokeWidth * 2;
+      (brush as any).opacity = 0.3;
+      console.log(
+        `[Canvas] tool: marker, color: ${penColor}, width: ${strokeWidth * 2}, opacity: 0.3`,
+      );
+      break;
+    }
+
+    case "pen": {
+      // 🖊 Pen Tool: regular drawing with full opacity
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      brush.color = penColor;
+      brush.width = strokeWidth;
+      (brush as any).opacity = 1;
+      console.log(
+        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth}, opacity: 1`,
+      );
+      break;
+    }
+
+    case "eraser": {
+      // 🧹 Eraser Tool: white brush simulation
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      brush.color = "#ffffff";
+      brush.width = eraserWidth;
+      (brush as any).opacity = 1;
+      console.log(`[Canvas] tool: eraser, width: ${eraserWidth}`);
+      break;
+    }
+
+    case "select": {
+      // 🔲 Select Tool: freehand lasso (drawing disabled)
+      canvas.isDrawingMode = false;
+      canvas.selection = false;
+      console.log("[Canvas] tool: select (lasso - drawing disabled)");
+      break;
+    }
+
+    default:
+      console.warn(`[Canvas] unknown tool: ${tool}`);
+  }
+}
+
+/**
+ * whiteboard canvas component using fabric.js
+ * manages drawing surface and path synchronization
+ */
 const WhiteboardCanvas = forwardRef<
   WhiteboardCanvasHandle,
   WhiteboardCanvasProps
@@ -85,6 +187,7 @@ const WhiteboardCanvas = forwardRef<
     tool = "pen",
     onCanvasReady,
     onPathCreated,
+    onSelectionReady,
   } = props;
 
   // ============================================================
@@ -96,11 +199,13 @@ const WhiteboardCanvas = forwardRef<
   const isRemoteUpdateRef = useRef(false);
   // store callback in ref to avoid canvas recreation when callback changes
   const onPathCreatedRef = useRef(onPathCreated);
+  const onSelectionReadyRef = useRef(onSelectionReady);
 
   // keep the ref in sync with the prop
   useEffect(() => {
     onPathCreatedRef.current = onPathCreated;
-  }, [onPathCreated]);
+    onSelectionReadyRef.current = onSelectionReady;
+  }, [onPathCreated, onSelectionReady]);
 
   // ============================================================
   // canvas initialization
@@ -216,40 +321,259 @@ const WhiteboardCanvas = forwardRef<
 
   /**
    * update brush settings based on tool prop
-   * switches between pen, eraser, and select modes
+   * switches between all tool modes
    */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (tool === "pen") {
-      // pen mode - enable drawing with colored brush
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = penColor;
-        canvas.freeDrawingBrush.width = strokeWidth;
-      }
-      console.log(
-        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth}`,
-      );
-    } else if (tool === "eraser") {
-      // eraser mode - use white brush to simulate erasing
-      // this draws white strokes over existing content
-      canvas.isDrawingMode = true;
-      canvas.selection = false;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = "#ffffff";
-        canvas.freeDrawingBrush.width = eraserWidth;
-      }
-      console.log(`[Canvas] tool: eraser (white brush), width: ${eraserWidth}`);
-    } else if (tool === "select") {
-      // select mode - disable drawing, handled by SelectionTool component
-      canvas.isDrawingMode = false;
-      canvas.selection = false;
-      console.log("[Canvas] tool: select (drawing disabled)");
-    }
+    configureBrush(canvas, tool, penColor, strokeWidth, eraserWidth);
   }, [tool, penColor, strokeWidth, eraserWidth]);
+
+  // ============================================================
+  // lasso selection handler
+  // ============================================================
+
+  /**
+   * handle lasso selection tool
+   * allows freehand drawing of selection boundary
+   */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || tool !== "select") {
+      return;
+    }
+
+    let isDrawingLasso = false;
+    let lassoPath: fabric.Path | null = null;
+    let tempPath: fabric.Path | null = null;
+    const lassoPoints: Array<{ x: number; y: number }> = [];
+
+    // Helper function to check if point is inside polygon (point-in-polygon algorithm)
+    const isPointInPolygon = (
+      point: { x: number; y: number },
+      polygon: Array<{ x: number; y: number }>,
+    ): boolean => {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x,
+          yi = polygon[i].y;
+        const xj = polygon[j].x,
+          yj = polygon[j].y;
+
+        const intersect =
+          yi > point.y !== yj > point.y &&
+          point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    };
+
+    // Helper function to check if bounding box intersects with lasso
+    const boundingBoxIntersectsLasso = (
+      bounds: { left: number; top: number; width: number; height: number },
+      lasso: { x: number; y: number }[],
+    ): boolean => {
+      if (lasso.length < 3) return false;
+
+      const corners = [
+        { x: bounds.left, y: bounds.top },
+        { x: bounds.left + bounds.width, y: bounds.top },
+        { x: bounds.left, y: bounds.top + bounds.height },
+        {
+          x: bounds.left + bounds.width,
+          y: bounds.top + bounds.height,
+        },
+      ];
+
+      // Check if any corner is inside polygon
+      for (const corner of corners) {
+        if (isPointInPolygon(corner, lasso)) {
+          return true;
+        }
+      }
+
+      // Check if any polygon point is inside bounding box
+      for (const point of lasso) {
+        if (
+          point.x >= bounds.left &&
+          point.x <= bounds.left + bounds.width &&
+          point.y >= bounds.top &&
+          point.y <= bounds.top + bounds.height
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    // Helper function to create SVG path from points
+    const createPathFromPoints = (points: Array<{ x: number; y: number }>) => {
+      if (points.length === 0) return "";
+      const pathData = points
+        .map((point, idx) => `${idx === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+        .join(" ");
+      return pathData;
+    };
+
+    const handleMouseDown = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+      if (tool !== "select") return;
+
+      isDrawingLasso = true;
+      lassoPoints.length = 0;
+
+      const point = event.scenePoint;
+      lassoPoints.push({ x: point.x, y: point.y });
+    };
+
+    const handleMouseMove = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+      if (!isDrawingLasso) return;
+
+      const point = event.scenePoint;
+
+      // Add point if it's far enough from the last one (to avoid too many points)
+      if (lassoPoints.length === 0 || 
+          Math.hypot(
+            point.x - lassoPoints[lassoPoints.length - 1].x,
+            point.y - lassoPoints[lassoPoints.length - 1].y,
+          ) > 5) {
+        lassoPoints.push({ x: point.x, y: point.y });
+      }
+
+      // Remove old temporary path
+      if (tempPath) {
+        canvas.remove(tempPath);
+        tempPath = null;
+      }
+
+      // Create new temporary path with lasso outline
+      if (lassoPoints.length > 1) {
+        const pathData = createPathFromPoints(lassoPoints);
+        tempPath = new fabric.Path(pathData, {
+          stroke: "#48A6A7",
+          strokeWidth: 2,
+          fill: "rgba(72, 166, 167, 0.1)",
+          selectable: false,
+          evented: false,
+          objectCaching: false,
+        });
+        canvas.add(tempPath);
+        canvas.renderAll();
+      }
+    };
+
+    const handleMouseUp = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+      if (!isDrawingLasso || lassoPoints.length < 3) {
+        isDrawingLasso = false;
+        if (tempPath) {
+          canvas.remove(tempPath);
+          tempPath = null;
+        }
+        canvas.renderAll();
+        lassoPoints.length = 0;
+        return;
+      }
+
+      isDrawingLasso = false;
+
+      // Remove temporary path
+      if (tempPath) {
+        canvas.remove(tempPath);
+        tempPath = null;
+      }
+
+      // Close the path
+      const lastPoint = lassoPoints[lassoPoints.length - 1];
+      const firstPoint = lassoPoints[0];
+
+      if (
+        Math.hypot(lastPoint.x - firstPoint.x, lastPoint.y - firstPoint.y) >
+        10
+      ) {
+        lassoPoints.push(firstPoint);
+      }
+
+      // Find all objects that intersect with the lasso
+      const objects = canvas.getObjects();
+      const selectedObjects: fabric.FabricObject[] = [];
+
+      objects.forEach((obj) => {
+        const bounds = obj.getBoundingRect();
+        if (
+          boundingBoxIntersectsLasso(bounds, lassoPoints)
+        ) {
+          selectedObjects.push(obj);
+        }
+      });
+
+      // Create active selection if objects found
+      if (selectedObjects.length > 0) {
+        const activeSelection = new fabric.ActiveSelection(selectedObjects, {
+          canvas,
+        });
+        canvas.setActiveObject(activeSelection);
+        
+        // Get bounding box of selected objects
+        const bounds = activeSelection.getBoundingRect();
+        
+        // Extract image from selection bounds
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = bounds.width;
+        tempCanvas.height = bounds.height;
+        const tempCtx = tempCanvas.getContext("2d");
+
+        if (tempCtx) {
+          const mainCanvasElement = canvas.getElement();
+          tempCtx.drawImage(
+            mainCanvasElement,
+            bounds.left,
+            bounds.top,
+            bounds.width,
+            bounds.height,
+            0,
+            0,
+            bounds.width,
+            bounds.height
+          );
+
+          const imageData = tempCanvas.toDataURL("image/png");
+          
+          // Call selection ready callback
+          onSelectionReadyRef.current?.(imageData, {
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+          });
+        }
+        
+        canvas.renderAll();
+        console.log(
+          `[Canvas] Lasso selection: ${selectedObjects.length} objects selected`,
+        );
+      } else {
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        console.log("[Canvas] Lasso selection: no objects selected");
+      }
+
+      lassoPoints.length = 0;
+    };
+
+    canvas.on("mouse:down", handleMouseDown);
+    canvas.on("mouse:move", handleMouseMove);
+    canvas.on("mouse:up", handleMouseUp);
+
+    return () => {
+      canvas.off("mouse:down", handleMouseDown);
+      canvas.off("mouse:move", handleMouseMove);
+      canvas.off("mouse:up", handleMouseUp);
+      if (tempPath) {
+        canvas.remove(tempPath);
+      }
+    };
+  }, [tool]);
 
   // ============================================================
   // imperative handle methods
