@@ -126,6 +126,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 /**
+ * Get all users (development/testing utility)
+ */
+export async function getUsers(): Promise<TutoringUser[]> {
+  const response = await fetch(`${TUTORING_API_URL}/users/`, {
+    method: "GET",
+    headers: getContentHeaders(),
+  });
+  return handleResponse<TutoringUser[]>(response);
+}
+
+/**
  * Create a new tutoring session for a specific section (Teacher only)
  */
 export async function createSession(

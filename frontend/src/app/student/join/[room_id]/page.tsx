@@ -157,7 +157,9 @@ function SessionView({
             wsUrl={joinData.livekit_ws_url}
             token={joinData.token}
             role="student"
-            sessionId={joinData.session_id}
+            userName={user.full_name}
+            sessionLabel={joinData.section_name ?? undefined}
+            onLeaveSession={onLeaveSession}
           />
         )}
       </div>
