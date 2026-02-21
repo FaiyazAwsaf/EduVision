@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Tool = "pen" | "eraser" | "select";
+export type Tool = "pencil" | "pen" | "fountain" | "marker" | "eraser" | "select";
 
 export type ToolbarProps = {
   role: "teacher" | "student";
@@ -111,14 +111,14 @@ export default function Toolbar(props: ToolbarProps) {
         <>
           <div className="flex flex-col gap-1.5">
             <span className="text-[#006A71] text-xs font-bold uppercase">
-              Drawing
+              Drawing Tools
             </span>
 
-            {(["pen", "eraser", "select"] as Tool[]).map((tool) => (
+            {(["pencil", "pen", "fountain", "marker", "eraser", "select"] as Tool[]).map((tool) => (
               <button
                 key={tool}
                 type="button"
-                disabled={isDisabled && tool != "select"}
+                disabled={isDisabled && tool !== "select"}
                 onClick={() => onToolChange(tool)}
                 className={`px-3 py-2 border rounded text-sm flex items-center gap-1.5 transition-all
                   ${
@@ -129,17 +129,23 @@ export default function Toolbar(props: ToolbarProps) {
                   ${isDisabled && tool !== "select" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                {tool === "pen"
-                  ? "✏️ Pen"
-                  : tool === "eraser"
-                    ? "🧹 Eraser"
-                    : "🔲 Select"}
+                {tool === "pencil"
+                  ? "✏️ Pencil"
+                  : tool === "pen"
+                    ? "🖊 Pen"
+                    : tool === "fountain"
+                      ? "🖋 Fountain"
+                      : tool === "marker"
+                        ? "🟨 Marker"
+                        : tool === "eraser"
+                          ? "🧹 Eraser"
+                          : "🔲 Select"}
               </button>
             ))}
           </div>
 
           {/* pen controls */}
-          {currentTool === "pen" && (
+          {(["pencil", "pen", "fountain", "marker"] as Tool[]).includes(currentTool) && (
             <>
               {/* color picker */}
               <div className="flex flex-col gap-1.5">
@@ -256,8 +262,7 @@ export default function Toolbar(props: ToolbarProps) {
           {currentTool === "select" && (
             <div className="flex flex-col gap-2">
               <div className="text-xs text-[#48A6A7] p-2 bg-[#9ACBD0]/20 rounded break-words whitespace-normal">
-                Draw a rectangle to select an area, then click "Convert to
-                Notation"
+                Draw a freehand lasso to select objects, then convert to notation.
               </div>
               <button
                 type="button"
