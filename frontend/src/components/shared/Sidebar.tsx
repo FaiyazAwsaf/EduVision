@@ -21,6 +21,11 @@ import {
   ChevronUp,
   LibraryBig,
   KeyRound,
+  GraduationCap,
+  School,
+  Layers,
+  UserCog,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -84,6 +89,43 @@ const studentNavItems: NavEntry[] = [
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
 ];
 
+const adminNavItems: NavEntry[] = [
+  { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+  {
+    label: "Users",
+    icon: Users,
+    children: [
+      { label: "All Users", href: "/admin/users", icon: UserCog },
+      {
+        label: "Teachers",
+        href: "/admin/users?role=teacher",
+        icon: GraduationCap,
+      },
+      { label: "Students", href: "/admin/users?role=student", icon: Users },
+    ],
+  },
+  {
+    label: "School",
+    icon: School,
+    children: [
+      { label: "Classes", href: "/admin/classes", icon: Layers },
+      { label: "Sections", href: "/admin/sections", icon: School },
+    ],
+  },
+  {
+    label: "Academics",
+    icon: BookOpen,
+    children: [
+      { label: "Subjects", href: "/admin/subjects", icon: BookOpen },
+      {
+        label: "Assignments",
+        href: "/admin/assignments",
+        icon: ClipboardCheck,
+      },
+    ],
+  },
+];
+
 const roleConfig = {
   teacher: {
     navItems: teacherNavItems,
@@ -97,6 +139,12 @@ const roleConfig = {
     settingsHref: "/student/settings",
     roleLabel: "Student",
   },
+  admin: {
+    navItems: adminNavItems,
+    portalLabel: "Admin Panel",
+    settingsHref: "/admin/settings",
+    roleLabel: "Admin",
+  },
 };
 
 /* ── Collapsible nav group ─────────────────────────────── */
@@ -109,7 +157,7 @@ function NavGroupItem({
 }) {
   const isChildActive = group.children.some(
     (child) =>
-      pathname === child.href || pathname?.startsWith(child.href + "/")
+      pathname === child.href || pathname?.startsWith(child.href + "/"),
   );
 
   const [open, setOpen] = useState(isChildActive);
@@ -150,8 +198,7 @@ function NavGroupItem({
         <div className="ml-3 pl-3 border-l-2 border-secondary/40 mt-1 space-y-0.5">
           {group.children.map((child) => {
             const isActive =
-              pathname === child.href ||
-              pathname?.startsWith(child.href + "/");
+              pathname === child.href || pathname?.startsWith(child.href + "/");
             return (
               <Link
                 key={child.href}
@@ -232,7 +279,7 @@ function SettingsExpander({ pathname }: { pathname: string }) {
 }
 
 interface SidebarProps {
-  role: "teacher" | "student";
+  role: "teacher" | "student" | "admin";
 }
 
 export default function Sidebar({ role }: SidebarProps) {
@@ -313,7 +360,13 @@ export default function Sidebar({ role }: SidebarProps) {
 
         {/* User pill */}
         <Link
-          href={role === "student" ? "/student/profile" : "/teacher/profile"}
+          href={
+            role === "student"
+              ? "/student/profile"
+              : role === "admin"
+                ? "/admin/dashboard"
+                : "/teacher/profile"
+          }
           className="mt-3 flex items-center gap-3 bg-background rounded-xl px-3 py-3 hover:bg-primary/5 transition-colors cursor-pointer"
         >
           <div className="w-9 h-9 rounded-full bg-primary-dark flex items-center justify-center text-white font-semibold text-sm shadow-sm">

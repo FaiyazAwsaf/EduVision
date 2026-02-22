@@ -27,7 +27,9 @@ export default function SignInPage() {
   // If already authenticated, redirect based on role
   useEffect(() => {
     if (isReady && isAuthenticated && user) {
-      if (user.role === "teacher") {
+      if (user.role === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (user.role === "teacher") {
         router.replace("/teacher/dashboard");
       } else if (user.role === "student") {
         router.replace("/student/dashboard");
@@ -51,12 +53,13 @@ export default function SignInPage() {
       const user = await login({ username: username.trim(), password });
 
       // Redirect based on user role
-      if (user.role === "teacher") {
+      if (user.role === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (user.role === "teacher") {
         router.replace("/teacher/dashboard");
       } else if (user.role === "student") {
         router.replace("/student/dashboard");
       } else {
-        // Fallback to signin if role is unexpected
         router.replace("/signin");
       }
     } catch (err: unknown) {
@@ -120,7 +123,9 @@ export default function SignInPage() {
 
           {/* Heading */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-primary-dark mb-2">Sign In</h2>
+            <h2 className="text-3xl font-bold text-primary-dark mb-2">
+              Sign In
+            </h2>
             <p className="text-primary font-light">
               Welcome back to your learning journey
             </p>

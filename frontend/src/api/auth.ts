@@ -23,7 +23,7 @@ export interface User {
   first_name: string;
   last_name: string;
   is_active: boolean;
-  role: "teacher" | "student";
+  role: "teacher" | "student" | "admin";
   date_joined: string;
 }
 
@@ -86,7 +86,7 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE_URL}/auth/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",  // store the httpOnly refresh_token cookie
+    credentials: "include", // store the httpOnly refresh_token cookie
     body: JSON.stringify(payload),
   });
 
@@ -105,7 +105,7 @@ export async function refreshAccessToken(): Promise<string | null> {
     const res = await fetch(`${API_BASE_URL}/auth/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",  // send the httpOnly refresh_token cookie
+      credentials: "include", // send the httpOnly refresh_token cookie
     });
 
     if (!res.ok) {
