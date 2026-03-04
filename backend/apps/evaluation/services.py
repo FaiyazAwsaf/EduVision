@@ -13,6 +13,8 @@ Uses Google's Gemini API for OCR and evaluation.
 import os
 import json
 import logging
+import re
+import tempfile
 from typing import Optional
 from decimal import Decimal
 from datetime import datetime
@@ -20,6 +22,7 @@ from datetime import datetime
 from django.conf import settings
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from .image_processing import preprocess_script_image
 
 from .models import (
     AnswerScript,
@@ -72,6 +75,99 @@ class ScriptEvaluationService:
             HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         }
+
+    def _strip_code_fences(self, text: str) -> str:
+        text = (text or "").strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        return text.strip()
+
+    def _extract_json_block(self, text: str) -> str:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return text[start:end + 1]
+        return text
+
+    def _parse_ocr_json(self, raw_text: str) -> dict:
+        cleaned = self._strip_code_fences(raw_text)
+        candidates = [cleaned, self._extract_json_block(cleaned)]
+
+        for candidate in candidates:
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                pass
+
+            repaired = re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r"\\\\", candidate)
+            try:
+                return json.loads(repaired)
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError("Could not parse OCR JSON response")
+
+    def _preprocess_image_for_ocr(self, image_path: str) -> str:
+        """
+        Run shared preprocessing pipeline and write to a temporary PNG for OCR.
+        Returns processed file path; falls back to original on failure.
+        """
+        try:
+            with open(image_path, "rb") as image_file:
+                original_bytes = image_file.read()
+
+            processed_bytes = preprocess_script_image(
+                original_bytes,
+                sharpen=True,
+                equalize=True,
+                equalize_method="clahe",
+                denoise=True,
+                binarize=True,
+                binarization_method="adaptive",
+                adaptive_block_size=15,
+                adaptive_c=3,
+            )
+
+            fd, temp_path = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            with open(temp_path, "wb") as output_file:
+                output_file.write(processed_bytes)
+            return temp_path
+        except Exception as e:
+            logger.warning(f"Image preprocessing failed, using original image: {e}")
+            return image_path
+
+    def _fallback_plain_text_ocr(self, image_path: str) -> dict:
+        image_file = genai.upload_file(image_path)
+        prompt = """
+        You are an OCR assistant.
+        Extract all visible text exactly as written.
+        Keep line breaks.
+        If unreadable, write [illegible].
+        Return ONLY plain text.
+        """
+        response = self.model.generate_content(
+            [prompt, image_file],
+            generation_config=genai.GenerationConfig(
+                response_mime_type="text/plain",
+                temperature=0.0,
+            ),
+            safety_settings=self.safety_settings,
+        )
+
+        text = (response.text or "").strip()
+        return {
+            "extracted_text": text,
+            "equations": [],
+            "question_numbers_found": [],
+            "has_diagrams": False,
+            "confidence": 0.5 if text else 0.0,
+            "notes": "Fallback plain-text OCR used",
+        }
     
     def extract_text_from_pages(self, script: AnswerScript) -> dict:
         """
@@ -87,8 +183,10 @@ class ScriptEvaluationService:
         pages_content = []
         
         for page in script.pages.all().order_by("page_number"):
+            processed_path = None
             try:
                 image_path = page.image.path
+                processed_path = self._preprocess_image_for_ocr(image_path)
                 
                 extraction_prompt = """
                 You are an expert at reading handwritten mathematical answers.
@@ -118,53 +216,49 @@ class ScriptEvaluationService:
                 """
                 
                 # Upload image to Gemini
-                image_file = genai.upload_file(image_path)
+                image_file = genai.upload_file(processed_path)
                 
                 # Generate response with image
                 response = self.model.generate_content(
                     [extraction_prompt, image_file],
                     generation_config=genai.GenerationConfig(
                         response_mime_type="application/json",
-                        temperature=0.2,
+                        temperature=0.0,
                     ),
                     safety_settings=self.safety_settings
                 )
                 
-                # Try to parse JSON, handling LaTeX escape issues
                 try:
-                    result = json.loads(response.text)
-                except json.JSONDecodeError as json_err:
-                    logger.warning(f"JSON decode error on page {page.page_number}, attempting to fix LaTeX escapes: {json_err}")
-                    # Try to fix common LaTeX escape issues
-                    fixed_text = response.text.replace('\\', '\\\\')
-                    try:
-                        result = json.loads(fixed_text)
-                        logger.info(f"Successfully parsed JSON after fixing escapes on page {page.page_number}")
-                    except json.JSONDecodeError:
-                        # If still fails, extract text manually from response
-                        logger.error(f"Could not parse JSON even after fixes on page {page.page_number}")
-                        result = {
-                            "extracted_text": response.text[:1000],  # Use raw response as fallback
-                            "equations": [],
-                            "question_numbers_found": [],
-                            "has_diagrams": False,
-                            "confidence": 0.3,
-                            "notes": "JSON parsing failed, using raw response"
-                        }
+                    result = self._parse_ocr_json(response.text)
+                except Exception as parse_err:
+                    logger.warning(
+                        f"OCR JSON parse failed on page {page.page_number}: {parse_err}. Using fallback OCR."
+                    )
+                    result = self._fallback_plain_text_ocr(processed_path)
+
+                extracted_text = result.get("extracted_text", "") or ""
+                equations = result.get("equations", []) or []
+                question_numbers = result.get("question_numbers_found", []) or []
+
+                try:
+                    confidence = float(result.get("confidence", 0.0))
+                except (TypeError, ValueError):
+                    confidence = 0.0
+                confidence = max(0.0, min(1.0, confidence))
                 
                 # Update page with extracted content
-                page.extracted_text = result.get("extracted_text", "")
-                page.extracted_equations = result.get("equations", [])
-                page.ocr_confidence = result.get("confidence", 0.0)
+                page.extracted_text = extracted_text
+                page.extracted_equations = equations
+                page.ocr_confidence = confidence
                 page.processing_notes = result.get("notes", "")
                 page.save()
                 
                 pages_content.append({
                     "page_number": page.page_number,
-                    "text": result.get("extracted_text", ""),
-                    "equations": result.get("equations", []),
-                    "question_numbers": result.get("question_numbers_found", []),
-                    "confidence": result.get("confidence", 0.0)
+                    "text": extracted_text,
+                    "equations": equations,
+                    "question_numbers": question_numbers,
+                    "confidence": confidence
                 })
                 
             except Exception as e:
@@ -175,6 +269,12 @@ class ScriptEvaluationService:
                     "equations": [],
                     "error": str(e)
                 })
+            finally:
+                if processed_path and processed_path != page.image.path and os.path.exists(processed_path):
+                    try:
+                        os.unlink(processed_path)
+                    except Exception:
+                        pass
         
         # Combine all text
         full_text = "\n\n".join([
