@@ -1,23 +1,8 @@
-"""
-AI-powered Script Evaluation Service
-
-This service handles:
-1. OCR processing of handwritten answer scripts using Vision AI
-2. Mathematical equation parsing
-3. Rubric-based automated grading
-4. Feedback generation
-
-Uses Google's Gemini API for OCR and evaluation.
-"""
-
 import os
-import json
 import logging
-from typing import Optional
+import time
 from decimal import Decimal
 from datetime import datetime
-
-from django.conf import settings
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from .ocr_service import OCRExtractionService
@@ -142,6 +127,7 @@ class ScriptEvaluationService:
         4. Calculate total score
         5. Generate overall feedback
         """
+        total_start_time = time.perf_counter()
         try:
             # Validate rubric_set exists
             if not script.rubric_set:
@@ -234,8 +220,13 @@ class ScriptEvaluationService:
             script.status = "evaluated"
             script.evaluated_at = datetime.now()
             script.save()
+
+            total_elapsed = time.perf_counter() - total_start_time
             
-            logger.info(f"Script {script.id} evaluated successfully. Score: {script.total_score}/{total_max_marks}")
+            logger.info(
+                f"Script {script.id} evaluated successfully in {total_elapsed:.2f}s. "
+                f"Score: {script.total_score}/{total_max_marks}"
+            )
             
             return script
             
