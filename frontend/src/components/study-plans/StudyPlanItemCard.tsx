@@ -38,13 +38,13 @@ export default function StudyPlanItemCard({
     1: "bg-red-50 text-red-800 border-red-200",
     2: "bg-orange-50 text-orange-800 border-orange-200",
     3: "bg-amber-50 text-amber-800 border-amber-200",
-    4: "bg-[#9ACBD0]/20 text-[#006A71] border-[#9ACBD0]",
-    5: "bg-[#F2EFE7] text-[#48A6A7] border-[#9ACBD0]",
+    4: "bg-secondary/20 text-primary-dark border-secondary",
+    5: "bg-background text-primary border-secondary",
   };
 
   const statusColors: Record<StudyPlanItemStatus, string> = {
-    [StudyPlanItemStatus.PENDING]: "bg-[#F2EFE7] text-[#006A71]",
-    [StudyPlanItemStatus.IN_PROGRESS]: "bg-[#9ACBD0]/30 text-[#006A71]",
+    [StudyPlanItemStatus.PENDING]: "bg-background text-primary-dark",
+    [StudyPlanItemStatus.IN_PROGRESS]: "bg-secondary/30 text-primary-dark",
     [StudyPlanItemStatus.COMPLETED]: "bg-green-50 text-green-800",
   };
 
@@ -101,7 +101,7 @@ export default function StudyPlanItemCard({
   };
 
   return (
-    <div className="border border-[#9ACBD0] rounded-lg p-4 bg-white hover:border-[#48A6A7] transition-colors">
+    <div className="border border-secondary rounded-lg p-4 bg-white hover:border-primary transition-colors">
       {/* Header with status and priority */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex gap-2">
@@ -120,7 +120,7 @@ export default function StudyPlanItemCard({
             Priority {item.priority}
           </span>
           {item.source === "manual" && (
-            <span className="px-2 py-1 text-xs font-medium rounded bg-[#9ACBD0]/20 text-[#006A71]">
+            <span className="px-2 py-1 text-xs font-medium rounded bg-secondary/20 text-primary-dark">
               Manual
             </span>
           )}
@@ -134,14 +134,14 @@ export default function StudyPlanItemCard({
             type="text"
             value={editedTopic}
             onChange={(e) => setEditedTopic(e.target.value)}
-            className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md text-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+            className="w-full px-3 py-2 border border-secondary rounded-md text-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={isUpdating}
           />
           <div className="grid grid-cols-2 gap-3">
             <select
               value={editedPriority}
               onChange={(e) => setEditedPriority(parseInt(e.target.value))}
-              className="px-3 py-2 border border-[#9ACBD0] rounded-md text-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+              className="px-3 py-2 border border-secondary rounded-md text-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
               disabled={isUpdating}
             >
               <option value={1}>Priority 1 (Highest)</option>
@@ -154,21 +154,21 @@ export default function StudyPlanItemCard({
               type="date"
               value={editedDate}
               onChange={(e) => setEditedDate(e.target.value)}
-              className="px-3 py-2 border border-[#9ACBD0] rounded-md text-[#006A71] focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+              className="px-3 py-2 border border-secondary rounded-md text-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
               disabled={isUpdating}
             />
           </div>
         </div>
       ) : (
         <div className="mb-3">
-          <h3 className="font-medium text-[#006A71] mb-1">{item.topic}</h3>
+          <h3 className="font-medium text-primary-dark mb-1">{item.topic}</h3>
           {item.scheduled_date && (
-            <p className="text-sm text-[#48A6A7] flex items-center gap-1">
+            <p className="text-sm text-primary flex items-center gap-1">
               <Calendar className="w-4 h-4" /> Scheduled: {new Date(item.scheduled_date).toLocaleDateString()}
             </p>
           )}
           {item.linked_request_id && (
-            <p className="text-sm text-[#48A6A7] mt-1 flex items-center gap-1">
+            <p className="text-sm text-primary mt-1 flex items-center gap-1">
               <LinkIcon className="w-4 h-4" /> Linked to content request
             </p>
           )}
@@ -188,7 +188,7 @@ export default function StudyPlanItemCard({
             <button
               onClick={handleSaveEdit}
               disabled={isUpdating || !editedTopic.trim()}
-              className="px-3 py-1 text-sm bg-[#48A6A7] text-white rounded hover:bg-[#006A71] disabled:opacity-50 transition-colors"
+              className="px-3 py-1 text-sm bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50 transition-colors"
             >
               Save
             </button>
@@ -201,7 +201,7 @@ export default function StudyPlanItemCard({
                 setError(null);
               }}
               disabled={isUpdating}
-              className="px-3 py-1 text-sm border border-[#9ACBD0] text-[#006A71] rounded hover:bg-[#F2EFE7] disabled:opacity-50 transition-colors"
+              className="px-3 py-1 text-sm border border-secondary text-primary-dark rounded hover:bg-background disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
@@ -225,7 +225,7 @@ export default function StudyPlanItemCard({
                   handleStatusChange(StudyPlanItemStatus.IN_PROGRESS)
                 }
                 disabled={isUpdating}
-                className="px-3 py-1 text-sm bg-[#48A6A7] text-white rounded hover:bg-[#006A71] disabled:opacity-50 transition-colors"
+                className="px-3 py-1 text-sm bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50 transition-colors"
               >
                 Start
               </button>
@@ -233,7 +233,7 @@ export default function StudyPlanItemCard({
             <button
               onClick={() => setIsEditing(true)}
               disabled={isUpdating}
-              className="px-3 py-1 text-sm border text-[#006A71] border-[#9ACBD0] rounded hover:bg-[#F2EFE7] disabled:opacity-50 transition-colors"
+              className="px-3 py-1 text-sm border text-primary-dark border-secondary rounded hover:bg-background disabled:opacity-50 transition-colors"
             >
               Edit
             </button>

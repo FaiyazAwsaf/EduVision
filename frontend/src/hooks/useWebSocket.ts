@@ -16,7 +16,7 @@ export type WebSocketMessage = {
     | "lock_state"
     | "clear_canvas"
     | "latex_added";
-  data?: any;
+  data?: Record<string, unknown>;
   senderId?: string;
   sessionId?: string;
 };
@@ -55,7 +55,9 @@ export function useWebSocket(config: WebSocketConfig) {
   const connect = useCallback(() => {
     try {
       // WebSocket endpoint format: ws://<host>/ws/whiteboard/{sessionId}/
-      const wsUrl = `ws://localhost:8000/ws/whiteboard/${sessionId}/`;
+      const wsHost = process.env.NEXT_PUBLIC_WS_HOST || "localhost:8000";
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${wsHost}/ws/whiteboard/${sessionId}/`;
 
       console.log(`[WebSocket] Connecting to ${wsUrl} as ${role}...`);
       setConnectionState("connecting");

@@ -81,20 +81,50 @@ class ContentRequestRepository:
             updated_at=domain.updated_at,
         )
     
-    def create(self, request: ContentRequest) -> ContentRequest:
+    def create(self, request: ContentRequest, user=None, subject='', target_class_id=None, target_section_id=None) -> ContentRequest:
         """
         Persist a new content request.
         
         Args:
             request: ContentRequest domain entity to persist
+            user: Optional user who created this request
+            subject: Optional academic subject
+            target_class_id: Optional target class UUID
+            target_section_id: Optional target section UUID
             
         Returns:
             The persisted ContentRequest with updated timestamps
-            
-        Raises:
-            django.db.IntegrityError: If constraint violation occurs
         """
         model = self._to_model(request)
+        if user:
+            model.created_by = user
+            model.role = getattr(user, 'role', 'student')
+            
+            # Auto-fill subject from teacher's department if not provided
+            if not subject and getattr(user, 'role', '') == 'teacher':
+                try:
+                    department = user.teacher_profile.department
+                    if department:
+                        subject = department
+                except Exception:
+                    pass
+        if subject:
+            model.subject = subject
+        if target_class_id:
+            model.target_class_id = target_class_id
+        if target_section_id:
+            model.target_section_id = target_section_id
+            
+        # Auto-suggest difficulty from target class if not set
+        if target_class_id and not request.difficulty:
+            try:
+                from ..services.difficulty_mapper import suggest_difficulty
+                from apps.students.models import Class as ClassModel
+                target_class = ClassModel.objects.get(id=target_class_id)
+                model.difficulty = suggest_difficulty(target_class.name)
+            except Exception:
+                pass
+        
         model.save()
         return self._to_domain(model)
     
@@ -114,42 +144,47 @@ class ContentRequestRepository:
         except ContentRequestModel.DoesNotExist:
             return None
     
-    def list_all(self, limit: int = 100, offset: int = 0) -> List[ContentRequest]:
+    def list_all(self, limit: int = 100, offset: int = 0, user=None) -> List[ContentRequest]:
         """
         List all content requests with pagination.
         
         Args:
             limit: Maximum number of requests to return (default: 100)
             offset: Number of requests to skip (default: 0)
+            user: Optional user to filter by
             
         Returns:
             List of ContentRequest entities
         """
-        models = ContentRequestModel.objects.all()[offset:offset + limit]
+        qs = ContentRequestModel.objects.all()
+        if user:
+            qs = qs.filter(created_by=user)
+        models = qs[offset:offset + limit]
         return [self._to_domain(model) for model in models]
     
     def list_by_status(
         self, 
         status: RequestStatus, 
         limit: int = 100, 
-        offset: int = 0
+        offset: int = 0,
+        user=None,
     ) -> List[ContentRequest]:
         """
         List content requests by status.
-        
-        Useful for workers to fetch pending requests or monitor processing.
         
         Args:
             status: Status to filter by
             limit: Maximum number of requests to return
             offset: Number of requests to skip
+            user: Optional user to filter by
             
         Returns:
             List of ContentRequest entities with the specified status
         """
-        models = ContentRequestModel.objects.filter(
-            status=status.value
-        ).order_by('created_at')[offset:offset + limit]
+        qs = ContentRequestModel.objects.filter(status=status.value)
+        if user:
+            qs = qs.filter(created_by=user)
+        models = qs.order_by('created_at')[offset:offset + limit]
         return [self._to_domain(model) for model in models]
     
     def update_status(

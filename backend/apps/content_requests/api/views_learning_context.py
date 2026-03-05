@@ -8,6 +8,7 @@ import logging
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
 from ..persistence.learning_context_repository import LearningContextRepository
 from .serializers_learning_context import LearningContextSerializer, LearningContextCreateSerializer
@@ -21,24 +22,11 @@ class LearningContextView(APIView):
     
     POST /api/content-requests/{request_id}/context/
     - Create or update learning context
-    - All fields optional (graceful degradation)
-    - Allows partial updates
     
     GET /api/content-requests/{request_id}/context/
     - Retrieve existing learning context
-    - Returns 404 if no context exists
-    
-    Design decisions:
-    - No authentication required (Phase 4 - pre-auth)
-    - Context is optional for content generation
-    - Supports create-or-update pattern
-    - All errors return clear messages
-    
-    Extension Points:
-    - Add user authentication
-    - Add validation against user's learning history
-    - Add auto-population from Module 3 analytics
     """
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, request_id):
         """

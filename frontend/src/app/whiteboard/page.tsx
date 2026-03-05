@@ -66,7 +66,7 @@ function WhiteboardContent() {
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
       {/* Back Button */}
       <button
-        onClick={() => router.push("/")}
+        onClick={() => router.push("/teacher/dashboard")}
         style={{
           position: "fixed",
           top: 10,
