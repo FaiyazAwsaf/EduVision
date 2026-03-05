@@ -1,15 +1,3 @@
-"""
-AI-powered Script Evaluation Service
-
-This service handles:
-1. OCR processing of handwritten answer scripts using Vision AI
-2. Mathematical equation parsing
-3. Rubric-based automated grading
-4. Feedback generation
-
-Uses Google's Gemini API for OCR and evaluation.
-"""
-
 import os
 import json
 import logging

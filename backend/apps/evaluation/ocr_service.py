@@ -14,6 +14,13 @@ class OCRExtractionService:
     def __init__(self, model, safety_settings):
         self.model = model
         self.safety_settings = safety_settings
+        self.fast_mode = self._env_bool("EVALUATION_FAST_MODE", True)
+
+    def _env_bool(self, name: str, default: bool) -> bool:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return value.strip().lower() in {"1", "true", "yes", "on"}
 
     def _strip_code_fences(self, text: str) -> str:
         text = (text or "").strip()
@@ -55,16 +62,21 @@ class OCRExtractionService:
             with open(image_path, "rb") as image_file:
                 original_bytes = image_file.read()
 
+            max_dimension = None
+            if self.fast_mode:
+                max_dimension = int(os.getenv("EVALUATION_OCR_MAX_DIMENSION", "1800"))
+
             processed_bytes = preprocess_script_image(
                 original_bytes,
                 sharpen=True,
                 equalize=True,
                 equalize_method="clahe",
-                denoise=True,
+                denoise=not self.fast_mode,
                 binarize=True,
                 binarization_method="adaptive",
                 adaptive_block_size=15,
                 adaptive_c=3,
+                max_dimension=max_dimension,
             )
 
             fd, temp_path = tempfile.mkstemp(suffix=".png")
