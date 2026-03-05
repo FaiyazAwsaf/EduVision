@@ -106,13 +106,58 @@ class ContentRequestModel(models.Model):
         help_text=_("Timestamp when request was last updated")
     )
     
-    # Extension point for future phases
-    # When authentication is implemented, add:
-    # user = models.ForeignKey('user.User', on_delete=models.CASCADE, null=True, blank=True)
+    # User ownership
+    created_by = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='content_requests',
+        help_text=_('User who created this request')
+    )
     
-    # When content generation is implemented, add:
-    # generated_content_url = models.URLField(null=True, blank=True)
-    # error_message = models.TextField(null=True, blank=True)
+    # Role that created this request (enables role-specific features)
+    role = models.CharField(
+        max_length=10,
+        choices=[('student', 'Student'), ('teacher', 'Teacher')],
+        default='student',
+        help_text=_('Role of the user who created this request')
+    )
+    
+    # Academic subject (separate from topic — e.g. "Mathematics" vs "Quadratic Equations")
+    subject = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text=_('Academic subject for this content')
+    )
+    
+    # Target audience (for teachers)
+    target_class = models.ForeignKey(
+        'students.Class',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text=_('Target class for this content')
+    )
+    
+    target_section = models.ForeignKey(
+        'students.Section',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text=_('Target section for this content')
+    )
+    
+    # Regeneration lineage
+    regenerated_from = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='regenerations',
+        help_text=_('Original request this was regenerated from')
+    )
     
     class Meta:
         db_table = 'content_requests'
@@ -244,10 +289,7 @@ class FeedbackModel(models.Model):
     - One feedback per generated content (enforced at DB level)
     - All fields except comment are required for data quality
     - Cascade delete when content is deleted
-    - No user association (pre-auth phase)
-    
     Future extensions:
-    - Add user_id when auth is implemented
     - Add feedback_version for schema evolution
     - Add moderation_status for quality control
     """
@@ -290,6 +332,15 @@ class FeedbackModel(models.Model):
         blank=True,
         null=True,
         help_text='Additional feedback or suggestions (optional)'
+    )
+    
+    created_by = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='content_feedback',
+        help_text='User who submitted this feedback'
     )
     
     submitted_at = models.DateTimeField(
@@ -426,6 +477,15 @@ class LearningContextModel(models.Model):
         help_text='When context was provided'
     )
     
+    created_by = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='learning_contexts',
+        help_text='User who provided this context'
+    )
+    
     updated_at = models.DateTimeField(
         auto_now=True,
         help_text='Last update to context'
@@ -531,13 +591,15 @@ class StudyPlan(models.Model):
         help_text=_("Unique identifier for the study plan")
     )
     
-    # [FUTURE] Will be required after auth integration
-    user_id = models.CharField(
-        max_length=255,
+    # User ownership (FK to CustomUser)
+    user = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
+        related_name='study_plans',
         db_index=True,
-        help_text=_("User who owns this study plan (nullable until auth is integrated)")
+        help_text=_("User who owns this study plan")
     )
     
     name = models.CharField(
@@ -574,7 +636,7 @@ class StudyPlan(models.Model):
         db_table = 'study_plans'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['user_id', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
             models.Index(fields=['mode']),
         ]
     

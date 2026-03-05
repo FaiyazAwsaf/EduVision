@@ -22,6 +22,7 @@ import {
   getFeedback,
 } from "@/api/contentRequests";
 import ErrorMessage from "@/components/shared/ErrorMessage";
+import { formatDate } from "@/utils/formatters";
 import FeedbackForm from "@/components/feedback/FeedbackForm";
 import FeedbackDisplay from "@/components/feedback/FeedbackDisplay";
 import AddToStudyPlanModal from "@/components/study-plans/AddToStudyPlanModal";
@@ -95,49 +96,43 @@ export default function GeneratedContentView({
     }
   };
 
-  // Format timestamp
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  };
-
   return (
     <div className="space-y-6">
       {/* Metadata */}
-      <div className="rounded-lg border border-[#9ACBD0] bg-[#F2EFE7] p-4">
-        <h3 className="text-sm font-semibold text-[#006A71] mb-3">
+      <div className="rounded-lg border border-secondary bg-background p-4">
+        <h3 className="text-sm font-semibold text-primary-dark mb-3">
           Content Details
         </h3>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
-            <dt className="font-medium text-[#48A6A7]">Topic</dt>
-            <dd className="text-[#006A71]">{content.topic}</dd>
+            <dt className="font-medium text-primary">Topic</dt>
+            <dd className="text-primary-dark">{content.topic}</dd>
           </div>
           <div>
-            <dt className="font-medium text-[#48A6A7]">Content Type</dt>
-            <dd className="text-[#006A71]">
+            <dt className="font-medium text-primary">Content Type</dt>
+            <dd className="text-primary-dark">
               {content.content_type.replace("_", " ")}
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-[#48A6A7]">Style</dt>
-            <dd className="text-[#006A71]">
+            <dt className="font-medium text-primary">Style</dt>
+            <dd className="text-primary-dark">
               {content.style.replace("_", " ")}
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-[#48A6A7]">Format</dt>
-            <dd className="text-[#006A71]">{content.output_format}</dd>
+            <dt className="font-medium text-primary">Format</dt>
+            <dd className="text-primary-dark">{content.output_format}</dd>
           </div>
           <div>
-            <dt className="font-medium text-[#48A6A7]">Generated</dt>
-            <dd className="text-[#006A71]">{formatDate(content.created_at)}</dd>
+            <dt className="font-medium text-primary">Generated</dt>
+            <dd className="text-primary-dark">
+              {formatDate(content.created_at)}
+            </dd>
           </div>
           <div>
-            <dt className="font-medium text-[#48A6A7]">AI Model</dt>
-            <dd className="text-[#006A71]">{content.metadata.model}</dd>
+            <dt className="font-medium text-primary">AI Model</dt>
+            <dd className="text-primary-dark">{content.metadata.model}</dd>
           </div>
         </dl>
       </div>
@@ -146,21 +141,21 @@ export default function GeneratedContentView({
       {/* This provides an alternative entry point to link content to study plans
           without requiring users to navigate to study plan view first.
           Reuses existing study_plan_items API - NO new backend endpoints. */}
-      <div className="rounded-lg border border-[#9ACBD0] bg-[#9ACBD0]/10 p-4">
+      <div className="rounded-lg border border-secondary bg-secondary/10 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-[#006A71] mb-1">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-primary-dark mb-1">
               <BookOpen className="w-4 h-4" />
               <span>Study Plan Integration</span>
             </h3>
-            <p className="text-sm text-[#48A6A7]">
+            <p className="text-sm text-primary">
               Add this generated content to your study plan for better
               organization and tracking.
             </p>
           </div>
           <button
             onClick={() => setShowAddToStudyPlanModal(true)}
-            className="shrink-0 inline-flex items-center gap-2 rounded-md bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] transition-colors"
+            className="shrink-0 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors"
           >
             <svg
               className="w-4 h-4"
@@ -190,15 +185,15 @@ export default function GeneratedContentView({
 
       {/* Content Display */}
       {/* Always show text content with download option */}
-      <div className="rounded-lg border border-[#9ACBD0] bg-white p-8 text-[#006A71]">
-        <div className="flex items-center justify-between mb-6 pb-2 border-b border-[#9ACBD0]">
-          <h3 className="text-lg font-semibold text-[#006A71]">
+      <div className="rounded-lg border border-secondary bg-white p-8 text-primary-dark">
+        <div className="flex items-center justify-between mb-6 pb-2 border-b border-secondary">
+          <h3 className="text-lg font-semibold text-primary-dark">
             Generated Content
           </h3>
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="inline-flex items-center gap-2 rounded-md bg-[#48A6A7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#006A71] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#48A6A7] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             {isDownloading ? (
               <>

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AnswerScript, ScriptPage, QuestionEvaluation
+from .models import AnswerScript, ScriptPage, QuestionEvaluation, ScriptSubmissionForm
 
 
 class ScriptPageInline(admin.TabularInline):
@@ -66,3 +66,16 @@ class QuestionEvaluationAdmin(admin.ModelAdmin):
         "mistakes_identified",
     ]
     search_fields = ["script__student_name", "question_rubric__question_number"]
+
+
+@admin.register(ScriptSubmissionForm)
+class ScriptSubmissionFormAdmin(admin.ModelAdmin):
+    list_display = [
+        "title",
+        "assignment",
+        "status",
+        "deadline",
+        "created_at",
+    ]
+    list_filter = ["status", "created_at"]
+    search_fields = ["title", "assignment__subject__name"]

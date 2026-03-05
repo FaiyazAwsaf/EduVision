@@ -15,6 +15,7 @@ When Module 3 is integrated, these views should:
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 
 from ..models import StudyPlan, StudyPlanItem
@@ -30,27 +31,15 @@ from .serializers_study_plan import (
 class StudyPlanViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing study plans.
-    
-    Endpoints:
-    - POST /study-plans/ - Create new study plan
-    - GET /study-plans/ - List all study plans
-    - GET /study-plans/{id}/ - Get specific study plan with items
-    - PATCH /study-plans/{id}/ - Update study plan
-    - DELETE /study-plans/{id}/ - Delete study plan
-    - POST /study-plans/{id}/items/ - Add item to study plan
-    
-    Phase 5: Manual mode only
-    - mode='manual' enforced
-    - auto_detect_weakness=False enforced
-    
-    [MODULE 3 HOOKS]
-    Future endpoints to add when Module 3 is active:
-    - POST /study-plans/{id}/detect-weaknesses/ - Trigger analytics scan
-    - POST /study-plans/{id}/suggest-topics/ - Get analytics recommendations
-    - GET /study-plans/{id}/analytics/ - Get analytics data for plan
     """
-    
+    permission_classes = [IsAuthenticated]
     queryset = StudyPlan.objects.all().prefetch_related('items')
+    
+    def get_queryset(self):
+        """Filter study plans to only the authenticated user's plans."""
+        return StudyPlan.objects.filter(
+            user=self.request.user
+        ).prefetch_related('items')
     
     def get_serializer_class(self):
         """Use different serializers for create vs other actions."""
@@ -59,13 +48,7 @@ class StudyPlanViewSet(viewsets.ModelViewSet):
         return StudyPlanSerializer
     
     def list(self, request):
-        """
-        List all study plans.
-        
-        [FUTURE] When auth is implemented:
-        - Filter by user_id from request.user
-        - Implement pagination
-        """
+        """List all study plans for the authenticated user."""
         queryset = self.get_queryset()
         serializer = StudyPlanSerializer(queryset, many=True)
         return Response(serializer.data)
@@ -73,18 +56,11 @@ class StudyPlanViewSet(viewsets.ModelViewSet):
     def create(self, request):
         """
         Create a new study plan in manual mode.
-        
-        Phase 5: Always creates with mode='manual' and auto_detect_weakness=False
-        
-        Request body:
-        {
-            "name": "Math Study Plan",
-            "user_id": "optional_user_id"  // nullable until auth integration
-        }
+        Auto-sets user from request.user.
         """
         serializer = StudyPlanCreateSerializer(data=request.data)
         if serializer.is_valid():
-            study_plan = serializer.save()
+            study_plan = serializer.save(user=request.user)
             response_serializer = StudyPlanSerializer(study_plan)
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -151,22 +127,16 @@ class StudyPlanViewSet(viewsets.ModelViewSet):
 class StudyPlanItemViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing individual study plan items.
-    
-    Endpoints:
-    - GET /study-plan-items/ - List all items (filtered by study plan)
-    - GET /study-plan-items/{id}/ - Get specific item
-    - PATCH /study-plan-items/{id}/ - Update item (status, priority, etc.)
-    - DELETE /study-plan-items/{id}/ - Delete item
-    
-    [MODULE 3 HOOKS]
-    Future functionality when Module 3 is active:
-    - PATCH can trigger source change from 'analytics' to 'mixed' when user modifies
-    - Include analytics explanation in response
-    - Support bulk priority recalculation
     """
-    
+    permission_classes = [IsAuthenticated]
     queryset = StudyPlanItem.objects.all().select_related('study_plan', 'linked_request')
     serializer_class = StudyPlanItemSerializer
+    
+    def get_queryset(self):
+        """Filter items to only those in the authenticated user's study plans."""
+        return StudyPlanItem.objects.filter(
+            study_plan__user=self.request.user
+        ).select_related('study_plan', 'linked_request')
     
     def get_serializer_class(self):
         """Use update serializer for PATCH requests."""

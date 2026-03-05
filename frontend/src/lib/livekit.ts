@@ -1,8 +1,8 @@
 /**
- * LiveKit Media Manager - Phase 4
+ * LiveKit Media Manager - Multi-Party
  *
  * Manages LiveKit room connection and media tracks for tutoring sessions.
- * Extends existing audio-only implementation to support 1-to-1 video.
+ * Supports multiple remote participants (teacher + N students).
  *
  * Key Principles:
  * - LiveKit handles all WebRTC negotiation, ICE, and track routing
@@ -10,14 +10,11 @@
  * - Role metadata is passed via tokens (backend-generated)
  * - Video failure must NOT break audio
  * - Clean teardown on disconnect
- *
- * This is a MEDIA layer, not an authority layer.
  */
 
 import {
   Room,
   RoomEvent,
-  LocalTrack,
   LocalAudioTrack,
   LocalVideoTrack,
   RemoteTrack,
@@ -26,11 +23,9 @@ import {
   RemoteParticipant,
   Track,
   ConnectionState,
-  createLocalTracks,
   createLocalAudioTrack,
   createLocalVideoTrack,
   TrackPublication,
-  LocalTrackPublication,
   RemoteTrackPublication,
   Participant,
   DisconnectReason,
@@ -56,6 +51,20 @@ export interface LocalTrackState {
   screenShareError: string | null;
 }
 
+/** Per-participant track state for multi-party */
+export interface ParticipantTrackState {
+  identity: string;
+  name: string;
+  role: "teacher" | "student" | null;
+  audioTrack: RemoteAudioTrack | null;
+  videoTrack: RemoteVideoTrack | null;
+  screenShareTrack: RemoteVideoTrack | null;
+  isAudioEnabled: boolean;
+  isVideoEnabled: boolean;
+  isSpeaking: boolean;
+}
+
+/** Legacy single-participant state (kept for backward compat) */
 export interface RemoteTrackState {
   audioTrack: RemoteAudioTrack | null;
   videoTrack: RemoteVideoTrack | null;
@@ -69,6 +78,7 @@ export interface LiveKitEventHandlers {
   onConnectionStateChange?: (state: LiveKitConnectionState) => void;
   onLocalTracksReady?: (state: LocalTrackState) => void;
   onRemoteTracksChanged?: (state: RemoteTrackState) => void;
+  onRemoteParticipantsChanged?: (participants: ParticipantTrackState[]) => void;
   onError?: (error: Error, context: string) => void;
   onParticipantConnected?: (participant: RemoteParticipant) => void;
   onParticipantDisconnected?: (participant: RemoteParticipant) => void;
@@ -76,35 +86,25 @@ export interface LiveKitEventHandlers {
 
 // ==================== LiveKit Manager ====================
 
-/**
- * LiveKit Room Manager
- *
- * Manages a single LiveKit room connection with audio and video tracks.
- * Designed for 1-to-1 tutoring sessions.
- */
 export class LiveKitManager {
   private room: Room | null = null;
   private localAudioTrack: LocalAudioTrack | null = null;
   private localVideoTrack: LocalVideoTrack | null = null;
   private localScreenShareTrack: LocalVideoTrack | null = null;
-  private remoteAudioTrack: RemoteAudioTrack | null = null;
-  private remoteVideoTrack: RemoteVideoTrack | null = null;
-  private remoteScreenShareTrack: RemoteVideoTrack | null = null;
-  private remoteParticipant: RemoteParticipant | null = null;
+
+  // Multi-party: per-participant state
+  private remoteParticipantsMap: Map<string, ParticipantTrackState> = new Map();
+  // Per-participant audio elements
+  private audioElements: Map<string, HTMLAudioElement> = new Map();
 
   private connectionState: LiveKitConnectionState = "disconnected";
   private handlers: LiveKitEventHandlers = {};
 
-  // Error tracking (video fail should not affect audio)
   private audioError: string | null = null;
   private videoError: string | null = null;
   private screenShareError: string | null = null;
 
-  // Role from metadata
   private role: "teacher" | "student" | null = null;
-
-  // Audio element for remote audio playback
-  private audioElement: HTMLAudioElement | null = null;
 
   constructor() {
     console.log("[LiveKit] Manager created");
@@ -112,23 +112,14 @@ export class LiveKitManager {
 
   // ==================== Public API ====================
 
-  /**
-   * Set event handlers
-   */
   setEventHandlers(handlers: LiveKitEventHandlers): void {
     this.handlers = { ...this.handlers, ...handlers };
   }
 
-  /**
-   * Get current connection state
-   */
   getConnectionState(): LiveKitConnectionState {
     return this.connectionState;
   }
 
-  /**
-   * Get local track state
-   */
   getLocalTrackState(): LocalTrackState {
     return {
       audioTrack: this.localAudioTrack,
@@ -136,36 +127,35 @@ export class LiveKitManager {
       screenShareTrack: this.localScreenShareTrack,
       isAudioEnabled: this.localAudioTrack?.isMuted === false,
       isVideoEnabled: this.localVideoTrack?.isMuted === false,
-      isScreenSharing: !!this.localScreenShareTrack && this.localScreenShareTrack.isMuted === false,
+      isScreenSharing:
+        !!this.localScreenShareTrack &&
+        this.localScreenShareTrack.isMuted === false,
       audioError: this.audioError,
       videoError: this.videoError,
       screenShareError: this.screenShareError,
     };
   }
 
-  /**
-   * Get remote track state
-   */
+  /** Get all remote participants as an array */
+  getRemoteParticipants(): ParticipantTrackState[] {
+    return Array.from(this.remoteParticipantsMap.values());
+  }
+
+  /** Legacy: Get first remote participant state (backward compat) */
   getRemoteTrackState(): RemoteTrackState {
+    const first = this.remoteParticipantsMap.values().next().value as ParticipantTrackState | undefined;
     return {
-      audioTrack: this.remoteAudioTrack,
-      videoTrack: this.remoteVideoTrack,
-      screenShareTrack: this.remoteScreenShareTrack,
-      participantIdentity: this.remoteParticipant?.identity || null,
-      participantName: this.remoteParticipant?.name || null,
-      participantRole: this.getParticipantRole(this.remoteParticipant),
+      audioTrack: first?.audioTrack || null,
+      videoTrack: first?.videoTrack || null,
+      screenShareTrack: first?.screenShareTrack || null,
+      participantIdentity: first?.identity || null,
+      participantName: first?.name || null,
+      participantRole: first?.role || null,
     };
   }
 
-  /**
-   * Connect to LiveKit room and publish local tracks
-   *
-   * @param wsUrl LiveKit WebSocket URL
-   * @param token LiveKit access token (contains role metadata)
-   */
   async connect(wsUrl: string, token: string): Promise<void> {
     if (this.room) {
-      console.log("[LiveKit] Already connected, disconnecting first");
       await this.disconnect();
     }
 
@@ -173,43 +163,29 @@ export class LiveKitManager {
     this.setConnectionState("connecting");
 
     try {
-      // Create room instance
       this.room = new Room({
         adaptiveStream: true,
         dynacast: true,
-        // Audio processing options
         audioCaptureDefaults: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
-        // Video defaults (720p for 1-to-1)
         videoCaptureDefaults: {
-          resolution: {
-            width: 1280,
-            height: 720,
-            frameRate: 30,
-          },
+          resolution: { width: 1280, height: 720, frameRate: 30 },
         },
       });
 
-      // Set up event handlers BEFORE connecting
       this.setupRoomEventHandlers();
-
-      // Connect to room
       await this.room.connect(wsUrl, token);
 
       console.log("[LiveKit] Connected to room:", this.room.name);
       this.setConnectionState("connected");
 
-      // Parse role from local participant metadata
       this.role = this.getParticipantRole(this.room.localParticipant);
       console.log("[LiveKit] Local participant role:", this.role);
 
-      // Acquire and publish local tracks
       await this.acquireAndPublishLocalTracks();
-
-      // Check for existing remote participants
       this.handleExistingParticipants();
     } catch (error) {
       console.error("[LiveKit] Connection failed:", error);
@@ -219,22 +195,15 @@ export class LiveKitManager {
     }
   }
 
-  /**
-   * Disconnect from room and clean up all resources
-   */
   async disconnect(): Promise<void> {
     console.log("[LiveKit] Disconnecting...");
 
-    // Stop and unpublish local tracks
     await this.cleanupLocalTracks();
 
-    // Disconnect from room
     if (this.room) {
       try {
         await this.room.disconnect();
       } catch (error) {
-        // Ignore "Client initiated disconnect" error - this is expected
-        // LiveKit throws this error when disconnect() is called intentionally
         const err = error as Error;
         if (!err.message?.includes("Client initiated disconnect")) {
           console.error("[LiveKit] Unexpected disconnect error:", err);
@@ -243,26 +212,20 @@ export class LiveKitManager {
       this.room = null;
     }
 
-    // Clean up remote track references
-    this.remoteAudioTrack = null;
-    this.remoteVideoTrack = null;
-    this.remoteScreenShareTrack = null;
-    this.remoteParticipant = null;
+    // Clean up all remote participants
+    this.remoteParticipantsMap.clear();
 
-    // Clean up audio element
-    if (this.audioElement) {
-      this.audioElement.pause();
-      this.audioElement.srcObject = null;
-      this.audioElement = null;
+    // Clean up audio elements
+    for (const el of this.audioElements.values()) {
+      el.pause();
+      el.srcObject = null;
     }
+    this.audioElements.clear();
 
     this.setConnectionState("disconnected");
     console.log("[LiveKit] Disconnected");
   }
 
-  /**
-   * Toggle local audio mute
-   */
   async setAudioEnabled(enabled: boolean): Promise<void> {
     if (this.localAudioTrack) {
       if (enabled) {
@@ -270,14 +233,10 @@ export class LiveKitManager {
       } else {
         await this.localAudioTrack.mute();
       }
-      console.log(`[LiveKit] Audio ${enabled ? "unmuted" : "muted"}`);
       this.notifyLocalTracksChanged();
     }
   }
 
-  /**
-   * Toggle local video
-   */
   async setVideoEnabled(enabled: boolean): Promise<void> {
     if (this.localVideoTrack) {
       if (enabled) {
@@ -285,131 +244,82 @@ export class LiveKitManager {
       } else {
         await this.localVideoTrack.mute();
       }
-      console.log(`[LiveKit] Video ${enabled ? "enabled" : "disabled"}`);
       this.notifyLocalTracksChanged();
     }
   }
 
-  /**
-   * Check if audio is muted
-   */
   isAudioMuted(): boolean {
     return this.localAudioTrack?.isMuted ?? true;
   }
 
-  /**
-   * Check if video is enabled
-   */
   isVideoEnabled(): boolean {
     return this.localVideoTrack?.isMuted === false;
   }
 
-  /**
-   * Check if screen sharing
-   */
   isScreenSharing(): boolean {
-    return !!this.localScreenShareTrack && this.localScreenShareTrack.isMuted === false;
+    return (
+      !!this.localScreenShareTrack &&
+      this.localScreenShareTrack.isMuted === false
+    );
   }
 
-  /**
-   * Start screen sharing
-   */
   async startScreenShare(): Promise<void> {
-    if (!this.room) {
-      console.warn("[LiveKit] Cannot start screen share - not connected");
-      return;
-    }
-
-    if (this.localScreenShareTrack) {
-      console.log("[LiveKit] Screen share already active");
-      return;
-    }
+    if (!this.room) return;
+    if (this.localScreenShareTrack) return;
 
     try {
-      console.log("[LiveKit] Starting screen share...");
       this.screenShareError = null;
-
-      // Import screen share functions from livekit-client
       const { createLocalScreenTracks } = await import("livekit-client");
 
-      // Create screen share tracks (includes audio if user shares tab audio)
       const tracks = await createLocalScreenTracks({
-        audio: true, // Capture system audio if available
-        resolution: {
-          width: 1920,
-          height: 1080,
-          frameRate: 15,
-        },
+        audio: true,
+        resolution: { width: 1920, height: 1080, frameRate: 15 },
       });
 
-      // Find the video track (screen)
       const screenTrack = tracks.find(
-        (track) => track.kind === Track.Kind.Video
+        (t) => t.kind === Track.Kind.Video,
       ) as LocalVideoTrack | undefined;
 
-      if (!screenTrack) {
-        throw new Error("No screen track created");
-      }
+      if (!screenTrack) throw new Error("No screen track created");
 
       this.localScreenShareTrack = screenTrack;
 
-      // Set up track ended handler (user clicks "Stop sharing" in browser)
       screenTrack.mediaStreamTrack.addEventListener("ended", () => {
-        console.log("[LiveKit] Screen share ended by user");
         this.stopScreenShare();
       });
 
-      // Publish screen share track
       await this.room.localParticipant.publishTrack(screenTrack, {
         name: "screen",
         source: Track.Source.ScreenShare,
       });
 
-      console.log("[LiveKit] Screen share started and published");
       this.notifyLocalTracksChanged();
     } catch (error) {
       const err = error as Error;
-      console.error("[LiveKit] Failed to start screen share:", err);
       this.screenShareError = this.getScreenShareErrorMessage(err);
       this.handlers.onError?.(err, "screen-share");
-
-      // Clean up on failure
       if (this.localScreenShareTrack) {
         this.localScreenShareTrack.stop();
         this.localScreenShareTrack = null;
       }
-
       throw error;
     }
   }
 
-  /**
-   * Stop screen sharing
-   */
   async stopScreenShare(): Promise<void> {
-    if (!this.localScreenShareTrack) {
-      console.log("[LiveKit] No active screen share to stop");
-      return;
-    }
+    if (!this.localScreenShareTrack) return;
 
     try {
-      console.log("[LiveKit] Stopping screen share...");
-
-      // Unpublish track
       if (this.room) {
-        await this.room.localParticipant.unpublishTrack(this.localScreenShareTrack);
+        await this.room.localParticipant.unpublishTrack(
+          this.localScreenShareTrack,
+        );
       }
-
-      // Stop track
       this.localScreenShareTrack.stop();
       this.localScreenShareTrack = null;
       this.screenShareError = null;
-
-      console.log("[LiveKit] Screen share stopped");
       this.notifyLocalTracksChanged();
     } catch (error) {
-      console.error("[LiveKit] Error stopping screen share:", error);
-      // Clean up anyway
       if (this.localScreenShareTrack) {
         this.localScreenShareTrack.stop();
         this.localScreenShareTrack = null;
@@ -418,9 +328,6 @@ export class LiveKitManager {
     }
   }
 
-  /**
-   * Toggle screen sharing
-   */
   async toggleScreenShare(): Promise<void> {
     if (this.isScreenSharing()) {
       await this.stopScreenShare();
@@ -429,515 +336,425 @@ export class LiveKitManager {
     }
   }
 
-  /**
-   * Attach local video to element
-   */
+  // ─── Local track attach/detach ──────────────────────────────────────
+
   attachLocalVideo(element: HTMLVideoElement): void {
-    if (this.localVideoTrack) {
-      this.localVideoTrack.attach(element);
-      console.log("[LiveKit] Local video attached to element");
-    }
+    this.localVideoTrack?.attach(element);
   }
 
-  /**
-   * Detach local video from element
-   */
   detachLocalVideo(element: HTMLVideoElement): void {
-    if (this.localVideoTrack) {
-      this.localVideoTrack.detach(element);
-      console.log("[LiveKit] Local video detached from element");
-    }
+    this.localVideoTrack?.detach(element);
   }
 
-  /**
-   * Attach remote video to element
-   */
-  attachRemoteVideo(element: HTMLVideoElement): void {
-    if (this.remoteVideoTrack) {
-      this.remoteVideoTrack.attach(element);
-      console.log("[LiveKit] Remote video attached to element");
-    }
-  }
-
-  /**
-   * Detach remote video from element
-   */
-  detachRemoteVideo(element: HTMLVideoElement): void {
-    if (this.remoteVideoTrack) {
-      this.remoteVideoTrack.detach(element);
-      console.log("[LiveKit] Remote video detached from element");
-    }
-  }
-
-  /**
-   * Attach local screen share to element
-   */
   attachLocalScreenShare(element: HTMLVideoElement): void {
-    if (this.localScreenShareTrack) {
-      this.localScreenShareTrack.attach(element);
-      console.log("[LiveKit] Local screen share attached to element");
-    }
+    this.localScreenShareTrack?.attach(element);
   }
 
-  /**
-   * Detach local screen share from element
-   */
   detachLocalScreenShare(element: HTMLVideoElement): void {
-    if (this.localScreenShareTrack) {
-      this.localScreenShareTrack.detach(element);
-      console.log("[LiveKit] Local screen share detached from element");
+    this.localScreenShareTrack?.detach(element);
+  }
+
+  // ─── Per-participant attach/detach ──────────────────────────────────
+
+  attachParticipantVideo(identity: string, element: HTMLVideoElement): void {
+    const p = this.remoteParticipantsMap.get(identity);
+    if (p?.videoTrack) {
+      p.videoTrack.attach(element);
     }
   }
 
-  /**
-   * Attach remote screen share to element
-   */
-  attachRemoteScreenShare(element: HTMLVideoElement): void {
-    if (this.remoteScreenShareTrack) {
-      this.remoteScreenShareTrack.attach(element);
-      console.log("[LiveKit] Remote screen share attached to element");
+  detachParticipantVideo(identity: string, element: HTMLVideoElement): void {
+    const p = this.remoteParticipantsMap.get(identity);
+    if (p?.videoTrack) {
+      p.videoTrack.detach(element);
     }
   }
 
-  /**
-   * Detach remote screen share from element
-   */
-  detachRemoteScreenShare(element: HTMLVideoElement): void {
-    if (this.remoteScreenShareTrack) {
-      this.remoteScreenShareTrack.detach(element);
-      console.log("[LiveKit] Remote screen share detached from element");
+  attachParticipantScreenShare(
+    identity: string,
+    element: HTMLVideoElement,
+  ): void {
+    const p = this.remoteParticipantsMap.get(identity);
+    if (p?.screenShareTrack) {
+      p.screenShareTrack.attach(element);
+    }
+  }
+
+  detachParticipantScreenShare(
+    identity: string,
+    element: HTMLVideoElement,
+  ): void {
+    const p = this.remoteParticipantsMap.get(identity);
+    if (p?.screenShareTrack) {
+      p.screenShareTrack.detach(element);
     }
   }
 
   // ==================== Private Methods ====================
 
-  /**
-   * Set up LiveKit room event handlers
-   */
   private setupRoomEventHandlers(): void {
     if (!this.room) return;
 
-    // Connection state changes
-    this.room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
-      console.log("[LiveKit] Connection state changed:", state);
+    this.room.on(
+      RoomEvent.ConnectionStateChanged,
+      (state: ConnectionState) => {
+        switch (state) {
+          case ConnectionState.Connecting:
+            this.setConnectionState("connecting");
+            break;
+          case ConnectionState.Connected:
+            this.setConnectionState("connected");
+            break;
+          case ConnectionState.Reconnecting:
+            this.setConnectionState("reconnecting");
+            break;
+          case ConnectionState.Disconnected:
+            this.setConnectionState("disconnected");
+            break;
+        }
+      },
+    );
 
-      switch (state) {
-        case ConnectionState.Connecting:
-          this.setConnectionState("connecting");
-          break;
-        case ConnectionState.Connected:
-          this.setConnectionState("connected");
-          break;
-        case ConnectionState.Reconnecting:
-          this.setConnectionState("reconnecting");
-          break;
-        case ConnectionState.Disconnected:
-          this.setConnectionState("disconnected");
-          break;
-      }
-    });
-
-    // Participant connected
     this.room.on(
       RoomEvent.ParticipantConnected,
       (participant: RemoteParticipant) => {
         console.log("[LiveKit] Participant connected:", participant.identity);
-        this.handleRemoteParticipant(participant);
+        this.upsertParticipant(participant);
+        this.notifyRemoteParticipantsChanged();
         this.handlers.onParticipantConnected?.(participant);
-      }
+      },
     );
 
-    // Participant disconnected
     this.room.on(
       RoomEvent.ParticipantDisconnected,
       (participant: RemoteParticipant) => {
-        console.log(
-          "[LiveKit] Participant disconnected:",
-          participant.identity
-        );
-
-        if (this.remoteParticipant?.identity === participant.identity) {
-          this.remoteParticipant = null;
-          this.remoteAudioTrack = null;
-          this.remoteVideoTrack = null;
-          this.notifyRemoteTracksChanged();
+        console.log("[LiveKit] Participant disconnected:", participant.identity);
+        this.remoteParticipantsMap.delete(participant.identity);
+        // Clean up audio element
+        const audioEl = this.audioElements.get(participant.identity);
+        if (audioEl) {
+          audioEl.pause();
+          audioEl.srcObject = null;
+          this.audioElements.delete(participant.identity);
         }
-
+        this.notifyRemoteParticipantsChanged();
         this.handlers.onParticipantDisconnected?.(participant);
-      }
+      },
     );
 
-    // Track subscribed (remote track available)
     this.room.on(
       RoomEvent.TrackSubscribed,
       (
         track: RemoteTrack,
         publication: RemoteTrackPublication,
-        participant: RemoteParticipant
+        participant: RemoteParticipant,
       ) => {
         console.log(
-          `[LiveKit] Track subscribed: ${track.kind} (source: ${publication.source}) from ${participant.identity}`
+          `[LiveKit] Track subscribed: ${track.kind} (source: ${publication.source}) from ${participant.identity}`,
         );
         this.handleRemoteTrack(track, publication, participant);
-      }
+      },
     );
 
-    // Track unsubscribed
     this.room.on(
       RoomEvent.TrackUnsubscribed,
       (
         track: RemoteTrack,
         publication: RemoteTrackPublication,
-        participant: RemoteParticipant
+        participant: RemoteParticipant,
       ) => {
         console.log(
-          `[LiveKit] Track unsubscribed: ${track.kind} (source: ${publication.source}) from ${participant.identity}`
+          `[LiveKit] Track unsubscribed: ${track.kind} (source: ${publication.source}) from ${participant.identity}`,
         );
-
-        if (track.kind === Track.Kind.Audio) {
-          if (this.remoteAudioTrack === track) {
-            this.remoteAudioTrack = null;
-          }
-        } else if (track.kind === Track.Kind.Video) {
-          if (publication.source === Track.Source.ScreenShare) {
-            if (this.remoteScreenShareTrack === track) {
-              this.remoteScreenShareTrack = null;
-            }
-          } else {
-            if (this.remoteVideoTrack === track) {
-              this.remoteVideoTrack = null;
+        const state = this.remoteParticipantsMap.get(participant.identity);
+        if (state) {
+          if (track.kind === Track.Kind.Audio && state.audioTrack === track) {
+            state.audioTrack = null;
+            state.isAudioEnabled = false;
+          } else if (track.kind === Track.Kind.Video) {
+            if (
+              publication.source === Track.Source.ScreenShare &&
+              state.screenShareTrack === track
+            ) {
+              state.screenShareTrack = null;
+            } else if (state.videoTrack === track) {
+              state.videoTrack = null;
+              state.isVideoEnabled = false;
             }
           }
         }
-
-        this.notifyRemoteTracksChanged();
-      }
+        this.notifyRemoteParticipantsChanged();
+      },
     );
 
-    // Track muted/unmuted
     this.room.on(
       RoomEvent.TrackMuted,
       (publication: TrackPublication, participant: Participant) => {
-        console.log(
-          `[LiveKit] Track muted: ${publication.kind} by ${participant.identity}`
-        );
         if (participant !== this.room?.localParticipant) {
-          this.notifyRemoteTracksChanged();
+          const state = this.remoteParticipantsMap.get(participant.identity);
+          if (state) {
+            if (publication.kind === Track.Kind.Audio)
+              state.isAudioEnabled = false;
+            if (
+              publication.kind === Track.Kind.Video &&
+              publication.source !== Track.Source.ScreenShare
+            )
+              state.isVideoEnabled = false;
+          }
+          this.notifyRemoteParticipantsChanged();
         }
-      }
+      },
     );
 
     this.room.on(
       RoomEvent.TrackUnmuted,
       (publication: TrackPublication, participant: Participant) => {
-        console.log(
-          `[LiveKit] Track unmuted: ${publication.kind} by ${participant.identity}`
-        );
         if (participant !== this.room?.localParticipant) {
-          this.notifyRemoteTracksChanged();
+          const state = this.remoteParticipantsMap.get(participant.identity);
+          if (state) {
+            if (publication.kind === Track.Kind.Audio)
+              state.isAudioEnabled = true;
+            if (
+              publication.kind === Track.Kind.Video &&
+              publication.source !== Track.Source.ScreenShare
+            )
+              state.isVideoEnabled = true;
+          }
+          this.notifyRemoteParticipantsChanged();
         }
-      }
+      },
     );
 
-    // Disconnected
+    this.room.on(
+      RoomEvent.ActiveSpeakersChanged,
+      (speakers: Participant[]) => {
+        const speakerIds = new Set(speakers.map((s) => s.identity));
+        for (const [id, state] of this.remoteParticipantsMap) {
+          state.isSpeaking = speakerIds.has(id);
+        }
+        this.notifyRemoteParticipantsChanged();
+      },
+    );
+
     this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
       console.log("[LiveKit] Disconnected from room, reason:", reason);
       this.setConnectionState("disconnected");
     });
 
-    // Reconnected
     this.room.on(RoomEvent.Reconnected, () => {
       console.log("[LiveKit] Reconnected to room");
       this.setConnectionState("connected");
     });
   }
 
-  /**
-   * Acquire local audio and video tracks, then publish them
-   *
-   * CRITICAL: Video failure must NOT prevent audio from working
-   */
   private async acquireAndPublishLocalTracks(): Promise<void> {
     if (!this.room) return;
 
-    // Reset errors
     this.audioError = null;
     this.videoError = null;
 
-    // Try to acquire audio first (required)
+    // Audio (required)
     try {
-      console.log("[LiveKit] Acquiring audio track...");
       this.localAudioTrack = await createLocalAudioTrack({
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       });
-
-      console.log("[LiveKit] Audio track acquired, publishing...");
       await this.room.localParticipant.publishTrack(this.localAudioTrack);
-      console.log("[LiveKit] Audio track published");
     } catch (error) {
       const err = error as Error;
-      console.error("[LiveKit] Failed to acquire/publish audio:", err);
       this.audioError = this.getMediaErrorMessage(err, "microphone");
       this.handlers.onError?.(err, "audio");
-      // Audio failure is critical - notify but continue
     }
 
-    // Try to acquire video (optional - failure should not break session)
+    // Video (optional - failure is non-critical)
     try {
-      console.log("[LiveKit] Acquiring video track...");
       this.localVideoTrack = await createLocalVideoTrack({
-        resolution: {
-          width: 1280,
-          height: 720,
-          frameRate: 30,
-        },
+        resolution: { width: 1280, height: 720, frameRate: 30 },
       });
-
-      console.log("[LiveKit] Video track acquired, publishing...");
       await this.room.localParticipant.publishTrack(this.localVideoTrack);
-      console.log("[LiveKit] Video track published");
     } catch (error) {
       const err = error as Error;
-      console.warn("[LiveKit] Failed to acquire/publish video:", err);
       this.videoError = this.getMediaErrorMessage(err, "camera");
-      // Video failure is NOT critical - session continues with audio only
-      // Do NOT call onError for video failure - it's expected in some cases
       console.log("[LiveKit] Continuing with audio-only session");
     }
 
-    // Notify handlers of local track state
     this.notifyLocalTracksChanged();
   }
 
-  /**
-   * Handle existing participants when joining a room
-   */
   private handleExistingParticipants(): void {
     if (!this.room) return;
-
-    // In 1-to-1, there should be at most one other participant
     for (const participant of this.room.remoteParticipants.values()) {
       console.log(
         "[LiveKit] Found existing participant:",
-        participant.identity
+        participant.identity,
       );
-      this.handleRemoteParticipant(participant);
-    }
-  }
-
-  /**
-   * Handle a remote participant (subscribe to their tracks)
-   */
-  private handleRemoteParticipant(participant: RemoteParticipant): void {
-    this.remoteParticipant = participant;
-
-    // Subscribe to existing tracks
-    for (const publication of participant.trackPublications.values()) {
-      if (publication.track && publication.isSubscribed) {
-        this.handleRemoteTrack(
-          publication.track as RemoteTrack,
-          publication as RemoteTrackPublication,
-          participant
-        );
+      this.upsertParticipant(participant);
+      // Subscribe to existing tracks
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.track && publication.isSubscribed) {
+          this.handleRemoteTrack(
+            publication.track as RemoteTrack,
+            publication as RemoteTrackPublication,
+            participant,
+          );
+        }
       }
     }
-
-    this.notifyRemoteTracksChanged();
+    this.notifyRemoteParticipantsChanged();
   }
 
-  /**
-   * Handle a remote track
-   */
+  /** Upsert a participant into the map */
+  private upsertParticipant(participant: RemoteParticipant): void {
+    const existing = this.remoteParticipantsMap.get(participant.identity);
+    if (!existing) {
+      this.remoteParticipantsMap.set(participant.identity, {
+        identity: participant.identity,
+        name: participant.name || participant.identity,
+        role: this.getParticipantRole(participant),
+        audioTrack: null,
+        videoTrack: null,
+        screenShareTrack: null,
+        isAudioEnabled: false,
+        isVideoEnabled: false,
+        isSpeaking: false,
+      });
+    } else {
+      existing.name = participant.name || participant.identity;
+      existing.role = this.getParticipantRole(participant);
+    }
+  }
+
   private handleRemoteTrack(
     track: RemoteTrack,
     publication: RemoteTrackPublication,
-    participant: RemoteParticipant
+    participant: RemoteParticipant,
   ): void {
+    this.upsertParticipant(participant);
+    const state = this.remoteParticipantsMap.get(participant.identity)!;
+
     if (track.kind === Track.Kind.Audio) {
-      this.remoteAudioTrack = track as RemoteAudioTrack;
-      this.attachRemoteAudio(track as RemoteAudioTrack);
+      state.audioTrack = track as RemoteAudioTrack;
+      state.isAudioEnabled = !publication.isMuted;
+      this.attachRemoteAudio(participant.identity, track as RemoteAudioTrack);
     } else if (track.kind === Track.Kind.Video) {
-      // Differentiate between camera and screen share
       if (publication.source === Track.Source.ScreenShare) {
-        console.log("[LiveKit] Received screen share track");
-        this.remoteScreenShareTrack = track as RemoteVideoTrack;
+        state.screenShareTrack = track as RemoteVideoTrack;
       } else {
-        console.log("[LiveKit] Received camera track");
-        this.remoteVideoTrack = track as RemoteVideoTrack;
+        state.videoTrack = track as RemoteVideoTrack;
+        state.isVideoEnabled = !publication.isMuted;
       }
     }
 
-    this.remoteParticipant = participant;
-    this.notifyRemoteTracksChanged();
+    this.notifyRemoteParticipantsChanged();
   }
 
-  /**
-   * Attach remote audio for playback
-   */
-  private attachRemoteAudio(track: RemoteAudioTrack): void {
-    console.log("[LiveKit] Attaching remote audio for playback");
-
-    // Create audio element if not exists
-    if (!this.audioElement) {
-      this.audioElement = document.createElement("audio");
-      this.audioElement.autoplay = true;
+  private attachRemoteAudio(
+    identity: string,
+    track: RemoteAudioTrack,
+  ): void {
+    let el = this.audioElements.get(identity);
+    if (!el) {
+      el = document.createElement("audio");
+      el.autoplay = true;
+      this.audioElements.set(identity, el);
     }
-
-    track.attach(this.audioElement);
-
-    // Handle autoplay policy
-    this.audioElement.play().catch((error) => {
-      console.warn("[LiveKit] Autoplay blocked:", error);
-    });
+    track.attach(el);
+    el.play().catch(() => {});
   }
 
-  /**
-   * Clean up local tracks
-   */
   private async cleanupLocalTracks(): Promise<void> {
-    console.log("[LiveKit] Cleaning up local tracks...");
-
-    // Stop and unpublish audio track
     if (this.localAudioTrack) {
       try {
         await this.room?.localParticipant.unpublishTrack(this.localAudioTrack);
-      } catch (e) {
-        // Ignore unpublish errors during cleanup
-      }
+      } catch {}
       this.localAudioTrack.stop();
       this.localAudioTrack = null;
     }
 
-    // Stop and unpublish video track
     if (this.localVideoTrack) {
       try {
         await this.room?.localParticipant.unpublishTrack(this.localVideoTrack);
-      } catch (e) {
-        // Ignore unpublish errors during cleanup
-      }
+      } catch {}
       this.localVideoTrack.stop();
       this.localVideoTrack = null;
     }
 
-    // Stop and unpublish screen share track
     if (this.localScreenShareTrack) {
       try {
-        await this.room?.localParticipant.unpublishTrack(this.localScreenShareTrack);
-      } catch (e) {
-        // Ignore unpublish errors during cleanup
-      }
+        await this.room?.localParticipant.unpublishTrack(
+          this.localScreenShareTrack,
+        );
+      } catch {}
       this.localScreenShareTrack.stop();
       this.localScreenShareTrack = null;
     }
-
-    console.log("[LiveKit] Local tracks cleaned up");
   }
 
-  /**
-   * Get user-friendly media error message
-   */
   private getMediaErrorMessage(
     error: Error,
-    device: "microphone" | "camera"
+    device: "microphone" | "camera",
   ): string {
     const name = error.name;
+    const label = device === "microphone" ? "Microphone" : "Camera";
 
-    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      return `${
-        device === "microphone" ? "Microphone" : "Camera"
-      } permission denied. Please allow access.`;
-    } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    if (name === "NotAllowedError" || name === "PermissionDeniedError")
+      return `${label} permission denied. Please allow access.`;
+    if (name === "NotFoundError" || name === "DevicesNotFoundError")
       return `No ${device} found. Please connect a ${device}.`;
-    } else if (name === "NotReadableError" || name === "TrackStartError") {
-      return `${
-        device === "microphone" ? "Microphone" : "Camera"
-      } is in use by another application.`;
-    } else if (name === "OverconstrainedError") {
-      return `${
-        device === "microphone" ? "Microphone" : "Camera"
-      } doesn't support required settings.`;
-    }
-
+    if (name === "NotReadableError" || name === "TrackStartError")
+      return `${label} is in use by another application.`;
+    if (name === "OverconstrainedError")
+      return `${label} doesn't support required settings.`;
     return `Failed to access ${device}: ${error.message}`;
   }
 
-  /**
-   * Get user-friendly screen share error message
-   */
   private getScreenShareErrorMessage(error: Error): string {
     const name = error.name;
-
-    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    if (name === "NotAllowedError" || name === "PermissionDeniedError")
       return "Screen sharing permission denied or cancelled.";
-    } else if (name === "NotFoundError") {
-      return "No screen available to share.";
-    } else if (name === "NotReadableError") {
+    if (name === "NotFoundError") return "No screen available to share.";
+    if (name === "NotReadableError")
       return "Cannot access screen. It may be in use.";
-    } else if (name === "AbortError") {
-      return "Screen sharing was cancelled.";
-    }
-
+    if (name === "AbortError") return "Screen sharing was cancelled.";
     return `Failed to share screen: ${error.message}`;
   }
 
-  /**
-   * Get participant role from metadata
-   */
   private getParticipantRole(
-    participant: Participant | null | undefined
+    participant: Participant | null | undefined,
   ): "teacher" | "student" | null {
     if (!participant?.metadata) return null;
-
     try {
       const metadata = JSON.parse(participant.metadata);
       const role = metadata.role?.toLowerCase();
-      if (role === "teacher" || role === "student") {
-        return role;
-      }
-    } catch {
-      // Invalid metadata
-    }
-
+      if (role === "teacher" || role === "student") return role;
+    } catch {}
     return null;
   }
 
-  /**
-   * Set connection state and notify handlers
-   */
   private setConnectionState(state: LiveKitConnectionState): void {
     if (this.connectionState !== state) {
-      console.log(
-        `[LiveKit] Connection state: ${this.connectionState} → ${state}`
-      );
       this.connectionState = state;
       this.handlers.onConnectionStateChange?.(state);
     }
   }
 
-  /**
-   * Notify handlers of local track changes
-   */
   private notifyLocalTracksChanged(): void {
     this.handlers.onLocalTracksReady?.(this.getLocalTrackState());
   }
 
-  /**
-   * Notify handlers of remote track changes
-   */
-  private notifyRemoteTracksChanged(): void {
+  private notifyRemoteParticipantsChanged(): void {
+    const participants = this.getRemoteParticipants();
+    this.handlers.onRemoteParticipantsChanged?.(participants);
+    // Legacy compat
     this.handlers.onRemoteTracksChanged?.(this.getRemoteTrackState());
   }
 }
 
-// ==================== Singleton Instance ====================
+// ==================== Singleton ====================
 
 let managerInstance: LiveKitManager | null = null;
 
-/**
- * Get or create the LiveKit manager instance
- */
 export function getLiveKitManager(): LiveKitManager {
   if (!managerInstance) {
     managerInstance = new LiveKitManager();
@@ -945,9 +762,6 @@ export function getLiveKitManager(): LiveKitManager {
   return managerInstance;
 }
 
-/**
- * Destroy the LiveKit manager instance
- */
 export async function destroyLiveKitManager(): Promise<void> {
   if (managerInstance) {
     await managerInstance.disconnect();

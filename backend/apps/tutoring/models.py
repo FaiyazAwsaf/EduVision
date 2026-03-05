@@ -1,9 +1,9 @@
 """
 Tutoring Session Models
 
-Implements the core models for Module 5: One-on-One Live Tutoring Room.
-Includes User model with role-based authority and TutoringSession model
-for managing tutoring room lifecycle.
+Implements section-based batch tutoring sessions.
+A teacher creates a session for a specific section,
+and all students from that section can join.
 """
 
 import uuid
@@ -11,91 +11,34 @@ from django.db import models
 from django.utils import timezone
 
 
-class UserRole(models.TextChoices):
-    """User role enumeration for role-based access control."""
-    TEACHER = 'TEACHER', 'Teacher'
-    STUDENT = 'STUDENT', 'Student'
-
-
 class SessionStatus(models.TextChoices):
     """
     Session status state machine.
-    
+
     State transitions:
-    - WAITING → ACTIVE (when student joins)
-    - WAITING → ENDED (when teacher ends empty session)
-    - ACTIVE → GRACE (when teacher disconnects - Phase 6)
-    - ACTIVE → ENDED (when either party ends session)
-    - GRACE → ACTIVE (when teacher reconnects - Phase 6)
-    - GRACE → ENDED (when grace period expires - Phase 6)
+    - WAITING -> ACTIVE (when first student joins)
+    - WAITING -> ENDED (when teacher ends empty session)
+    - ACTIVE -> GRACE (when teacher disconnects - Phase 6)
+    - ACTIVE -> ENDED (when teacher ends session)
+    - GRACE -> ACTIVE (when teacher reconnects - Phase 6)
+    - GRACE -> ENDED (when grace period expires - Phase 6)
     """
-    WAITING = 'WAITING', 'Waiting for student'
+    WAITING = 'WAITING', 'Waiting for students'
     ACTIVE = 'ACTIVE', 'Session active'
     GRACE = 'GRACE', 'Grace period (teacher absent)'
     ENDED = 'ENDED', 'Session ended'
 
 
-class TutoringUser(models.Model):
-    """
-    User model for tutoring system.
-    
-    Implements role-based authority:
-    - TEACHER: Can create and control sessions
-    - STUDENT: Can only join existing sessions
-    """
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        help_text="Unique identifier for the user"
-    )
-    email = models.EmailField(
-        unique=True,
-        help_text="User's email address (unique identifier)"
-    )
-    full_name = models.CharField(
-        max_length=255,
-        help_text="User's full display name"
-    )
-    role = models.CharField(
-        max_length=10,
-        choices=UserRole.choices,
-        help_text="User's role determining their permissions"
-    )
-    created_at = models.DateTimeField(
-        default=timezone.now,
-        help_text="When the user was created"
-    )
-
-    class Meta:
-        db_table = 'tutoring_users'
-        verbose_name = 'Tutoring User'
-        verbose_name_plural = 'Tutoring Users'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.full_name} ({self.role})"
-
-    @property
-    def is_teacher(self) -> bool:
-        """Check if user has teacher role."""
-        return self.role == UserRole.TEACHER
-
-    @property
-    def is_student(self) -> bool:
-        """Check if user has student role."""
-        return self.role == UserRole.STUDENT
-
-
 class TutoringSession(models.Model):
     """
     Tutoring session model.
-    
+
     Core concepts:
     - Every session has ONE teacher (owner)
-    - Every session can have ZERO or ONE student
+    - A session targets a specific Section
+    - Multiple students from that section can join
     - Teachers control session lifecycle
-    - Students are participants, not controllers
+    - Student participation is tracked via SessionParticipant
     """
     id = models.UUIDField(
         primary_key=True,
@@ -109,18 +52,18 @@ class TutoringSession(models.Model):
         help_text="LiveKit room identifier (format: tutoring_{uuid})"
     )
     teacher = models.ForeignKey(
-        TutoringUser,
+        'authentication.CustomUser',
         on_delete=models.CASCADE,
         related_name='teacher_sessions',
         help_text="Teacher who owns this session"
     )
-    student = models.ForeignKey(
-        TutoringUser,
+    section = models.ForeignKey(
+        'students.Section',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='student_sessions',
-        help_text="Student who joined this session (null if no student yet)"
+        related_name='tutoring_sessions',
+        help_text="Section this session is for"
     )
     status = models.CharField(
         max_length=10,
@@ -132,11 +75,6 @@ class TutoringSession(models.Model):
         null=True,
         blank=True,
         help_text="LiveKit access token for teacher"
-    )
-    livekit_token_student = models.TextField(
-        null=True,
-        blank=True,
-        help_text="LiveKit access token for student"
     )
     grace_expires_at = models.DateTimeField(
         null=True,
@@ -162,70 +100,89 @@ class TutoringSession(models.Model):
             models.Index(fields=['room_id']),
             models.Index(fields=['status']),
             models.Index(fields=['teacher']),
-            models.Index(fields=['student']),
+            models.Index(fields=['section', 'status']),
         ]
 
     def __str__(self):
-        return f"Session {self.room_id} ({self.status})"
+        section_label = f" [{self.section}]" if self.section else ""
+        return f"Session {self.room_id}{section_label} ({self.status})"
 
     @property
     def is_waiting(self) -> bool:
-        """Check if session is waiting for student."""
         return self.status == SessionStatus.WAITING
 
     @property
     def is_active(self) -> bool:
-        """Check if session is active (both participants present)."""
         return self.status == SessionStatus.ACTIVE
 
     @property
     def is_ended(self) -> bool:
-        """Check if session has ended."""
         return self.status == SessionStatus.ENDED
 
     @property
-    def has_student(self) -> bool:
-        """Check if a student has joined."""
-        return self.student is not None
+    def participant_count(self) -> int:
+        """Number of students who have joined and not left."""
+        return self.participants.filter(left_at__isnull=True).count()
 
-    def can_student_join(self) -> bool:
-        """
-        Check if a student can join this session.
-        
-        Returns True if:
-        - Session exists
-        - Session is not ended
-        - No student has joined yet
-        """
-        return not self.is_ended and not self.has_student
-
-    def activate(self, student: TutoringUser, token: str) -> None:
-        """
-        Activate session when a student joins.
-        
-        Args:
-            student: The student joining the session
-            token: LiveKit access token for the student
-        """
-        self.student = student
-        self.livekit_token_student = token
-        self.status = SessionStatus.ACTIVE
-        self.save()
+    def activate(self) -> None:
+        """Activate session when the first student joins."""
+        if self.status == SessionStatus.WAITING:
+            self.status = SessionStatus.ACTIVE
+            self.save(update_fields=['status'])
 
     def end(self) -> None:
-        """End the session permanently."""
+        """End the session permanently. Mark all participants as left."""
         self.status = SessionStatus.ENDED
         self.ended_at = timezone.now()
-        self.save()
+        self.save(update_fields=['status', 'ended_at'])
+        # Mark all active participants as left
+        self.participants.filter(left_at__isnull=True).update(left_at=timezone.now())
 
-    def is_participant(self, user: TutoringUser) -> bool:
-        """
-        Check if user is a participant (teacher or student) of this session.
-        
-        Args:
-            user: The user to check
-            
-        Returns:
-            True if user is the teacher or student of this session
-        """
-        return self.teacher_id == user.id or self.student_id == user.id
+    def is_participant(self, user) -> bool:
+        """Check if user is the teacher or an active participant."""
+        if self.teacher_id == user.id:
+            return True
+        return self.participants.filter(user=user, left_at__isnull=True).exists()
+
+
+class SessionParticipant(models.Model):
+    """
+    Tracks individual student participation in a tutoring session.
+    Each student gets their own LiveKit token and join/leave timestamps.
+    """
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    session = models.ForeignKey(
+        TutoringSession,
+        on_delete=models.CASCADE,
+        related_name='participants',
+    )
+    user = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.CASCADE,
+        related_name='session_participations',
+    )
+    livekit_token = models.TextField(
+        blank=True,
+        help_text="LiveKit access token for this participant"
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+    left_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'tutoring_session_participants'
+        ordering = ['joined_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['session', 'user'],
+                condition=models.Q(left_at__isnull=True),
+                name='unique_active_participant',
+            )
+        ]
+
+    def __str__(self):
+        status = "active" if self.left_at is None else "left"
+        return f"{self.user} in {self.session.room_id} ({status})"

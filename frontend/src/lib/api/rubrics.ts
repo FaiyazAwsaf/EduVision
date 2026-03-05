@@ -10,6 +10,7 @@ export interface QuestionRubric {
   id?: string;
   question_number: number;
   question_text: string;
+  reference_answer?: string;
   max_marks: number;
   evaluation_rules: any[]; // Reuse existing EvaluationRule type
   created_at?: string;
@@ -73,7 +74,7 @@ export interface TestRubricSetResult {
  * Create a new rubric set
  */
 export async function createRubricSet(
-  payload: CreateRubricSetPayload
+  payload: CreateRubricSetPayload,
 ): Promise<RubricSet> {
   const response = await fetch(`${API_URL}/rubrics/`, {
     method: "POST",
@@ -96,7 +97,7 @@ export async function createRubricSet(
  */
 export async function updateRubricSet(
   id: string,
-  payload: Partial<CreateRubricSetPayload>
+  payload: Partial<CreateRubricSetPayload>,
 ): Promise<RubricSet> {
   const response = await fetch(`${API_URL}/rubrics/${id}/`, {
     method: "PUT",
@@ -138,7 +139,7 @@ export async function publishRubricSet(id: string): Promise<RubricSet> {
  */
 export async function testRubricSet(
   rubricSet: { questions: QuestionRubric[] },
-  answers: Record<number, string>
+  answers: Record<number, string>,
 ): Promise<TestRubricSetResult> {
   const response = await fetch(`${API_URL}/rubrics/test/`, {
     method: "POST",
@@ -352,7 +353,7 @@ export async function listRubrics(filters?: {
 export async function getRubric(id: string): Promise<Rubric> {
   // Map to RubricSet API
   const rubricSet = await getRubricSet(id);
-  
+
   // Convert first question to legacy format
   const firstQuestion = rubricSet.questions[0] || {
     question_text: "",
@@ -410,7 +411,7 @@ export async function archiveRubric(id: string): Promise<Rubric> {
  */
 export async function testRubric(
   rubric: { evaluation_rules: any[]; total_marks: number },
-  answer: string
+  answer: string,
 ): Promise<TestRubricResult> {
   // Create a temporary single-question rubric set for testing
   const rubricSet = {

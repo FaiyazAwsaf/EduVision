@@ -70,7 +70,7 @@ export class WebRTCManager {
   constructor(
     roomId: string,
     role: "teacher" | "student",
-    wsManager: TutoringWebSocketManager
+    wsManager: TutoringWebSocketManager,
   ) {
     this.roomId = roomId;
     this.role = role;
@@ -159,7 +159,7 @@ export class WebRTCManager {
   async handleSignal(
     signalType: string,
     signalData: unknown,
-    senderRole: "teacher" | "student"
+    senderRole: "teacher" | "student",
   ): Promise<void> {
     console.log(`[WebRTC] Received signal: ${signalType} from ${senderRole}`);
 
@@ -167,13 +167,13 @@ export class WebRTCManager {
       case "offer":
         await this.handleOffer(
           signalData as RTCSessionDescriptionInit,
-          senderRole
+          senderRole,
         );
         break;
       case "answer":
         await this.handleAnswer(
           signalData as RTCSessionDescriptionInit,
-          senderRole
+          senderRole,
         );
         break;
       case "ice_candidate":
@@ -307,7 +307,7 @@ export class WebRTCManager {
     if (typeof window !== "undefined" && !window.isSecureContext) {
       throw new Error(
         "Microphone access requires a secure context (HTTPS or localhost). " +
-          "Please access this page via HTTPS."
+          "Please access this page via HTTPS.",
       );
     }
 
@@ -323,7 +323,7 @@ export class WebRTCManager {
 
       console.log(
         "[WebRTC] Local audio acquired:",
-        this.localStream.getAudioTracks().map((t) => t.label)
+        this.localStream.getAudioTracks().map((t) => t.label),
       );
 
       this.handlers.onLocalAudioReady?.(this.localStream);
@@ -331,7 +331,7 @@ export class WebRTCManager {
       const err = error as Error;
       if (err.name === "NotAllowedError") {
         throw new Error(
-          "Microphone permission denied. Please allow microphone access."
+          "Microphone permission denied. Please allow microphone access.",
         );
       } else if (err.name === "NotFoundError") {
         throw new Error("No microphone found. Please connect a microphone.");
@@ -366,7 +366,7 @@ export class WebRTCManager {
         console.log("[WebRTC] Sending ICE candidate");
         this.wsManager.sendWebRTCSignal(
           "ice_candidate",
-          event.candidate.toJSON()
+          event.candidate.toJSON(),
         );
       }
     };
@@ -457,7 +457,7 @@ export class WebRTCManager {
    */
   private async handleOffer(
     offer: RTCSessionDescriptionInit,
-    senderRole: "teacher" | "student"
+    senderRole: "teacher" | "student",
   ): Promise<void> {
     // Explicit role check - only teacher can send offers
     if (senderRole !== "teacher") {
@@ -481,7 +481,7 @@ export class WebRTCManager {
 
       console.log("[WebRTC] Setting remote description (offer)");
       await this.peerConnection!.setRemoteDescription(
-        new RTCSessionDescription(offer)
+        new RTCSessionDescription(offer),
       );
 
       this.isSettingRemoteDescription = false;
@@ -535,7 +535,7 @@ export class WebRTCManager {
    */
   private async handleAnswer(
     answer: RTCSessionDescriptionInit,
-    senderRole: "teacher" | "student"
+    senderRole: "teacher" | "student",
   ): Promise<void> {
     // Explicit role check - only student can send answers
     if (senderRole !== "student") {
@@ -559,7 +559,7 @@ export class WebRTCManager {
 
       console.log("[WebRTC] Setting remote description (answer)");
       await this.peerConnection.setRemoteDescription(
-        new RTCSessionDescription(answer)
+        new RTCSessionDescription(answer),
       );
 
       this.isSettingRemoteDescription = false;
@@ -577,7 +577,7 @@ export class WebRTCManager {
    * Handle incoming ICE candidate
    */
   private async handleIceCandidate(
-    candidate: RTCIceCandidateInit
+    candidate: RTCIceCandidateInit,
   ): Promise<void> {
     if (!this.peerConnection) {
       console.log("[WebRTC] Queuing ICE candidate - no peer connection yet");
@@ -591,7 +591,7 @@ export class WebRTCManager {
       !this.peerConnection.remoteDescription
     ) {
       console.log(
-        "[WebRTC] Queuing ICE candidate - remote description not set"
+        "[WebRTC] Queuing ICE candidate - remote description not set",
       );
       this.pendingIceCandidates.push(new RTCIceCandidate(candidate));
       return;
@@ -612,7 +612,7 @@ export class WebRTCManager {
     if (this.pendingIceCandidates.length === 0) return;
 
     console.log(
-      `[WebRTC] Processing ${this.pendingIceCandidates.length} pending ICE candidates`
+      `[WebRTC] Processing ${this.pendingIceCandidates.length} pending ICE candidates`,
     );
 
     for (const candidate of this.pendingIceCandidates) {

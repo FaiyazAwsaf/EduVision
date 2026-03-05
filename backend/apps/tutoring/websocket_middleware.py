@@ -46,10 +46,10 @@ class TokenAuthMiddleware(BaseMiddleware):
         if user_id:
             # Fetch user from database
             scope['user'] = await self.get_user(user_id)
-            # Check if we got a real user (TutoringUser has full_name, AnonymousUser doesn't)
-            if hasattr(scope['user'], 'full_name'):
+            # Check if we got a real user (CustomUser has first_name, AnonymousUser doesn't)
+            if hasattr(scope['user'], 'first_name'):
                 logger.debug(
-                    f"WebSocket authenticated: {scope['user'].full_name} ({scope['user'].id})"
+                    f"WebSocket authenticated: {scope['user'].first_name} {scope['user'].last_name} ({scope['user'].id})"
                 )
         else:
             scope['user'] = AnonymousUser()
@@ -60,19 +60,19 @@ class TokenAuthMiddleware(BaseMiddleware):
     @database_sync_to_async
     def get_user(self, user_id):
         """
-        Fetch TutoringUser from database.
+        Fetch CustomUser from database.
         
         Args:
             user_id: UUID string of the user
             
         Returns:
-            TutoringUser instance or AnonymousUser if not found
+            CustomUser instance or AnonymousUser if not found
         """
-        from apps.tutoring.models import TutoringUser
+        from apps.authentication.models import CustomUser
         
         try:
-            return TutoringUser.objects.get(id=user_id)
-        except TutoringUser.DoesNotExist:
+            return CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
             logger.warning(f"WebSocket auth failed: User {user_id} not found")
             return AnonymousUser()
         except Exception as e:

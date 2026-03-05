@@ -63,11 +63,13 @@ class ContentRequestService:
         output_format: str,
         difficulty: Optional[str] = None,
         notes: Optional[str] = None,
+        user=None,
+        subject: Optional[str] = None,
+        target_class_id=None,
+        target_section_id=None,
     ) -> ContentRequest:
         """
         Create a new content request.
-        
-        Validates input, creates domain entity, persists it, and enqueues for processing.
         
         Args:
             topic: Subject matter for content generation
@@ -76,12 +78,13 @@ class ContentRequestService:
             output_format: Desired output format (from OutputFormat enum)
             difficulty: Optional difficulty level (from Difficulty enum)
             notes: Optional additional instructions
+            user: Optional authenticated user
+            subject: Optional academic subject
+            target_class_id: Optional target class UUID (for teachers)
+            target_section_id: Optional target section UUID (for teachers)
             
         Returns:
             Created ContentRequest domain entity
-            
-        Raises:
-            ValidationError: If validation fails
         """
         # Prepare data for validation
         data = {
@@ -113,7 +116,13 @@ class ContentRequestService:
             raise ValidationError({'domain': [str(e)]})
         
         # Persist the request
-        persisted = self.repository.create(request)
+        persisted = self.repository.create(
+            request, 
+            user=user,
+            subject=subject or '',
+            target_class_id=target_class_id,
+            target_section_id=target_section_id,
+        )
         
         logger.info(
             f"Created content request {persisted.id} - "
@@ -156,7 +165,8 @@ class ContentRequestService:
         self,
         status: Optional[RequestStatus] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        user=None,
     ) -> List[ContentRequest]:
         """
         List content requests with optional filtering.
@@ -165,17 +175,18 @@ class ContentRequestService:
             status: Optional status filter
             limit: Maximum number of results (default: 100)
             offset: Number of results to skip (default: 0)
+            user: Optional user to filter by (only their requests)
             
         Returns:
             List of ContentRequest entities
         """
         if status:
-            requests = self.repository.list_by_status(status, limit, offset)
+            requests = self.repository.list_by_status(status, limit, offset, user=user)
             logger.debug(
                 f"Listed {len(requests)} requests with status {status.value}"
             )
         else:
-            requests = self.repository.list_all(limit, offset)
+            requests = self.repository.list_all(limit, offset, user=user)
             logger.debug(f"Listed {len(requests)} requests (all statuses)")
         
         return requests

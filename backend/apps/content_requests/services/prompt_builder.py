@@ -20,13 +20,26 @@ from ..domain.enums import ContentType, Style, Difficulty
 logger = logging.getLogger(__name__)
 
 
-def build_system_prompt() -> str:
+def build_system_prompt(role: str = 'student') -> str:
     """
     Build the base system prompt for educational content generation.
-    
-    This provides the AI with its role and general guidelines.
-    Does not include request-specific or context-specific information.
+    Teacher prompts emphasize classroom-ready material.
+    Student prompts emphasize learning.
     """
+    if role == 'teacher':
+        return """You are an expert educational content creator helping teachers build
+classroom-ready materials. Your goal is to create professional, structured content
+that teachers can directly use in their lessons.
+
+Guidelines:
+- Create clear, well-structured educational materials
+- Include teacher notes and delivery suggestions where appropriate
+- Ensure content aligns with curriculum standards
+- Use proper formatting (headers, lists, emphasis)
+- Support mathematical notation when needed
+- Make content engaging and age-appropriate for the target class
+- Include assessment-ready elements (questions, rubrics) when relevant"""
+    
     return """You are an expert educational content creator specializing in clear, 
 accurate, and pedagogically sound explanations. Your goal is to help students 
 learn effectively by providing well-structured content tailored to their needs.
@@ -74,6 +87,17 @@ def build_context_aware_prompt(
     prompt_parts.append(f"Topic: {request.topic}")
     prompt_parts.append(f"Content Type: {request.content_type.value}")
     prompt_parts.append(f"Style: {request.style.value}")
+    
+    # Add subject context if available (Phase B)
+    if hasattr(request, 'subject') and request.subject:
+        prompt_parts.insert(0, f"Subject: {request.subject}")
+    
+    # Add class/section context if available (Phase B)
+    if hasattr(request, 'target_class_name') and request.target_class_name:
+        audience = f"Target audience: {request.target_class_name}"
+        if hasattr(request, 'target_section_name') and request.target_section_name:
+            audience += f", Section {request.target_section_name}"
+        prompt_parts.append(audience)
     
     if request.difficulty:
         prompt_parts.append(f"Difficulty Level: {request.difficulty.value}")
@@ -215,7 +239,52 @@ Format as a comprehensive formula reference:
 3. Definition of all variables
 4. When to use it
 5. Important notes or constraints
-        """
+        """,
+        
+        ContentType.LESSON_PLAN: """
+Format as a structured lesson plan with:
+1. Learning Objectives (2-4 clear, measurable objectives)
+2. Prerequisites / Prior Knowledge
+3. Materials Needed
+4. Lesson Structure:
+   - Introduction / Hook (5-10 min)
+   - Main Teaching Activities with time allocations
+   - Guided Practice
+   - Independent Practice
+   - Closure / Assessment
+5. Differentiation strategies for mixed-ability classes
+6. Assessment / Exit Ticket questions
+        """,
+        
+        ContentType.QUIZ_GENERATOR: """
+Generate a quiz with:
+1. 10-15 questions of mixed types (MCQ, short answer, true/false)
+2. Clear question numbering
+3. For MCQ: 4 options each with one correct answer
+4. Include an Answer Key at the end
+5. Vary difficulty across questions (easy → medium → hard)
+6. Map questions to specific learning objectives
+        """,
+        
+        ContentType.WORKSHEET_BUILDER: """
+Create a student worksheet with:
+1. Title and instructions at the top
+2. A brief concept review/reminder box
+3. 8-12 practice problems of increasing difficulty
+4. Space indicators for student work (e.g., "Show your work below")
+5. A challenge/extension problem at the end
+6. Include an Answer Key section at the end
+        """,
+        
+        ContentType.TOPIC_EXPLANATION: """
+Create a comprehensive topic explanation suitable for classroom use:
+1. Start with a clear definition and real-world relevance
+2. Break the topic into key sub-concepts
+3. Provide 2-3 worked examples per sub-concept
+4. Include diagrams/visual descriptions where helpful
+5. Add "Check Your Understanding" questions throughout
+6. End with a summary of key takeaways
+        """,
     }
     
     return instructions.get(content_type, "").strip()

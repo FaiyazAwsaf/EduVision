@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import dj_database_url
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -16,12 +17,19 @@ load_dotenv(BASE_DIR.parent / ".env")  # Root directory .env
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-kf-j8*1=_&4ek(vd04jln1j!ba!io9sz^+#$xo_5))_)5)4z2p"
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-kf-j8*1=_&4ek(vd04jln1j!ba!io9sz^+#$xo_5))_)5)4z2p",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if h.strip()
+]
 
 
 # Application definition
@@ -41,19 +49,20 @@ INSTALLED_APPS = [
     "channels",  # Django Channels for WebSocket support
     
     # Project apps
-    "apps.user.apps.UserConfig",
+    "apps.authentication.apps.AuthenticationConfig",
     "apps.content_requests.apps.ContentRequestsConfig",
     "apps.intelligence.apps.IntelligenceConfig",  # Phase 6: Intelligence & Adaptive Optimization
     "apps.tutoring.apps.TutoringConfig", 
     "apps.evaluation.apps.EvaluationConfig",
     "apps.rubrics.apps.RubricsConfig",
+    "apps.students.apps.StudentsConfig",
+    "apps.whiteboard.apps.WhiteboardConfig",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS - should be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -89,21 +98,23 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Channel Layers Configuration (Django Channels)
-# Using in-memory channel layer for development (use Redis in production)
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
-    },
-}
-# For production with Redis, use:
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [("127.0.0.1", 6379)],
-#         },
-#     },
-# }
+# Set USE_REDIS_CHANNELS=true in Docker/production to use Redis for cross-worker WebSocket support.
+# Local dev defaults to in-memory (sufficient for single-process runserver).
+if os.environ.get("USE_REDIS_CHANNELS", "").lower() in ("true", "1", "yes"):
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [os.environ.get("REDIS_URL", "redis://localhost:6379/0")],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
 
 
 # Database
@@ -135,9 +146,9 @@ else:
         }
     }
 
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -153,6 +164,8 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+AUTH_USER_MODEL = "authentication.CustomUser"
 
 
 # Internationalization
@@ -192,6 +205,9 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'apps.authentication.backends.CustomUserJWTAuthentication',
+    ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
         'rest_framework.parsers.FormParser',
@@ -210,14 +226,27 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
 }
 
+# ============================================================================
+# JWT CONFIGURATION
+# ============================================================================
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME" : timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME" : timedelta(days=7),
+    "AUTH_HEADER_TYPES" : ('Bearer', ),
+    "ROTATE_REFRESH_TOKENS" : True,
+}
 
 # ============================================================================
 # CORS CONFIGURATION
 # ============================================================================
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Next.js frontend
-    "http://127.0.0.1:3000",
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -332,29 +361,6 @@ LOGGING = {
             'level': 'INFO',
         },
     },
-}
-
-# Media files (uploaded files)
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-
-# CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-CORS_ALLOW_CREDENTIALS = True
-
-# REST Framework settings
-REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
-    ],
-    "DEFAULT_PARSER_CLASSES": [
-        "rest_framework.parsers.JSONParser",
-        "rest_framework.parsers.MultiPartParser",
-        "rest_framework.parsers.FormParser",
-    ],
 }
 
 # Gemini API Key (for script evaluation)

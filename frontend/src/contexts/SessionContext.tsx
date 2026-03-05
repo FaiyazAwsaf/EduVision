@@ -25,6 +25,7 @@ import {
   ConnectionState,
   SessionStatus,
   Participant,
+  SectionInfo,
   InitialState,
   ParticipantEvent,
   StatusChangeEvent,
@@ -33,6 +34,12 @@ import {
   WebRTCSignalEvent,
 } from "@/lib/websocket";
 
+// Participant with online status
+export interface SessionParticipant extends Participant {
+  role: string;
+  joined_at?: string;
+}
+
 // Session state interface
 export interface SessionState {
   sessionId: string;
@@ -40,9 +47,10 @@ export interface SessionState {
   status: SessionStatus;
   yourRole: "teacher" | "student";
   teacher: Participant | null;
-  student: Participant | null;
+  /** List of student participants */
+  participants: SessionParticipant[];
+  section: SectionInfo | null;
   isTeacherConnected: boolean;
-  isStudentConnected: boolean;
 }
 
 // Context value interface
@@ -127,10 +135,15 @@ export function SessionProvider({
         status: state.status,
         yourRole: state.your_role,
         teacher: state.teacher,
-        student: state.student,
-        // Use the connected status from the server
+        participants: (state.participants || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          connected: p.connected,
+          role: p.role || "student",
+          joined_at: p.joined_at,
+        })),
+        section: state.section,
         isTeacherConnected: state.teacher?.connected || false,
-        isStudentConnected: state.student?.connected || false,
       });
       setError(null);
     });
@@ -148,13 +161,31 @@ export function SessionProvider({
               : { id: event.user_id, name: event.user_name, connected: true },
           };
         } else {
-          return {
-            ...prev,
-            isStudentConnected: true,
-            student: prev.student
-              ? { ...prev.student, connected: true }
-              : { id: event.user_id, name: event.user_name, connected: true },
-          };
+          // Add or update student participant
+          const existing = prev.participants.find(
+            (p) => p.id === event.user_id,
+          );
+          if (existing) {
+            return {
+              ...prev,
+              participants: prev.participants.map((p) =>
+                p.id === event.user_id ? { ...p, connected: true } : p,
+              ),
+            };
+          } else {
+            return {
+              ...prev,
+              participants: [
+                ...prev.participants,
+                {
+                  id: event.user_id,
+                  name: event.user_name,
+                  connected: true,
+                  role: "student",
+                },
+              ],
+            };
+          }
         }
       });
 
@@ -176,10 +207,9 @@ export function SessionProvider({
         } else {
           return {
             ...prev,
-            isStudentConnected: false,
-            student: prev.student
-              ? { ...prev.student, connected: false }
-              : null,
+            participants: prev.participants.map((p) =>
+              p.id === event.user_id ? { ...p, connected: false } : p,
+            ),
           };
         }
       });
@@ -193,19 +223,27 @@ export function SessionProvider({
         return { ...prev, status: event.status };
       });
 
-      // Update student info if a student joined
+      // Add new student participant if a student joined (from status change metadata)
       if (event.metadata?.student_id && event.metadata?.student_name) {
         setSessionState((prev) => {
           if (!prev) return prev;
-          return {
-            ...prev,
-            student: {
-              id: event.metadata.student_id as string,
-              name: event.metadata.student_name as string,
-              connected: true,
-            },
-            isStudentConnected: true,
-          };
+          const studentId = event.metadata.student_id as string;
+          const exists = prev.participants.some((p) => p.id === studentId);
+          if (!exists) {
+            return {
+              ...prev,
+              participants: [
+                ...prev.participants,
+                {
+                  id: studentId,
+                  name: event.metadata.student_name as string,
+                  connected: true,
+                  role: "student",
+                },
+              ],
+            };
+          }
+          return prev;
         });
       }
 
