@@ -71,7 +71,6 @@ class OCRExtractionService:
                 sharpen=True,
                 equalize=True,
                 equalize_method="clahe",
-                denoise=not self.fast_mode,
                 binarize=True,
                 binarization_method="adaptive",
                 adaptive_block_size=15,

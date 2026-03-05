@@ -10,18 +10,13 @@ def sharpen_image(image: np.ndarray) -> np.ndarray:
     """
     Apply image sharpening using a convolution kernel.
     
-    Uses an unsharp masking technique with a sharpening kernel:
-    [[ 0, -1,  0],
-     [-1,  5, -1],
-     [ 0, -1,  0]]
-    
     Args:
         image: Input image as numpy array (grayscale or BGR)
     
     Returns:
         Sharpened image as numpy array
     """
-    # Define sharpening kernel
+    # Sharpening kernel
     kernel = np.array([
         [0, -1, 0],
         [-1, 5, -1],
@@ -92,49 +87,6 @@ def equalize_histogram_clahe(
     equalized = cv2.cvtColor(merged, cv2.COLOR_YCrCb2BGR)
     logger.debug("Applied CLAHE (luminance)")
     return equalized
-
-
-def denoise_image(
-    image: np.ndarray,
-    strength: int = 10,
-    color_strength: int = 10,
-    template_window_size: int = 7,
-    search_window_size: int = 21
-) -> np.ndarray:
-    """
-    Reduce noise using non-local means denoising.
-
-    Args:
-        image: Input image as numpy array (grayscale or BGR)
-        strength: Filter strength for luminance component
-        color_strength: Filter strength for color components
-        template_window_size: Size in pixels of the template patch
-        search_window_size: Size in pixels of the window used to compute weighted average
-
-    Returns:
-        Denoised image as numpy array
-    """
-    if len(image.shape) == 2:
-        denoised = cv2.fastNlMeansDenoising(
-            image,
-            None,
-            h=strength,
-            templateWindowSize=template_window_size,
-            searchWindowSize=search_window_size,
-        )
-        logger.debug("Applied grayscale denoising")
-        return denoised
-
-    denoised = cv2.fastNlMeansDenoisingColored(
-        image,
-        None,
-        h=strength,
-        hColor=color_strength,
-        templateWindowSize=template_window_size,
-        searchWindowSize=search_window_size,
-    )
-    logger.debug("Applied color denoising")
-    return denoised
 
 
 def binarize_image(
@@ -213,7 +165,6 @@ def preprocess_script_image(
     sharpen: bool = True,
     equalize: bool = False,
     equalize_method: str = "global",
-    denoise: bool = False,
     binarize: bool = True,
     binarization_method: str = "adaptive",
     adaptive_block_size: int = 11,
@@ -231,7 +182,6 @@ def preprocess_script_image(
         sharpen: Whether to apply sharpening
         equalize: Whether to apply histogram equalization
         equalize_method: "global" or "clahe" (only used if equalize=True)
-        denoise: Whether to apply denoising
         binarize: Whether to apply binarization
         binarization_method: Method for binarization ("adaptive", "otsu", "simple")
         adaptive_block_size: Neighborhood size for adaptive threshold
@@ -272,10 +222,6 @@ def preprocess_script_image(
                 image = equalize_histogram_clahe(image)
             else:
                 image = equalize_histogram(image)
-
-        # Apply denoising
-        if denoise:
-            image = denoise_image(image)
         
         # Apply binarization
         if binarize:
@@ -297,7 +243,7 @@ def preprocess_script_image(
         logger.info(
             "Successfully preprocessed image: "
             f"sharpen={sharpen}, equalize={equalize}, equalize_method={equalize_method}, "
-            f"denoise={denoise}, binarize={binarize}"
+            f"binarize={binarize}"
         )
         
         return processed_bytes
@@ -312,7 +258,6 @@ def preprocess_pil_image(
     sharpen: bool = True,
     equalize: bool = False,
     equalize_method: str = "global",
-    denoise: bool = False,
     binarize: bool = True,
     binarization_method: str = "adaptive",
     adaptive_block_size: int = 11,
@@ -326,7 +271,6 @@ def preprocess_pil_image(
         sharpen: Whether to apply sharpening
         equalize: Whether to apply histogram equalization
         equalize_method: "global" or "clahe" (only used if equalize=True)
-        denoise: Whether to apply denoising
         binarize: Whether to apply binarization
         binarization_method: Method for binarization
         adaptive_block_size: Neighborhood size for adaptive threshold
@@ -353,10 +297,6 @@ def preprocess_pil_image(
                 image_array = equalize_histogram_clahe(image_array)
             else:
                 image_array = equalize_histogram(image_array)
-
-        # Apply denoising
-        if denoise:
-            image_array = denoise_image(image_array)
         
         # Apply binarization
         if binarize:
