@@ -218,7 +218,8 @@ def preprocess_script_image(
     binarize: bool = True,
     binarization_method: str = "adaptive",
     adaptive_block_size: int = 11,
-    adaptive_c: int = 2
+    adaptive_c: int = 2,
+    max_dimension: int | None = None,
 ) -> bytes:
     """
     Complete preprocessing pipeline for answer script images.
@@ -236,6 +237,7 @@ def preprocess_script_image(
         binarization_method: Method for binarization ("adaptive", "otsu", "simple")
         adaptive_block_size: Neighborhood size for adaptive threshold
         adaptive_c: Constant subtracted from weighted mean
+        max_dimension: Optional longest-edge cap (pixels) for faster processing
     
     Returns:
         Preprocessed image as bytes (PNG format)
@@ -248,6 +250,18 @@ def preprocess_script_image(
         if image is None:
             logger.error("Failed to decode image")
             return image_bytes  # Return original if decode fails
+
+        if max_dimension and max_dimension > 0:
+            height, width = image.shape[:2]
+            longest_edge = max(height, width)
+            if longest_edge > max_dimension:
+                scale = max_dimension / float(longest_edge)
+                new_width = max(1, int(width * scale))
+                new_height = max(1, int(height * scale))
+                image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                logger.debug(
+                    f"Resized image for preprocessing from {width}x{height} to {new_width}x{new_height}"
+                )
         
         # Apply sharpening
         if sharpen:
