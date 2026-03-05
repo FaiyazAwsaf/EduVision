@@ -25,7 +25,7 @@ const actions = [
     title: "Upload New Script",
     description: "OCR analysis for handwritten notes",
     icon: Upload,
-    href: "/evaluation",
+    href: "/student/scripts",
     cta: "+ Upload",
     color: "bg-[#E8F4F5]",
     iconColor: "text-primary-dark",
