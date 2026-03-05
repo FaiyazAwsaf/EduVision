@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import time
 from typing import Optional
 from decimal import Decimal
 from datetime import datetime
@@ -130,6 +131,7 @@ class ScriptEvaluationService:
         4. Calculate total score
         5. Generate overall feedback
         """
+        total_start_time = time.perf_counter()
         try:
             # Validate rubric_set exists
             if not script.rubric_set:
@@ -222,8 +224,13 @@ class ScriptEvaluationService:
             script.status = "evaluated"
             script.evaluated_at = datetime.now()
             script.save()
+
+            total_elapsed = time.perf_counter() - total_start_time
             
-            logger.info(f"Script {script.id} evaluated successfully. Score: {script.total_score}/{total_max_marks}")
+            logger.info(
+                f"Script {script.id} evaluated successfully in {total_elapsed:.2f}s. "
+                f"Score: {script.total_score}/{total_max_marks}"
+            )
             
             return script
             
