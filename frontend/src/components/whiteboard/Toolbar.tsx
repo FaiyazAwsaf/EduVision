@@ -40,11 +40,11 @@ const COLORS = [
   "#00FF00", // green
   "#0000FF", // blue
   "#FFFF00", // yellow
-  "#FF00FF", // magenta
+  "#87CEEB", // light blue
   "#00FFFF", // cyan
   "#FFA500", // orange
   "#800080", // purple
-  "#A52A2A", // brown
+  "#A9A9A9", // grey
 ];
 
 const STROKE_WIDTHS = [1, 2, 3, 5, 8, 12];

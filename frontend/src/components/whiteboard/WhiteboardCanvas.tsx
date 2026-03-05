@@ -90,57 +90,58 @@ function configureBrush(
 
   switch (tool) {
     case "pencil": {
-      // ✏️ Pencil Tool: soft graphite look
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth;
-      (brush as any).opacity = 0.7;
+      brush.width = strokeWidth * 0.7;
+      (brush as any).opacity = 0.35;
       console.log(
-        `[Canvas] tool: pencil, color: ${penColor}, width: ${strokeWidth}, opacity: 0.7`,
+        `[Canvas] tool: pencil, color: ${penColor}, width: ${strokeWidth * 0.7}, opacity: 0.35`,
       );
       break;
     }
 
     case "fountain": {
-      // 🖋 Fountain Pen Tool: calligraphic with pressure simulation
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth * 1.5;
-      (brush as any).opacity = 1;
-      // Enable decimate for smoother strokes
+      brush.width = strokeWidth * 1.6;
+      (brush as any).opacity = 1.0;
       if ("decimate" in brush) {
-        (brush as any).decimate = 0.4;
+        (brush as any).decimate = 0.3;
       }
       console.log(
-        `[Canvas] tool: fountain, color: ${penColor}, width: ${strokeWidth * 1.5}, opacity: 1, decimate: 0.4`,
+        `[Canvas] tool: fountain, color: ${penColor}, width: ${strokeWidth * 1.6}, opacity: 1.0`,
       );
       break;
     }
 
     case "marker": {
-      // 🟨 Marker / Highlighter Tool: translucent overlay
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth * 2;
-      (brush as any).opacity = 0.3;
+      brush.width = strokeWidth * 2.0;
+      (brush as any).opacity = 0.45;
       console.log(
-        `[Canvas] tool: marker, color: ${penColor}, width: ${strokeWidth * 2}, opacity: 0.3`,
+        `[Canvas] tool: marker, color: ${penColor}, width: ${strokeWidth * 2.0}, opacity: 0.45`,
       );
       break;
     }
 
     case "pen": {
-      // 🖊 Pen Tool: regular drawing with full opacity
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth;
-      (brush as any).opacity = 1;
+      brush.width = strokeWidth * 1.3;
+      (brush as any).opacity = 1.0;
+      if ("decimate" in brush) {
+        (brush as any).decimate = 0.5;
+      }
+      if ("shadowBlur" in brush) {
+        (brush as any).shadowBlur = 1.5;
+      }
       console.log(
-        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth}, opacity: 1`,
+        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth * 1.3}, opacity: 1.0`,
       );
       break;
     }
@@ -517,36 +518,23 @@ const WhiteboardCanvas = forwardRef<
         // Get bounding box of selected objects
         const bounds = activeSelection.getBoundingRect();
         
-        // Extract image from selection bounds
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = bounds.width;
-        tempCanvas.height = bounds.height;
-        const tempCtx = tempCanvas.getContext("2d");
-
-        if (tempCtx) {
-          const mainCanvasElement = canvas.getElement();
-          tempCtx.drawImage(
-            mainCanvasElement,
-            bounds.left,
-            bounds.top,
-            bounds.width,
-            bounds.height,
-            0,
-            0,
-            bounds.width,
-            bounds.height
-          );
-
-          const imageData = tempCanvas.toDataURL("image/png");
-          
-          // Call selection ready callback
-          onSelectionReadyRef.current?.(imageData, {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-          });
-        }
+        // Use Fabric.js's built-in toDataURL with cropping
+        const imageData = canvas.toDataURL({
+          format: "png",
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+          multiplier: 1,
+        });
+        
+        // Call selection ready callback
+        onSelectionReadyRef.current?.(imageData, {
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+        });
         
         canvas.renderAll();
         console.log(

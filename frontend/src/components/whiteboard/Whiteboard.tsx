@@ -314,6 +314,17 @@ export default function Whiteboard({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleUndo, handleRedo, captureHistory]);
 
+  const handleToolChange = useCallback((tool: Tool) => {
+    setCurrentTool(tool);
+    if (tool === "pencil") {
+      setPenColor("#A9A9A9"); // grey
+    } else if (tool === "marker") {
+      setPenColor("#87CEEB"); // light blue
+    } else {
+      setPenColor("#000000");
+    }
+  }, []);
+
   // ============================================================
   // canvas event handlers
   // ============================================================
@@ -545,7 +556,7 @@ export default function Whiteboard({
         canRedo={canRedo}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        onToolChange={setCurrentTool}
+        onToolChange={handleToolChange}
         onColorChange={setPenColor}
         onStrokeWidthChange={setStrokeWidth}
         onEraserWidthChange={setEraserWidth}
