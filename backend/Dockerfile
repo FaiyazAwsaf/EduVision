@@ -18,20 +18,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
-    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir gunicorn uvicorn[standard] channels daphne
 
 # Copy application code
 COPY . .
 
-# Copy and set entrypoint script permissions
-COPY entrypoint.sh /entrypoint.sh
-RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+# Set entrypoint script permissions
+RUN chmod +x /app/entrypoint.sh
+
+# Collect static files
+RUN python manage.py collectstatic --noinput || true
 
 # Create non-root user
 RUN addgroup --system --gid 1001 django && \
@@ -47,12 +49,8 @@ USER django
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8000/api/health/ || exit 1
-
 # Set entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command (can be overridden in docker-compose)
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
