@@ -10,6 +10,10 @@ export enum ContentType {
   SUMMARY = "SUMMARY",
   WORKED_EXAMPLES = "WORKED_EXAMPLES",
   FORMULA_SHEET = "FORMULA_SHEET",
+  LESSON_PLAN = "LESSON_PLAN",
+  QUIZ_GENERATOR = "QUIZ_GENERATOR",
+  WORKSHEET_BUILDER = "WORKSHEET_BUILDER",
+  TOPIC_EXPLANATION = "TOPIC_EXPLANATION",
 }
 
 export enum Style {
@@ -45,6 +49,9 @@ export interface CreateContentRequestPayload {
   output_format: OutputFormat;
   difficulty?: Difficulty;
   notes?: string;
+  subject?: string;
+  target_class_id?: string;
+  target_section_id?: string;
 }
 
 // Content request response from API
@@ -57,6 +64,9 @@ export interface ContentRequest {
   difficulty?: Difficulty;
   notes?: string;
   status: RequestStatus;
+  role?: string;
+  subject?: string;
+  created_by_id?: string;
   created_at: string;
   updated_at: string;
 }

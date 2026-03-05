@@ -27,14 +27,11 @@ class WhiteboardConsumer(AsyncWebsocketConsumer):
         Handle WebSocket connection
         Extract session ID from URL and join room group
         """
-        # Get session ID from URL route
         self.session_id = self.scope["url_route"]["kwargs"]["session_id"]
         self.room_group_name = f"whiteboard_{self.session_id}"
 
-        # Join room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
-        # Accept connection
         await self.accept()
 
         print(f"[WebSocket] Client connected to session: {self.session_id}")
@@ -44,7 +41,7 @@ class WhiteboardConsumer(AsyncWebsocketConsumer):
         Handle WebSocket disconnection
         Leave room group
         """
-        # Leave room group
+        # leave room group
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
         print(
@@ -62,8 +59,7 @@ class WhiteboardConsumer(AsyncWebsocketConsumer):
 
             print(f"[WebSocket] Received message type: {message_type}")
 
-            # Forward message to all clients in the room
-            # This includes the sender, but the client should filter out its own messages
+            # forward message to all clients in the room
             await self.channel_layer.group_send(
                 self.room_group_name, {"type": "broadcast_message", "message": data}
             )

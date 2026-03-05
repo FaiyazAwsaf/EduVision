@@ -4,6 +4,39 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
+class ScriptSubmissionForm(models.Model):
+    """
+    A submission window opened by a teacher for students to upload scripts.
+    Links to a TeacherSubjectAssignment (teacher + subject + section).
+    """
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("closed", "Closed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assignment = models.ForeignKey(
+        "students.TeacherSubjectAssignment",
+        on_delete=models.CASCADE,
+        related_name="submission_forms",
+        help_text="The teaching assignment this form belongs to",
+    )
+    title = models.CharField(max_length=255, help_text="e.g. 'Mid-term ICT Exam'")
+    description = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="open")
+    deadline = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        db_table = "evaluation_submission_forms"
+
+    def __str__(self):
+        return f"{self.title} ({self.assignment})"
+
+
 class AnswerScript(models.Model):
     """
     Represents a student's answer script (collection of page images).
@@ -18,17 +51,43 @@ class AnswerScript(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
-    # Reference to RubricSet from rubrics module (required for evaluation)
+    # Reference to RubricSet from rubrics module (now optional — assigned at evaluation time)
     rubric_set = models.ForeignKey(
         'rubrics.RubricSet',
         on_delete=models.CASCADE,
         related_name="evaluated_scripts",
-        help_text="The rubric set (question paper) being evaluated",
-        null=False,  # Required field
-        blank=False
+        help_text="The rubric set used for evaluation",
+        null=True,
+        blank=True,
+    )
+
+    # ── Student linkage (new) ────────────────────────────────────────────────
+    student_user = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.CASCADE,
+        related_name="answer_scripts",
+        null=True,
+        blank=True,
+        help_text="The student who owns this script",
+    )
+    submission_form = models.ForeignKey(
+        ScriptSubmissionForm,
+        on_delete=models.CASCADE,
+        related_name="scripts",
+        null=True,
+        blank=True,
+        help_text="The submission form this script was submitted through (null for teacher uploads)",
+    )
+    uploaded_by = models.ForeignKey(
+        'authentication.CustomUser',
+        on_delete=models.SET_NULL,
+        related_name="uploaded_scripts",
+        null=True,
+        blank=True,
+        help_text="The teacher who manually uploaded this script (null for student submissions)",
     )
     
-    # Student identification (optional, can be anonymous)
+    # Legacy student identification (kept for backward compat)
     student_name = models.CharField(max_length=255, blank=True, null=True)
     student_id = models.CharField(max_length=50, blank=True, null=True)
     

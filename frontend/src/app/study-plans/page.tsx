@@ -145,27 +145,27 @@ export default function StudyPlansPage() {
     ) || [];
 
   return (
-    <div className="min-h-screen bg-[#F2EFE7]">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white border-b border-[#9ACBD0]">
+      <div className="bg-white border-b border-secondary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-[#006A71]">Study Plans</h1>
-              <p className="text-[#48A6A7] mt-1">
+              <h1 className="text-3xl font-bold text-primary-dark">Study Plans</h1>
+              <p className="text-primary mt-1">
                 Manual Mode - Create and manage your study topics manually
               </p>
             </div>
             <div>
               <button
                 onClick={() => (window.location.href = "/")}
-                className="bg-[#F2EFE7] text-[#006A71] px-4 py-2 rounded-md hover:bg-[#9ACBD0]/30 transition-colors mr-4 border border-[#9ACBD0]"
+                className="bg-background text-primary-dark px-4 py-2 rounded-md hover:bg-secondary/30 transition-colors mr-4 border border-secondary"
               >
                 &larr; Back
               </button>
               <button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] transition-colors"
+                className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors"
               >
                 + New Plan
               </button>
@@ -184,9 +184,9 @@ export default function StudyPlansPage() {
 
         {/* Create Plan Form Modal */}
         {showCreateForm && (
-          <div className="fixed bg-[#006A71]/20 backdrop-blur-sm inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full border border-[#9ACBD0]">
-              <h2 className="text-xl text-[#006A71] font-bold mb-4">
+          <div className="fixed bg-primary-dark/20 backdrop-blur-sm inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full border border-secondary">
+              <h2 className="text-xl text-primary-dark font-bold mb-4">
                 Create New Study Plan
               </h2>
               <CreateStudyPlanForm
@@ -199,15 +199,15 @@ export default function StudyPlansPage() {
 
         {isLoading ? (
           <div className="text-center py-12">
-            <div className="inline-block rounded-full h-8 w-8 border-4 border-[#48A6A7] border-t-transparent animate-spin"></div>
-            <p className="text-[#48A6A7] mt-4">Loading study plans...</p>
+            <div className="inline-block rounded-full h-8 w-8 border-4 border-primary border-t-transparent animate-spin"></div>
+            <p className="text-primary mt-4">Loading study plans...</p>
           </div>
         ) : plans.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-[#48A6A7] mb-4">No study plans yet.</p>
+            <p className="text-primary mb-4">No study plans yet.</p>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="bg-[#48A6A7] text-white px-6 py-2 rounded-md hover:bg-[#006A71] transition-colors"
+              className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary-dark transition-colors"
             >
               Create Your First Plan
             </button>
@@ -216,7 +216,7 @@ export default function StudyPlansPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Plans List */}
             <div className="lg:col-span-1">
-              <h2 className="text-lg font-semibold text-[#006A71] mb-4">
+              <h2 className="text-lg font-semibold text-primary-dark mb-4">
                 Your Plans
               </h2>
               <div className="space-y-3">
@@ -225,21 +225,21 @@ export default function StudyPlansPage() {
                     key={plan.id}
                     className={`border rounded-lg p-4 cursor-pointer transition-all ${
                       selectedPlan?.id === plan.id
-                        ? "border-[#48A6A7] bg-[#9ACBD0]/10"
-                        : "border-[#9ACBD0] hover:border-[#48A6A7] bg-white"
+                        ? "border-primary bg-secondary/10"
+                        : "border-secondary hover:border-primary bg-white"
                     }`}
                     onClick={() => loadPlanDetails(plan.id)}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="font-medium text-[#006A71]">
+                        <h3 className="font-medium text-primary-dark">
                           {plan.name}
                         </h3>
-                        <p className="text-sm text-[#48A6A7] mt-1">
+                        <p className="text-sm text-primary mt-1">
                           {plan.items.length}{" "}
                           {plan.items.length === 1 ? "item" : "items"}
                         </p>
-                        <span className="inline-block mt-2 px-2 py-1 text-xs bg-[#9ACBD0]/20 text-[#006A71] rounded">
+                        <span className="inline-block mt-2 px-2 py-1 text-xs bg-secondary/20 text-primary-dark rounded">
                           Manual Mode
                         </span>
                       </div>
@@ -264,17 +264,17 @@ export default function StudyPlansPage() {
                 <>
                   <div className="flex justify-between items-center mb-6">
                     <div>
-                      <h2 className="text-2xl font-bold text-[#006A71]">
+                      <h2 className="text-2xl font-bold text-primary-dark">
                         {selectedPlan.name}
                       </h2>
-                      <p className="text-[#48A6A7] text-sm mt-1">
+                      <p className="text-primary text-sm mt-1">
                         Created{" "}
                         {new Date(selectedPlan.created_at).toLocaleDateString()}
                       </p>
                     </div>
                     <button
                       onClick={() => setShowAddItemForm(true)}
-                      className="bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] transition-colors"
+                      className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors"
                     >
                       + Add Topic
                     </button>
@@ -282,8 +282,8 @@ export default function StudyPlansPage() {
 
                   {/* Add Item Form */}
                   {showAddItemForm && (
-                    <div className="mb-6 bg-white border border-[#9ACBD0] rounded-lg p-4">
-                      <h3 className="text-lg font-semibold text-[#006A71] mb-3">
+                    <div className="mb-6 bg-white border border-secondary rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-primary-dark mb-3">
                         Add New Topic
                       </h3>
                       <AddStudyPlanItemForm
@@ -296,8 +296,8 @@ export default function StudyPlansPage() {
 
                   {/* Items by Status */}
                   {selectedPlan.items.length === 0 ? (
-                    <div className="text-center py-12 bg-white border border-[#9ACBD0] rounded-lg">
-                      <p className="text-[#48A6A7] mb-4">
+                    <div className="text-center py-12 bg-white border border-secondary rounded-lg">
+                      <p className="text-primary mb-4">
                         No topics yet. Add your first topic to get started!
                       </p>
                     </div>
@@ -306,7 +306,7 @@ export default function StudyPlansPage() {
                       {/* Pending Items */}
                       {pendingItems.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-[#006A71] mb-3 flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-primary-dark mb-3 flex items-center gap-2">
                             <ClipboardList className="w-5 h-5" /> Pending ({pendingItems.length})
                           </h3>
                           <div className="space-y-3">
@@ -325,7 +325,7 @@ export default function StudyPlansPage() {
                       {/* In Progress Items */}
                       {inProgressItems.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-[#006A71] mb-3 flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-primary-dark mb-3 flex items-center gap-2">
                             <RefreshCw className="w-5 h-5" /> In Progress ({inProgressItems.length})
                           </h3>
                           <div className="space-y-3">
@@ -344,7 +344,7 @@ export default function StudyPlansPage() {
                       {/* Completed Items */}
                       {completedItems.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-semibold text-[#006A71] mb-3 flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-primary-dark mb-3 flex items-center gap-2">
                             <CheckCircle className="w-5 h-5 text-green-600" /> Completed ({completedItems.length})
                           </h3>
                           <div className="space-y-3">
@@ -363,8 +363,8 @@ export default function StudyPlansPage() {
                   )}
                 </>
               ) : (
-                <div className="text-center py-12 bg-white border border-[#9ACBD0] rounded-lg">
-                  <p className="text-[#48A6A7]">
+                <div className="text-center py-12 bg-white border border-secondary rounded-lg">
+                  <p className="text-primary">
                     Select a plan from the list to view details
                   </p>
                 </div>

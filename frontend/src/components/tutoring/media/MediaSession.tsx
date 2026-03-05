@@ -1,492 +1,268 @@
 /**
- * Media Session Component - Professional UI
+ * MediaSession - Google Meet-style multi-party layout
  *
- * Google Meet-inspired interface for live tutoring sessions
- * Features video, audio, and screen sharing capabilities
+ * Composes MeetGrid, ScreenShareLayout, MeetControlBar, and ParticipantListPanel
+ * into a single full-viewport component for tutoring sessions.
  */
 
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
-import { VideoRenderer } from "./VideoRenderer";
-import { ScreenShareRenderer } from "./ScreenShareRenderer";
-import { LiveKitConnectionState } from "@/lib/livekit";
-import {
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-  Monitor,
-  MonitorOff,
-  AlertCircle,
-  Maximize,
-  Minimize,
-} from "lucide-react";
+import { MeetGrid } from "./MeetGrid";
+import { ScreenShareLayout } from "./ScreenShareLayout";
+import { MeetControlBar } from "./MeetControlBar";
+import { ParticipantListPanel } from "./ParticipantListPanel";
+import type { GridParticipant } from "./MeetGrid";
+import type { PanelParticipant } from "./ParticipantListPanel";
+import { AlertCircle, Loader2 } from "lucide-react";
 
-interface MediaSessionProps {
-  /** LiveKit WebSocket URL */
+export interface MediaSessionProps {
   wsUrl: string | null;
-  /** LiveKit access token */
   token: string | null;
-  /** User's role in the session */
   role: "teacher" | "student";
-  /** Session ID (for display) */
-  sessionId?: string;
-}
-
-/**
- * Get connection status text
- */
-function getConnectionStatusText(state: LiveKitConnectionState): string {
-  switch (state) {
-    case "disconnected":
-      return "Disconnected";
-    case "connecting":
-      return "Connecting...";
-    case "connected":
-      return "Connected";
-    case "reconnecting":
-      return "Reconnecting...";
-    default:
-      return "Unknown";
-  }
+  /** Display name of the local user */
+  userName: string;
+  /** Session label displayed in participants panel */
+  sessionLabel?: string;
+  /** Called when teacher ends session */
+  onEndSession?: () => void;
+  /** Called when student leaves session */
+  onLeaveSession?: () => void;
 }
 
 export function MediaSession({
   wsUrl,
   token,
   role,
-  sessionId,
+  userName,
+  sessionLabel,
+  onEndSession,
+  onLeaveSession,
 }: MediaSessionProps) {
-  const videoContainerRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isParticipantPanelOpen, setIsParticipantPanelOpen] = useState(false);
 
   const {
     connectionState,
     localTracks,
-    remoteTracks,
+    remoteParticipants,
     isConnected,
-    isPeerConnected,
+    peerCount,
     error,
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
     attachLocalVideo,
     detachLocalVideo,
-    attachRemoteVideo,
-    detachRemoteVideo,
     attachLocalScreenShare,
     detachLocalScreenShare,
-    attachRemoteScreenShare,
-    detachRemoteScreenShare,
-  } = useLiveKit({
-    wsUrl,
-    token,
-    role,
-    autoConnect: true,
-  });
+    attachParticipantVideo,
+    detachParticipantVideo,
+    attachParticipantScreenShare,
+    detachParticipantScreenShare,
+  } = useLiveKit({ wsUrl, token, role, autoConnect: true });
 
-  // Derived states
-  const isAudioMuted = !localTracks.isAudioEnabled;
-  const isVideoOff = !localTracks.isVideoEnabled;
-  const isScreenSharing = localTracks.isScreenSharing;
-  const hasLocalVideo = !!localTracks.videoTrack;
-  const hasRemoteVideo = !!remoteTracks.videoTrack;
-  const hasLocalScreenShare = !!localTracks.screenShareTrack;
-  const hasRemoteScreenShare = !!remoteTracks.screenShareTrack;
+  // ─── Build unified participant list ─────────────────────────────────
 
-  // Check if any screen is being shared
-  const isAnyScreenSharing = hasLocalScreenShare || hasRemoteScreenShare;
+  const localParticipant: GridParticipant = useMemo(
+    () => ({
+      identity: "local",
+      name: userName,
+      role,
+      isLocal: true,
+      hasVideo: localTracks.isVideoEnabled,
+      hasAudio: localTracks.isAudioEnabled,
+      isSpeaking: false, // Local speaking state not tracked in current implementation
+      isOwner: true,
+      onAttachVideo: attachLocalVideo,
+      onDetachVideo: detachLocalVideo,
+    }),
+    [userName, role, localTracks.isVideoEnabled, localTracks.isAudioEnabled, attachLocalVideo, detachLocalVideo],
+  );
+
+  /** Sorted: owner first, then video-on before video-off */
+  const sortedParticipants: GridParticipant[] = useMemo(() => {
+    const remotes: GridParticipant[] = remoteParticipants.map((rp) => ({
+      identity: rp.identity,
+      name: rp.name,
+      role: rp.role,
+      isLocal: false,
+      hasVideo: rp.isVideoEnabled,
+      hasAudio: rp.isAudioEnabled,
+      isSpeaking: rp.isSpeaking,
+      isOwner: false,
+      onAttachVideo: (el: HTMLVideoElement) =>
+        attachParticipantVideo(rp.identity, el),
+      onDetachVideo: (el: HTMLVideoElement) =>
+        detachParticipantVideo(rp.identity, el),
+    }));
+
+    // Sort: video-on first, then video-off
+    remotes.sort((a, b) => {
+      if (a.hasVideo && !b.hasVideo) return -1;
+      if (!a.hasVideo && b.hasVideo) return 1;
+      return 0;
+    });
+
+    // Owner (local) always first
+    return [localParticipant, ...remotes];
+  }, [localParticipant, remoteParticipants, attachParticipantVideo, detachParticipantVideo]);
+
+  // ─── Screen share detection ─────────────────────────────────────────
+
+  const screenShareInfo = useMemo(() => {
+    // Check local screen share first
+    if (localTracks.isScreenSharing && localTracks.screenShareTrack) {
+      return {
+        presenterName: userName,
+        isLocal: true,
+        presenterIdentity: "local",
+        onAttach: attachLocalScreenShare,
+        onDetach: detachLocalScreenShare,
+      };
+    }
+    // Check remote screen shares
+    for (const rp of remoteParticipants) {
+      if (rp.screenShareTrack) {
+        return {
+          presenterName: rp.name,
+          isLocal: false,
+          presenterIdentity: rp.identity,
+          onAttach: (el: HTMLVideoElement) =>
+            attachParticipantScreenShare(rp.identity, el),
+          onDetach: (el: HTMLVideoElement) =>
+            detachParticipantScreenShare(rp.identity, el),
+        };
+      }
+    }
+    return null;
+  }, [
+    localTracks.isScreenSharing,
+    localTracks.screenShareTrack,
+    userName,
+    remoteParticipants,
+    attachLocalScreenShare,
+    detachLocalScreenShare,
+    attachParticipantScreenShare,
+    detachParticipantScreenShare,
+  ]);
+
+  // ─── Participants panel data ────────────────────────────────────────
+
+  const allPanelParticipants: PanelParticipant[] = useMemo(() => {
+    const local: PanelParticipant = {
+      identity: "local",
+      name: userName,
+      role,
+      isLocal: true,
+      hasAudio: localTracks.isAudioEnabled,
+      hasVideo: localTracks.isVideoEnabled,
+      isSpeaking: false,
+    };
+
+    const remotes: PanelParticipant[] = remoteParticipants.map((rp) => ({
+      identity: rp.identity,
+      name: rp.name,
+      role: rp.role,
+      isLocal: false,
+      hasAudio: rp.isAudioEnabled,
+      hasVideo: rp.isVideoEnabled,
+      isSpeaking: rp.isSpeaking,
+    }));
+
+    return [local, ...remotes];
+  }, [userName, role, localTracks, remoteParticipants]);
+
+  const toggleParticipants = useCallback(
+    () => setIsParticipantPanelOpen((v) => !v),
+    [],
+  );
 
   // Filter out expected disconnect errors
   const shouldShowError =
     error && !error.includes("Client initiated disconnect");
 
-  // Handle fullscreen state changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+  // ─── Loading / waiting state ────────────────────────────────────────
 
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, []);
-
-  // Toggle fullscreen mode
-  const toggleFullscreen = async () => {
-    if (!videoContainerRef.current) return;
-
-    try {
-      if (!document.fullscreenElement) {
-        await videoContainerRef.current.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (error) {
-      console.error("Error toggling fullscreen:", error);
-    }
-  };
-
-  // Debug logging
-  useEffect(() => {
-    console.log("[MediaSession] Props received:", {
-      wsUrl,
-      token: token ? "present" : "null",
-      role,
-      sessionId,
-    });
-  }, [wsUrl, token, role, sessionId]);
-
-  // Show waiting message if not connected yet
   if (!wsUrl || !token) {
     return (
       <div
-        className="h-screen flex items-center justify-center"
+        className="w-full h-full flex items-center justify-center"
         style={{ backgroundColor: "#F2EFE7" }}
       >
         <div className="text-center" style={{ color: "#006A71" }}>
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
-            style={{ borderColor: "#48A6A7" }}
-          ></div>
-          <p className="text-lg font-medium">Waiting for session...</p>
-          {/* Debug info */}
-          <div className="mt-4 text-xs text-gray-500">
-            <p>WebSocket URL: {wsUrl || "Not provided"}</p>
-            <p>Token: {token ? "Provided" : "Not provided"}</p>
-          </div>
+          <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" style={{ color: "#48A6A7" }} />
+          <p className="text-lg font-medium">Preparing session...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div
-      className="h-screen flex flex-col"
-      style={{ backgroundColor: "#F2EFE7" }}
-    >
-      {/* Header Bar */}
-      <div
-        className="flex items-center justify-between px-6 py-3 border-b"
-        style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}
-      >
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold" style={{ color: "#006A71" }}>
-            EduVision Tutoring
-          </h1>
-          {sessionId && (
-            <span
-              className="text-sm px-3 py-1 rounded-full"
-              style={{ backgroundColor: "#9ACBD0", color: "#006A71" }}
-            >
-              {role === "teacher" ? "Teacher" : "Student"}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-gray-400"
-            }`}
-          />
-          <span className="text-sm" style={{ color: "#006A71" }}>
-            {getConnectionStatusText(connectionState)}
-          </span>
-        </div>
-      </div>
+  // ─── Render ─────────────────────────────────────────────────────────
 
-      {/* Error Display */}
+  return (
+    <div className="w-full h-full flex flex-col" style={{ backgroundColor: "#F2EFE7" }}>
+      {/* Error banner */}
       {shouldShowError && (
-        <div
-          className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3"
-          style={{ backgroundColor: "#fee", borderLeft: "4px solid #dc2626" }}
-        >
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-red-900">Connection Error</p>
-            <p className="text-sm text-red-700 mt-1">{error}</p>
-          </div>
+        <div className="mx-2 mt-2 px-4 py-2 rounded-lg flex items-center gap-2 bg-red-50 border border-red-300">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <span className="text-sm text-red-700">{error}</span>
         </div>
       )}
 
-      {/* Video/Screen Share error (non-critical) */}
+      {/* Warning banner for video/screenshare errors */}
       {(localTracks.videoError || localTracks.screenShareError) &&
         !shouldShowError && (
-          <div
-            className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-start gap-3"
-            style={{
-              backgroundColor: "#fffbeb",
-              borderLeft: "4px solid #f59e0b",
-            }}
-          >
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              {localTracks.videoError && (
-                <p className="text-sm text-amber-900">
-                  {localTracks.videoError}
-                </p>
-              )}
-              {localTracks.screenShareError && (
-                <p className="text-sm text-amber-900">
-                  {localTracks.screenShareError}
-                </p>
-              )}
-            </div>
+          <div className="mx-2 mt-2 px-4 py-2 rounded-lg flex items-center gap-2 bg-amber-50 border border-amber-300">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="text-sm text-amber-800">
+              {localTracks.videoError || localTracks.screenShareError}
+            </span>
           </div>
         )}
 
-      {/* Main Content Area */}
-      <div
-        ref={videoContainerRef}
-        className="flex-1 relative overflow-hidden"
-        style={isFullscreen ? { backgroundColor: "#F2EFE7" } : undefined}
-      >
-        {isAnyScreenSharing ? (
-          /* Screen Share Layout: Full screen with minimized videos at top */
-          <div className="h-full flex flex-col">
-            {/* Minimized Videos at Top */}
-            <div className="absolute top-4 left-4 right-4 z-20 flex gap-3">
-              {hasRemoteVideo && (
-                <div
-                  className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2"
-                  style={{ borderColor: "#48A6A7" }}
-                >
-                  <VideoRenderer
-                    localTracks={localTracks}
-                    remoteTracks={remoteTracks}
-                    role={role}
-                    attachLocalVideo={attachLocalVideo}
-                    detachLocalVideo={detachLocalVideo}
-                    attachRemoteVideo={attachRemoteVideo}
-                    detachRemoteVideo={detachRemoteVideo}
-                    isPeerConnected={isPeerConnected}
-                    layout="remote-only"
-                  />
-                </div>
-              )}
-              {hasLocalVideo && (
-                <div
-                  className="w-48 h-36 rounded-lg overflow-hidden shadow-lg border-2"
-                  style={{ borderColor: "#9ACBD0" }}
-                >
-                  <VideoRenderer
-                    localTracks={localTracks}
-                    remoteTracks={remoteTracks}
-                    role={role}
-                    attachLocalVideo={attachLocalVideo}
-                    detachLocalVideo={detachLocalVideo}
-                    attachRemoteVideo={attachRemoteVideo}
-                    detachRemoteVideo={detachRemoteVideo}
-                    isPeerConnected={isPeerConnected}
-                    layout="local-only"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Screen Share Display */}
-            <div className="flex-1 flex items-center justify-center p-6">
-              {hasRemoteScreenShare && (
-                <div className="w-full h-full max-w-7xl max-h-full">
-                  <ScreenShareRenderer
-                    track={remoteTracks.screenShareTrack}
-                    isLocal={false}
-                    participantName={remoteTracks.participantName || undefined}
-                    attachScreenShare={attachRemoteScreenShare}
-                    detachScreenShare={detachRemoteScreenShare}
-                  />
-                </div>
-              )}
-              {hasLocalScreenShare && !hasRemoteScreenShare && (
-                <div className="w-full h-full max-w-7xl max-h-full">
-                  <ScreenShareRenderer
-                    track={localTracks.screenShareTrack}
-                    isLocal={true}
-                    attachScreenShare={attachLocalScreenShare}
-                    detachScreenShare={detachLocalScreenShare}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Normal Video Layout: Large remote + Small local */
-          <div className="h-full relative">
-            {/* Large Remote Video (main view) */}
-            <div className="absolute inset-0 flex items-center justify-center p-6">
-              <VideoRenderer
-                localTracks={localTracks}
-                remoteTracks={remoteTracks}
-                role={role}
-                attachLocalVideo={attachLocalVideo}
-                detachLocalVideo={detachLocalVideo}
-                attachRemoteVideo={attachRemoteVideo}
-                detachRemoteVideo={detachRemoteVideo}
-                isPeerConnected={isPeerConnected}
-                layout="remote-only"
-              />
-            </div>
-
-            {/* Small Local Video (bottom-right corner) */}
-            <div
-              className="absolute bottom-6 right-6 w-64 h-48 rounded-lg overflow-hidden shadow-2xl border-3 z-10"
-              style={{ borderColor: "#48A6A7" }}
-            >
-              <VideoRenderer
-                localTracks={localTracks}
-                remoteTracks={remoteTracks}
-                role={role}
-                attachLocalVideo={attachLocalVideo}
-                detachLocalVideo={detachLocalVideo}
-                attachRemoteVideo={attachRemoteVideo}
-                detachRemoteVideo={detachRemoteVideo}
-                isPeerConnected={isPeerConnected}
-                layout="local-only"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Control Bar */}
-      <div
-        className="px-6 py-4 border-t"
-        style={{ backgroundColor: "#FFFFFF", borderColor: "#9ACBD0" }}
-      >
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          {/* Peer Status */}
-          <div className="text-sm" style={{ color: "#006A71" }}>
-            {isPeerConnected ? (
-              <span className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                {role === "teacher" ? "Student" : "Teacher"} joined
-              </span>
-            ) : (
-              <span
-                className="flex items-center gap-2"
-                style={{ color: "#9ACBD0" }}
-              >
-                <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                Waiting for {role === "teacher" ? "student" : "teacher"}...
-              </span>
-            )}
-          </div>
-
-          {/* Control Buttons */}
-          <div className="flex items-center gap-3">
-            {/* Microphone Toggle */}
-            <button
-              onClick={toggleAudio}
-              disabled={!isConnected}
-              className={`p-4 rounded-full transition-all duration-200 ${
-                !isConnected
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : isAudioMuted
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "hover:bg-gray-100"
-              }`}
-              style={{
-                backgroundColor: !isConnected
-                  ? "#e5e7eb"
-                  : isAudioMuted
-                    ? "#ef4444"
-                    : "#48A6A7",
-                color: isAudioMuted || !isConnected ? "#fff" : "#fff",
-              }}
-              title={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
-            >
-              {isAudioMuted ? (
-                <MicOff className="w-5 h-5" />
-              ) : (
-                <Mic className="w-5 h-5" />
-              )}
-            </button>
-
-            {/* Camera Toggle */}
-            <button
-              onClick={toggleVideo}
-              disabled={!isConnected || !hasLocalVideo}
-              className={`p-4 rounded-full transition-all duration-200 ${
-                !isConnected || !hasLocalVideo
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : isVideoOff
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "hover:bg-gray-100"
-              }`}
-              style={{
-                backgroundColor:
-                  !isConnected || !hasLocalVideo
-                    ? "#e5e7eb"
-                    : isVideoOff
-                      ? "#ef4444"
-                      : "#48A6A7",
-                color:
-                  isVideoOff || !isConnected || !hasLocalVideo
-                    ? "#fff"
-                    : "#fff",
-              }}
-              title={isVideoOff ? "Turn on camera" : "Turn off camera"}
-            >
-              {isVideoOff ? (
-                <VideoOff className="w-5 h-5" />
-              ) : (
-                <Video className="w-5 h-5" />
-              )}
-            </button>
-
-            {/* Screen Share Toggle */}
-            <button
-              onClick={toggleScreenShare}
-              disabled={!isConnected}
-              className={`p-4 rounded-full transition-all duration-200 ${
-                !isConnected
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : isScreenSharing
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "hover:bg-gray-100"
-              }`}
-              style={{
-                backgroundColor: !isConnected
-                  ? "#e5e7eb"
-                  : isScreenSharing
-                    ? "#ef4444"
-                    : "#48A6A7",
-                color: isScreenSharing || !isConnected ? "#fff" : "#fff",
-              }}
-              title={isScreenSharing ? "Stop sharing" : "Share screen"}
-            >
-              {isScreenSharing ? (
-                <MonitorOff className="w-5 h-5" />
-              ) : (
-                <Monitor className="w-5 h-5" />
-              )}
-            </button>
-
-            {/* Fullscreen Toggle */}
-            <button
-              onClick={toggleFullscreen}
-              className="p-4 rounded-full transition-all duration-200 hover:bg-gray-100"
-              style={{
-                backgroundColor: "#48A6A7",
-                color: "#fff",
-              }}
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            >
-              {isFullscreen ? (
-                <Minimize className="w-5 h-5" />
-              ) : (
-                <Maximize className="w-5 h-5" />
-              )}
-            </button>
-          </div>
-
-          {/* Spacer for symmetry */}
-          <div className="w-32"></div>
+      {/* Main content area */}
+      <div className="flex-1 flex min-h-0">
+        {/* Video area */}
+        <div className="flex-1 min-w-0">
+          {screenShareInfo ? (
+            <ScreenShareLayout
+              presenterName={screenShareInfo.presenterName}
+              isLocalScreenShare={screenShareInfo.isLocal}
+              onAttachScreenShare={screenShareInfo.onAttach}
+              onDetachScreenShare={screenShareInfo.onDetach}
+              participants={sortedParticipants.slice(0, 4)}
+            />
+          ) : (
+            <MeetGrid participants={sortedParticipants.slice(0, 9)} />
+          )}
         </div>
+
+        {/* Participant list panel */}
+        <ParticipantListPanel
+          participants={allPanelParticipants}
+          isOpen={isParticipantPanelOpen}
+          onClose={() => setIsParticipantPanelOpen(false)}
+        />
       </div>
+
+      {/* Control bar */}
+      <MeetControlBar
+        isAudioOn={localTracks.isAudioEnabled}
+        isVideoOn={localTracks.isVideoEnabled}
+        isScreenSharing={localTracks.isScreenSharing}
+        hasVideoTrack={!!localTracks.videoTrack}
+        isConnected={isConnected}
+        role={role}
+        participantCount={peerCount + 1} // +1 for self
+        isParticipantPanelOpen={isParticipantPanelOpen}
+        onToggleAudio={toggleAudio}
+        onToggleVideo={toggleVideo}
+        onToggleScreenShare={toggleScreenShare}
+        onToggleParticipants={toggleParticipants}
+        onEndSession={onEndSession}
+        onLeaveSession={onLeaveSession}
+      />
     </div>
   );
 }

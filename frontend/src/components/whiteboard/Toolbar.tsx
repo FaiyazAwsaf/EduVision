@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Tool = "pen" | "eraser" | "select";
+export type Tool = "pencil" | "pen" | "fountain" | "marker" | "eraser" | "select";
 
 export type ToolbarProps = {
   role: "teacher" | "student";
@@ -19,6 +19,12 @@ export type ToolbarProps = {
   eraserWidth: number;
   isDrawingLocked: boolean;
   isConnected: boolean;
+  selectionReady?: boolean;
+  onConvertSelection?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   onToolChange: (tool: Tool) => void;
   onColorChange: (color: string) => void;
   onStrokeWidthChange: (width: number) => void;
@@ -53,6 +59,12 @@ export default function Toolbar(props: ToolbarProps) {
     eraserWidth,
     isDrawingLocked,
     isConnected,
+    selectionReady = false,
+    onConvertSelection,
+    canUndo = false,
+    canRedo = false,
+    onUndo,
+    onRedo,
     onToolChange,
     onColorChange,
     onStrokeWidthChange,
@@ -77,7 +89,7 @@ export default function Toolbar(props: ToolbarProps) {
   }, [currentTool]);
 
   return (
-    <div className="fixed top-2.5 left-2.5 bg-[#F2EFE7] p-3 rounded-lg shadow-lg border border-[#9ACBD0] z-[1000] flex flex-col gap-2 min-w-[180px] max-h-[90vh] overflow-y-auto">
+    <div className="fixed top-2.5 left-2.5 bg-[#F2EFE7] p-3 rounded-lg shadow-lg border border-[#9ACBD0] z-[1000] flex flex-col gap-2 min-w-[180px] w-[220px] max-w-[220px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
       {/* connection Status */}
       <div className="flex flex-col gap-1.5">
         <div
@@ -99,14 +111,14 @@ export default function Toolbar(props: ToolbarProps) {
         <>
           <div className="flex flex-col gap-1.5">
             <span className="text-[#006A71] text-xs font-bold uppercase">
-              Drawing
+              Drawing Tools
             </span>
 
-            {(["pen", "eraser", "select"] as Tool[]).map((tool) => (
+            {(["pencil", "pen", "fountain", "marker", "eraser", "select"] as Tool[]).map((tool) => (
               <button
                 key={tool}
                 type="button"
-                disabled={isDisabled && tool != "select"}
+                disabled={isDisabled && tool !== "select"}
                 onClick={() => onToolChange(tool)}
                 className={`px-3 py-2 border rounded text-sm flex items-center gap-1.5 transition-all
                   ${
@@ -117,17 +129,23 @@ export default function Toolbar(props: ToolbarProps) {
                   ${isDisabled && tool !== "select" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
-                {tool === "pen"
-                  ? "✏️ Pen"
-                  : tool === "eraser"
-                    ? "🧹 Eraser"
-                    : "🔲 Select"}
+                {tool === "pencil"
+                  ? "✏️ Pencil"
+                  : tool === "pen"
+                    ? "🖊 Pen"
+                    : tool === "fountain"
+                      ? "🖋 Fountain"
+                      : tool === "marker"
+                        ? "🟨 Marker"
+                        : tool === "eraser"
+                          ? "🧹 Eraser"
+                          : "🔲 Select"}
               </button>
             ))}
           </div>
 
           {/* pen controls */}
-          {currentTool === "pen" && (
+          {(["pencil", "pen", "fountain", "marker"] as Tool[]).includes(currentTool) && (
             <>
               {/* color picker */}
               <div className="flex flex-col gap-1.5">
@@ -135,7 +153,7 @@ export default function Toolbar(props: ToolbarProps) {
                   type="button"
                   disabled={isDisabled}
                   onClick={() => setShowColorPicker((v) => !v)}
-                  className="px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm flex items-center gap-2"
+                  className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm flex items-center gap-2"
                 >
                   <span
                     className="w-4 h-4 rounded-full border-2 border-[#006A71]"
@@ -174,7 +192,7 @@ export default function Toolbar(props: ToolbarProps) {
                   type="button"
                   disabled={isDisabled}
                   onClick={() => setShowStrokePicker((v) => !v)}
-                  className="px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
+                  className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
                 >
                   Width: {strokeWidth}px
                 </button>
@@ -211,7 +229,7 @@ export default function Toolbar(props: ToolbarProps) {
                 type="button"
                 disabled={isDisabled}
                 onClick={() => setShowEraserPicker((v) => !v)}
-                className="px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
+                className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
               >
                 Eraser: {eraserWidth}px
               </button>
@@ -242,9 +260,22 @@ export default function Toolbar(props: ToolbarProps) {
 
           {/* select tool info */}
           {currentTool === "select" && (
-            <div className="text-xs text-[#48A6A7] p-2 bg-[#9ACBD0]/20 rounded">
-              Draw a rectangle to select an area, then click "Convert to
-              Notation"
+            <div className="flex flex-col gap-2">
+              <div className="text-xs text-[#48A6A7] p-2 bg-[#9ACBD0]/20 rounded break-words whitespace-normal">
+                Draw a freehand lasso to select objects, then convert to notation.
+              </div>
+              <button
+                type="button"
+                onClick={onConvertSelection}
+                disabled={!selectionReady || isDisabled}
+                className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  selectionReady && !isDisabled
+                    ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                    : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+                }`}
+              >
+                📝 Convert to Notation
+              </button>
             </div>
           )}
 
@@ -257,6 +288,33 @@ export default function Toolbar(props: ToolbarProps) {
         <span className="text-[#006A71] text-xs font-bold uppercase">
           Canvas
         </span>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+              canUndo
+                ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+            }`}
+          >
+            ↩️ Undo
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+              canRedo
+                ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+            }`}
+          >
+            ↪️ Redo
+          </button>
+        </div>
 
         {role === "teacher" && (
           <button type="button" onClick={onClear} className="toolbar-btn">

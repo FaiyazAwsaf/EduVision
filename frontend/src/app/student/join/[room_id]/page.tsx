@@ -157,7 +157,9 @@ function SessionView({
             wsUrl={joinData.livekit_ws_url}
             token={joinData.token}
             role="student"
-            sessionId={joinData.session_id}
+            userName={user.full_name}
+            sessionLabel={joinData.section_name ?? undefined}
+            onLeaveSession={onLeaveSession}
           />
         )}
       </div>
@@ -175,10 +177,10 @@ function SessionView({
           )}
           {isEnded && (
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/student/dashboard")}
               className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Return Home
+              Return to Dashboard
             </button>
           )}
         </div>
