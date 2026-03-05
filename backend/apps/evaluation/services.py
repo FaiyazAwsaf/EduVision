@@ -1,12 +1,8 @@
 import os
-import json
 import logging
 import time
-from typing import Optional
 from decimal import Decimal
 from datetime import datetime
-
-from django.conf import settings
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from .ocr_service import OCRExtractionService
