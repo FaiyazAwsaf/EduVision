@@ -225,7 +225,7 @@ const STUDENT_TEMPLATES: TemplateWithIcon[] = [
 
 interface ContentRequestFormProps {
   onSuccess: (requestId: string) => void;
-  userRole?: "student" | "teacher";
+  userRole?: "student" | "teacher" | "admin";
   userId?: string;
 }
 

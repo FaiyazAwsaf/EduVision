@@ -143,7 +143,27 @@ async function evaluationFetch<T>(
     throw new Error(message);
   }
 
-  return response.json();
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentLength = response.headers.get("content-length");
+  if (contentLength === "0") {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const text = await response.text();
+    return (text ? (text as unknown as T) : (undefined as T));
+  }
+
+  const bodyText = await response.text();
+  if (!bodyText.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(bodyText) as T;
 }
 
 /** Authenticated version of evaluationFetch for endpoints requiring JWT. */
@@ -167,7 +187,27 @@ async function authenticatedEvaluationFetch<T>(
     throw new Error(message);
   }
 
-  return response.json();
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentLength = response.headers.get("content-length");
+  if (contentLength === "0") {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const text = await response.text();
+    return (text ? (text as unknown as T) : (undefined as T));
+  }
+
+  const bodyText = await response.text();
+  if (!bodyText.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(bodyText) as T;
 }
 
 // ─── Answer Scripts ──────────────────────────────────────────────────────────
