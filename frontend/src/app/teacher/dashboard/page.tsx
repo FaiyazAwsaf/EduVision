@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   listSessions,
   createSession,
+  rejoinSession,
   type SessionStatus,
 } from "@/api/tutoring";
 import { getMyClass, type MyClassInfo } from "@/api/school";
@@ -238,8 +239,7 @@ export default function TeacherDashboard() {
       .then((scripts) => {
         const sorted = [...scripts].sort(
           (a, b) =>
-            new Date(b.created_at).getTime() -
-            new Date(a.created_at).getTime(),
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
         setRecentScripts(sorted.slice(0, 6));
       })
@@ -272,6 +272,33 @@ export default function TeacherDashboard() {
       setSections([]);
     } finally {
       setLoadingSections(false);
+    }
+  };
+
+  const [joiningSessionId, setJoiningSessionId] = useState<string | null>(null);
+
+  // Rejoin existing active session
+  const handleRejoinSession = async (session: SessionStatus) => {
+    if (joiningSessionId) return;
+    setJoiningSessionId(session.id);
+    try {
+      const data = await rejoinSession(session.id);
+      const tutoringUser = {
+        id: user!.id,
+        email: user!.email,
+        full_name: `${user!.first_name} ${user!.last_name}`,
+        role: user!.role.toUpperCase() as "TEACHER" | "STUDENT",
+        created_at: user!.date_joined,
+      };
+      sessionStorage.setItem("tutoring_teacher_session", JSON.stringify(data));
+      sessionStorage.setItem(
+        "tutoring_teacher_user",
+        JSON.stringify(tutoringUser),
+      );
+      router.push("/teacher/dashboard/session");
+    } catch (err) {
+      console.error("Failed to rejoin session:", err);
+      setJoiningSessionId(null);
     }
   };
 
@@ -446,7 +473,7 @@ export default function TeacherDashboard() {
               {activeSessions.map((session) => (
                 <div
                   key={session.id}
-                  onClick={() => router.push("/teacher/dashboard/session")}
+                  onClick={() => handleRejoinSession(session)}
                   className="bg-white rounded-2xl border border-secondary/30 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
                 >
                   {/* Header */}
@@ -556,8 +583,17 @@ export default function TeacherDashboard() {
                   {/* Footer */}
                   <div className="flex items-center justify-end pt-3 border-t border-secondary/20">
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:text-primary-dark transition-colors">
-                      GO TO SESSION
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      {joiningSessionId === session.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          JOINING...
+                        </>
+                      ) : (
+                        <>
+                          GO TO SESSION
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -591,7 +627,8 @@ export default function TeacherDashboard() {
                 No submissions yet
               </p>
               <p className="text-xs text-muted">
-                Scripts submitted by students or uploaded by you will appear here
+                Scripts submitted by students or uploaded by you will appear
+                here
               </p>
             </div>
           ) : (
