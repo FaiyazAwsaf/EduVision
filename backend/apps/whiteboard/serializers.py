@@ -52,7 +52,7 @@ class WhiteboardSessionDetailSerializer(WhiteboardSessionSerializer):
         read_only_fields = WhiteboardSessionSerializer.Meta.read_only_fields + ['latest_state']
 
     def get_latest_state(self, obj):
-        latest = WhiteboardState.get_latest(obj)
+        latest = WhiteboardState.objects.filter(session=obj).order_by('-version').first()
         if latest:
             return WhiteboardStateSerializer(latest).data
         return None

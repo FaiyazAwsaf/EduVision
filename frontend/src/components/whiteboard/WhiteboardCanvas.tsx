@@ -147,13 +147,9 @@ function configureBrush(
     }
 
     case "eraser": {
-      // 🧹 Eraser Tool: white brush simulation
-      canvas.isDrawingMode = true;
+      canvas.isDrawingMode = false;
       canvas.selection = false;
-      brush.color = "#ffffff";
-      brush.width = eraserWidth;
-      (brush as any).opacity = 1;
-      console.log(`[Canvas] tool: eraser, width: ${eraserWidth}`);
+      console.log("[Canvas] tool: eraser (click to delete)");
       break;
     }
 
@@ -221,9 +217,22 @@ const WhiteboardCanvas = forwardRef<
 
     console.log("[Canvas] initializing fabric.js canvas...");
 
+    // Use container dimensions if available, otherwise fallback to viewport
+    let canvasWidth = containerRef.current.clientWidth;
+    let canvasHeight = containerRef.current.clientHeight;
+    
+    // Fallback to window dimensions if container dimensions are not yet available
+    if (canvasWidth === 0 || canvasHeight === 0) {
+      canvasWidth = window.innerWidth;
+      canvasHeight = window.innerHeight;
+      console.log("[Canvas] using window dimensions as fallback:", canvasWidth, "x", canvasHeight);
+    }
+
+    console.log("[Canvas] initializing with dimensions:", canvasWidth, "x", canvasHeight);
+
     const canvas = new fabric.Canvas("whiteboard-canvas", {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
+      width: canvasWidth,
+      height: canvasHeight,
       backgroundColor: "#ffffff",
       isDrawingMode: isDrawingEnabled,
       selection: false,
@@ -241,6 +250,27 @@ const WhiteboardCanvas = forwardRef<
 
     // notify parent component
     onCanvasReady?.(canvas);
+
+    // Add ResizeObserver to handle container resizing
+    const resizeObserver = new ResizeObserver(() => {
+      if (containerRef.current && canvasRef.current) {
+        const newWidth = containerRef.current.clientWidth;
+        const newHeight = containerRef.current.clientHeight;
+        if (newWidth > 0 && newHeight > 0) {
+          const currentWidth = canvasRef.current.getWidth();
+          const currentHeight = canvasRef.current.getHeight();
+          
+          // Only resize if dimensions actually changed
+          if (newWidth !== currentWidth || newHeight !== currentHeight) {
+            canvasRef.current.setDimensions({ width: newWidth, height: newHeight });
+            canvasRef.current.renderAll();
+            console.log(`[Canvas] resized from ${currentWidth}x${currentHeight} to ${newWidth}x${newHeight}`);
+          }
+        }
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
 
     // listen for path:created events (when user finishes drawing a stroke)
     canvas.on("path:created", (event) => {
@@ -268,6 +298,7 @@ const WhiteboardCanvas = forwardRef<
     // cleanup
     return () => {
       console.log("[Canvas] disposing canvas");
+      resizeObserver.disconnect();
       canvas.dispose();
       canvasRef.current = null;
     };
@@ -341,7 +372,7 @@ const WhiteboardCanvas = forwardRef<
    */
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || tool !== "select") {
+    if (!canvas || !tool || tool !== "select") {
       return;
     }
 
@@ -419,7 +450,7 @@ const WhiteboardCanvas = forwardRef<
     };
 
     const handleMouseDown = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-      if (tool !== "select") return;
+      if (!tool || tool !== "select") return;
 
       isDrawingLasso = true;
       lassoPoints.length = 0;
@@ -560,6 +591,49 @@ const WhiteboardCanvas = forwardRef<
       if (tempPath) {
         canvas.remove(tempPath);
       }
+    };
+  }, [tool]);
+
+  /**
+   * handle eraser tool
+   * allows clicking on objects to delete them
+   */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || tool !== "eraser") {
+      return;
+    }
+
+    const handleEraserMouseDown = (
+      event: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+    ) => {
+      // Get the pointer position in scene coordinates
+      const pointer = event.scenePoint;
+      
+      // Find the topmost object at the click position
+      let clickedObject: fabric.FabricObject | null = null;
+      const objects = canvas.getObjects();
+      
+      // Iterate from top to bottom (reverse order) to find topmost object
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        if (obj.containsPoint(pointer)) {
+          clickedObject = obj;
+          break;
+        }
+      }
+
+      if (clickedObject) {
+        canvas.remove(clickedObject);
+        canvas.renderAll();
+        console.log("[Canvas] Object erased");
+      }
+    };
+
+    canvas.on("mouse:down", handleEraserMouseDown);
+
+    return () => {
+      canvas.off("mouse:down", handleEraserMouseDown);
     };
   }, [tool]);
 
@@ -715,7 +789,7 @@ const WhiteboardCanvas = forwardRef<
   // ============================================================
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
       <canvas id="whiteboard-canvas" />
     </div>
   );

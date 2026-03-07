@@ -2,48 +2,150 @@
  * Whiteboard Page
  *
  * Entry point for the collaborative whiteboard
- * Extracts session/user info from URL params or generates defaults
+ * Authenticates user and loads/creates session from backend
  */
 
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useMemo, useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Whiteboard from "@/components/whiteboard/Whiteboard";
+import {
+  getCurrentUser,
+  getSession,
+  createSession,
+  CurrentUser,
+  WhiteboardSessionDetail,
+} from "@/api/whiteboardService";
 
 function WhiteboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [isClient, setIsClient] = useState(false);
 
-  // Ensure we're on the client side to avoid hydration mismatch
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [session, setSession] = useState<WhiteboardSessionDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    const initializeWhiteboard = async () => {
+      try {
+        setIsLoading(true);
 
-  // Extract params from URL or use defaults (only on client side)
-  const sessionId = useMemo(() => {
-    if (!isClient) return "loading";
-    return searchParams.get("session") || `session-${Date.now()}`;
-  }, [searchParams, isClient]);
+        // 1. Check authentication and get current user
+        console.log("[Whiteboard] Checking authentication...");
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+        console.log("[Whiteboard] User authenticated:", currentUser);
 
-  const userId = useMemo(() => {
-    if (!isClient) return "loading";
+        // 2. Get session ID from URL or create new one
+        const sessionId = searchParams.get("session");
+
+        if (sessionId) {
+          console.log("[Whiteboard] Loading session:", sessionId);
+          const loadedSession = await getSession(sessionId);
+          setSession(loadedSession);
+          console.log("[Whiteboard] Session loaded:", loadedSession);
+        } else {
+          // Create new session if none provided
+          console.log("[Whiteboard] Creating new session...");
+          const newSession = await createSession(`Whiteboard - ${new Date().toLocaleString()}`);
+          setSession(newSession);
+          console.log("[Whiteboard] Session created:", newSession);
+
+          // Update URL with session ID (optional)
+          window.history.replaceState(
+            null,
+            "",
+            `?session=${newSession.id}`,
+          );
+        }
+
+        setIsLoading(false);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "An error occurred";
+        console.error("[Whiteboard] Initialization error:", errorMessage);
+        setError(errorMessage);
+        setIsLoading(false);
+
+        // If not authenticated, redirect to login
+        if (errorMessage.includes("not authenticated") || errorMessage.includes("401")) {
+          console.log("[Whiteboard] Redirecting to login...");
+          router.push("/auth/login");
+        }
+      }
+    };
+
+    initializeWhiteboard();
+  }, [searchParams, router]);
+
+  // Loading state
+  if (isLoading) {
     return (
-      searchParams.get("userId") ||
-      `user-${Math.random().toString(36).substr(2, 9)}`
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#1a1a1a",
+          color: "#fff",
+          fontSize: "18px",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        <div>Initializing whiteboard...</div>
+        <div style={{ fontSize: "14px", color: "#888" }}>
+          Authenticating and loading session
+        </div>
+      </div>
     );
-  }, [searchParams, isClient]);
+  }
 
-  const role = useMemo(() => {
-    const roleParam = searchParams.get("role");
-    return roleParam === "teacher" || roleParam === "student"
-      ? roleParam
-      : "teacher";
-  }, [searchParams]);
+  // Error state
+  if (error) {
+    return (
+      <div
+        style={{
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#1a1a1a",
+          color: "#ff6b6b",
+          fontSize: "18px",
+          flexDirection: "column",
+          gap: "16px",
+          padding: "20px",
+          textAlign: "center",
+        }}
+      >
+        <div>Error initializing whiteboard:</div>
+        <div style={{ fontSize: "14px", color: "#ff9999" }}>{error}</div>
+        <button
+          onClick={() => router.push("/")}
+          style={{
+            marginTop: "20px",
+            padding: "10px 20px",
+            backgroundColor: "#48A6A7",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          Return to Home
+        </button>
+      </div>
+    );
+  }
 
-  // Don't render whiteboard until we're on client side
-  if (!isClient || sessionId === "loading" || userId === "loading") {
+  // Not authenticated or session not loaded
+  if (!user || !session) {
     return (
       <div
         style={{
@@ -57,41 +159,20 @@ function WhiteboardContent() {
           fontSize: "18px",
         }}
       >
-        Initializing whiteboard...
+        Initializing...
       </div>
     );
   }
 
+  // Success - render whiteboard
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
-      {/* Back Button */}
-      <button
-        onClick={() => router.push("/")}
-        style={{
-          position: "fixed",
-          top: 10,
-          right: 150,
-          zIndex: 1001,
-          padding: "8px 16px",
-          backgroundColor: "#48A6A7",
-          color: "#F2EFE7",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontSize: "14px",
-          fontWeight: "500",
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-          transition: "background-color 0.2s",
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#006A71")}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#48A6A7")}
-      >
-        ← Back to Home
-      </button>
-      <Whiteboard sessionId={sessionId} userId={userId} role={role} />
+      <Whiteboard
+        sessionId={session.id}
+        userId={user.id}
+        role={user.role}
+        initialState={session.latest_state}
+      />
     </div>
   );
 }
@@ -109,10 +190,9 @@ export default function WhiteboardPage() {
             justifyContent: "center",
             backgroundColor: "#1a1a1a",
             color: "#fff",
-            fontSize: "18px",
           }}
         >
-          Loading whiteboard...
+          Loading...
         </div>
       }
     >

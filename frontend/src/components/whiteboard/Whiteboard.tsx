@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
 import LatexRenderer, { LatexObject } from "./LatexRenderer";
 import { convertHandwritingToLatex } from "@/api/geminiService";
+import { saveState, WhiteboardState } from "@/api/whiteboardService";
 import Toolbar, { Tool } from "./Toolbar";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
 import * as fabric from "fabric";
@@ -35,6 +36,7 @@ export type WhiteboardProps = {
   sessionId: string;
   userId: string;
   role: "teacher" | "student";
+  initialState?: WhiteboardState | null;
 };
 
 /**
@@ -46,6 +48,15 @@ type CanvasPath = fabric.Path;
 type HistoryEntry = {
   canvas: ReturnType<WhiteboardCanvasHandle["exportToJSON"]>;
   latex: LatexObject[];
+};
+
+/**
+ * page data structure for multi-page whiteboard
+ */
+type PageData = {
+  id: string;
+  canvasState: ReturnType<WhiteboardCanvasHandle["exportToJSON"]> | null;
+  latexObjects: LatexObject[];
 };
 
 function isLatexIntersecting(
@@ -68,10 +79,21 @@ export default function Whiteboard({
   sessionId,
   userId,
   role,
+  initialState,
 }: WhiteboardProps) {
   // ============================================================
   // state management
   // ============================================================
+
+  // page management
+  const [pages, setPages] = useState<PageData[]>([
+    { id: "page-1", canvasState: null, latexObjects: [] },
+  ]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const pagesContainerRef = useRef<HTMLDivElement>(null);
+  const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedStateRef = useRef<string>("");
 
   // canvas state
   const canvasRef = useRef<WhiteboardCanvasHandle>(null);
@@ -105,6 +127,81 @@ export default function Whiteboard({
   useEffect(() => {
     latexObjectsRef.current = latexObjects;
   }, [latexObjects]);
+
+  // ============================================================
+  // Load initial state from backend
+  // ============================================================
+  useEffect(() => {
+    if (hasLoadedInitialState || !initialState) return;
+
+    console.log("[Whiteboard] Loading initial state from backend:", initialState);
+
+    try {
+      // Load canvas state
+      if (initialState.snapshot_json) {
+        canvasRef.current?.loadFromJSON(initialState.snapshot_json);
+        setPages([
+          {
+            id: "page-1",
+            canvasState: initialState.snapshot_json,
+            latexObjects: initialState.latex_objects || [],
+          },
+        ]);
+        setLatexObjects(initialState.latex_objects || []);
+        console.log("[Whiteboard] Initial state restored successfully");
+      }
+
+      setHasLoadedInitialState(true);
+    } catch (error) {
+      console.error("[Whiteboard] Error loading initial state:", error);
+      setHasLoadedInitialState(true);
+    }
+  }, [initialState, hasLoadedInitialState]);
+
+  // ============================================================
+  // Periodic state saving to backend
+  // ============================================================
+  useEffect(() => {
+    // Save state every 30 seconds
+    const saveIntervalId = setInterval(() => {
+      if (!canvasRef.current) return;
+
+      const currentCanvasState = canvasRef.current.exportToJSON();
+      if (!currentCanvasState) return;
+
+      const stateToSave = {
+        snapshot_json: currentCanvasState,
+        latex_objects: latexObjectsRef.current,
+        description: `Auto-saved at ${new Date().toLocaleTimeString()}`,
+      };
+
+      const stateKey = JSON.stringify(stateToSave);
+
+      // Only save if state has changed
+      if (stateKey === lastSavedStateRef.current) {
+        console.log("[Whiteboard] State unchanged, skipping save");
+        return;
+      }
+
+      console.log("[Whiteboard] Saving state to backend...");
+      lastSavedStateRef.current = stateKey;
+
+      saveState(
+        sessionId,
+        stateToSave.snapshot_json,
+        stateToSave.latex_objects,
+        stateToSave.description,
+      )
+        .then(() => {
+          console.log("[Whiteboard] State saved successfully");
+        })
+        .catch((error) => {
+          console.error("[Whiteboard] Error saving state:", error);
+        });
+    }, 30000); // Save every 30 seconds
+
+    return () => clearInterval(saveIntervalId);
+  }, [sessionId]);
 
   const updateHistoryAvailability = useCallback(() => {
     const { undo, redo } = historyRef.current;
@@ -220,6 +317,145 @@ export default function Whiteboard({
       console.log("[Whiteboard] WebSocket disconnected");
     },
   });
+
+  // ============================================================
+  // page management
+  // ============================================================
+
+  /**
+   * save current page state before switching
+   */
+  const saveCurrentPage = useCallback(() => {
+    const canvasState = canvasRef.current?.exportToJSON() ?? null;
+    setPages((prev) => {
+      const updated = [...prev];
+      updated[currentPageIndex] = {
+        ...updated[currentPageIndex],
+        canvasState,
+        latexObjects,
+      };
+      return updated;
+    });
+  }, [currentPageIndex, latexObjects]);
+
+  /**
+   * load a specific page
+   */
+  const loadPage = useCallback(
+    (pageIndex: number) => {
+      if (pageIndex === currentPageIndex) return;
+      if (pageIndex < 0 || pageIndex >= pages.length) return;
+
+      // save current page
+      saveCurrentPage();
+
+      // load new page
+      const page = pages[pageIndex];
+      setCurrentPageIndex(pageIndex);
+      setLatexObjects(page.latexObjects);
+
+      // load canvas state
+      if (page.canvasState) {
+        canvasRef.current?.loadFromJSON(page.canvasState);
+      } else {
+        canvasRef.current?.clearCanvas();
+      }
+
+      console.log(`[Whiteboard] Loaded page ${pageIndex + 1}/${pages.length}`);
+    },
+    [currentPageIndex, pages, saveCurrentPage],
+  );
+
+  // Track if page creation has been triggered at this scroll position to prevent duplicates
+  const pageCreationThresholdRef = useRef<number>(-1);
+
+  /**
+   * handle scroll to load pages and create new ones when needed
+   * stricter logic: only create new page when scrolled close to bottom (~95%)
+   */
+  useEffect(() => {
+    const container = pagesContainerRef.current;
+    if (!container) {
+      console.log("[Whiteboard] Pages container ref not available");
+      return;
+    }
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      console.log("[Whiteboard] Scroll event fired:", { scrollTop, scrollHeight, clientHeight });
+      const pageHeight = clientHeight;
+      
+      // Calculate how close to bottom we are (0 = top, 1 = bottom)
+      // If scrollHeight <= clientHeight (no scroll needed), consider it as being at bottom
+      const scrollProgress = scrollHeight > clientHeight 
+        ? (scrollTop + clientHeight) / scrollHeight 
+        : 1.0;  // At max scroll when content fits in viewport
+
+      // Load page based on scroll position
+      const visiblePageIndex = Math.floor(scrollTop / pageHeight);
+      if (
+        visiblePageIndex !== currentPageIndex &&
+        visiblePageIndex >= 0 &&
+        visiblePageIndex < pages.length
+      ) {
+        console.log(
+          `[Whiteboard] ✓ Scrolled to page ${visiblePageIndex + 1}/${pages.length}`
+        );
+        loadPage(visiblePageIndex);
+      }
+
+      // Only create new page when scrolled to 95% and there's room for more
+      // AND only once per threshold (prevent multiple creations)
+      if (
+        scrollProgress > 0.95 &&
+        pages.length < 100 &&
+        pageCreationThresholdRef.current < scrollProgress
+      ) {
+        pageCreationThresholdRef.current = scrollProgress;
+        const newPageId = `page-${Date.now()}`;
+        setPages((prev) => {
+          console.log("[Whiteboard] ✓ Auto-created new page", prev.length + 1);
+          return [
+            ...prev,
+            { id: newPageId, canvasState: null, latexObjects: [] },
+          ];
+        });
+      }
+
+      // Reset threshold when scrolling back up (below 90%)
+      if (scrollProgress < 0.9) {
+        pageCreationThresholdRef.current = -1;
+      }
+
+      console.log("[Whiteboard] Scroll progress:", {
+        scrollProgress: scrollProgress.toFixed(2),
+        visiblePageIndex,
+        pagesLength: pages.length,
+      });
+    };
+
+    container.addEventListener("scroll", handleScroll);
+    console.log("[Whiteboard] Scroll event listener attached to pages container");
+    
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      console.log("[Whiteboard] Scroll event listener removed");
+    };
+  }, [currentPageIndex, pages.length, loadPage]);
+
+  /**
+   * update current page when latex objects change
+   */
+  useEffect(() => {
+    setPages((prev) => {
+      const updated = [...prev];
+      updated[currentPageIndex] = {
+        ...updated[currentPageIndex],
+        latexObjects,
+      };
+      return updated;
+    });
+  }, [latexObjects, currentPageIndex]);
 
   // ============================================================
   // computed state
@@ -377,11 +613,9 @@ export default function Whiteboard({
           );
         } else {
           console.error("[Whiteboard] LaTeX conversion failed:", result.error);
-          alert(`Conversion failed: ${result.error}`);
         }
       } catch (error) {
         console.error("[Whiteboard] Error during conversion:", error);
-        alert("An error occurred during conversion");
       } finally {
         setIsConverting(false);
         setCurrentTool("pen");
@@ -540,64 +774,115 @@ export default function Whiteboard({
   // ============================================================
 
   return (
-    <div className="w-screen h-screen bg-[#1a1a1a] relative overflow-hidden">
-      {/* toolbar */}
-      <Toolbar
-        role={role}
-        currentTool={currentTool}
-        penColor={penColor}
-        strokeWidth={strokeWidth}
-        eraserWidth={eraserWidth}
-        isDrawingLocked={isDrawingLocked}
-        isConnected={websocket.isConnected}
-        selectionReady={!!selectionData}
-        onConvertSelection={handleConvertSelection}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onToolChange={handleToolChange}
-        onColorChange={setPenColor}
-        onStrokeWidthChange={setStrokeWidth}
-        onEraserWidthChange={setEraserWidth}
-        onClear={handleClear}
-        onExport={handleExport}
-        onToggleLock={role === "teacher" ? handleToggleLock : undefined}
-      />
-
-      {/* canvas */}
-      <div className="w-full h-full absolute top-0 left-0">
-        <WhiteboardCanvas
-          ref={canvasRef}
-          isDrawingEnabled={canDraw}
+    <div className="w-screen h-screen bg-[#1a1a1a] flex overflow-hidden">
+      {/* toolbar - sidebar on left */}
+      <div className="h-full overflow-y-auto">
+        <Toolbar
+          role={role}
+          currentTool={currentTool}
           penColor={penColor}
           strokeWidth={strokeWidth}
           eraserWidth={eraserWidth}
-          tool={currentTool}
-          onPathCreated={handlePathCreated}
-          onSelectionReady={handleSelectionReady}
-          onCanvasReady={() => {
-            historyRef.current.undo = [];
-            historyRef.current.redo = [];
-            lastSnapshotRef.current = "";
-            captureHistory([]);
-          }}
+          isDrawingLocked={isDrawingLocked}
+          isConnected={websocket.isConnected}
+          selectionReady={!!selectionData}
+          onConvertSelection={handleConvertSelection}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onToolChange={handleToolChange}
+          onColorChange={setPenColor}
+          onStrokeWidthChange={setStrokeWidth}
+          onEraserWidthChange={setEraserWidth}
+          onClear={handleClear}
+          onExport={handleExport}
+          onToggleLock={role === "teacher" ? handleToggleLock : undefined}
         />
       </div>
 
-      {/* latex overlay */}
-      <LatexRenderer
-        objects={latexObjects}
-        onObjectClick={handleLatexObjectClick}
-      />
+      {/* pages container - scrollable */}
+      <div
+        ref={pagesContainerRef}
+        className="flex-1 h-screen overflow-y-auto scroll-smooth"
+        style={{ 
+          scrollBehavior: "smooth", 
+          touchAction: "auto"
+        }}
+      >
+        {/* pages */}
+        {pages.map((page, index) => (
+          <div
+            key={page.id}
+            className="w-full relative bg-white"
+            style={{ 
+              height: "100vh",
+              position: "relative",
+              flexShrink: 0
+            }}
+          >
+            {index === currentPageIndex && (
+              <>
+                <WhiteboardCanvas
+                  ref={canvasRef}
+                  isDrawingEnabled={canDraw}
+                  penColor={penColor}
+                  strokeWidth={strokeWidth}
+                  eraserWidth={eraserWidth}
+                  tool={currentTool}
+                  onPathCreated={handlePathCreated}
+                  onSelectionReady={handleSelectionReady}
+                  onCanvasReady={() => {
+                    historyRef.current.undo = [];
+                    historyRef.current.redo = [];
+                    lastSnapshotRef.current = "";
+                    captureHistory([]);
+                  }}
+                />
 
-      {/* loading indicator */}
-      {isConverting && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
-          <div className="bg-white p-6 rounded-lg shadow-xl">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#48A6A7] mx-auto mb-4" />
-            <p className="text-[#006A71] font-bold">Converting to LaTeX...</p>
+                {/* latex overlay for current page */}
+                <div style={{ pointerEvents: 'auto' }}>
+                  <LatexRenderer
+                    objects={latexObjects}
+                    onObjectClick={handleLatexObjectClick}
+                  />
+                </div>
+
+                {/* page number indicator */}
+                <div className="fixed top-20 right-2.5 text-gray-600 text-sm z-[900] font-medium">
+                  {index + 1}/{pages.length}
+                </div>
+              </>
+            )}
           </div>
+        ))}
+      </div>
+
+      {/* converting indicator - positioned near selection */}
+      {isConverting && selectionBounds && (
+        <div
+          className="fixed z-[1500] bg-white px-4 py-2 rounded-lg shadow-lg border-2 border-[#48A6A7] flex items-center gap-2"
+          style={{
+            left: `${selectionBounds.left + selectionBounds.width / 2}px`,
+            top: `${selectionBounds.top - 50}px`,
+            transform: "translateX(-50%)",
+            pointerEvents: "none",
+          }}
+        >
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#48A6A7] border-t-transparent" />
+          <span className="text-sm font-medium text-[#006A71] whitespace-nowrap">
+            Converting...
+          </span>
+        </div>
+      )}
+
+      {/* fallback converting indicator if no selection bounds */}
+      {isConverting && !selectionBounds && (
+        <div className="fixed bottom-6 right-6 z-[1500] bg-white px-4 py-3 rounded-lg shadow-lg border-2 border-[#48A6A7] flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#48A6A7] border-t-transparent" />
+          <span className="text-sm font-medium text-[#006A71]">
+            Converting to LaTeX...
+          </span>
         </div>
       )}
 

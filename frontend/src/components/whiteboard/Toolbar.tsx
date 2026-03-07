@@ -48,7 +48,6 @@ const COLORS = [
 ];
 
 const STROKE_WIDTHS = [1, 2, 3, 5, 8, 12];
-const ERASER_WIDTHS = [10, 20, 30, 40, 50];
 
 export default function Toolbar(props: ToolbarProps) {
   const {
@@ -76,7 +75,6 @@ export default function Toolbar(props: ToolbarProps) {
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showStrokePicker, setShowStrokePicker] = useState(false);
-  const [showEraserPicker, setShowEraserPicker] = useState(false);
 
   const canDraw = role === "teacher" || !isDrawingLocked;
   const isDisabled = !isConnected || !canDraw;
@@ -85,7 +83,6 @@ export default function Toolbar(props: ToolbarProps) {
   useEffect(() => {
     setShowColorPicker(false);
     setShowStrokePicker(false);
-    setShowEraserPicker(false);
   }, [currentTool]);
 
   return (
@@ -224,37 +221,10 @@ export default function Toolbar(props: ToolbarProps) {
 
           {/* eraser controls */}
           {currentTool === "eraser" && (
-            <div className="flex flex-col gap-1.5">
-              <button
-                type="button"
-                disabled={isDisabled}
-                onClick={() => setShowEraserPicker((v) => !v)}
-                className="w-full px-3 py-2 border border-[#9ACBD0] rounded bg-[#F2EFE7] text-[#006A71] text-sm"
-              >
-                Eraser: {eraserWidth}px
-              </button>
-
-              {showEraserPicker && (
-                <div className="grid grid-cols-3 gap-1.5 p-2 border rounded">
-                  {ERASER_WIDTHS.map((width) => (
-                    <button
-                      key={width}
-                      type="button"
-                      onClick={() => {
-                        onEraserWidthChange(width);
-                        setShowEraserPicker(false);
-                      }}
-                      className={`px-2 py-1 rounded text-xs ${
-                        width === eraserWidth
-                          ? "bg-[#48A6A7] text-white"
-                          : "bg-[#F2EFE7] text-[#006A71]"
-                      }`}
-                    >
-                      {width}px
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="flex flex-col gap-2">
+              <div className="text-xs text-[#48A6A7] p-2 bg-[#9ACBD0]/20 rounded break-words whitespace-normal">
+                Click on any path to delete it.
+              </div>
             </div>
           )}
 
