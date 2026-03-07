@@ -12,7 +12,6 @@ from .feedback_service import OverallFeedbackService
 
 from .models import (
     AnswerScript,
-    ScriptPage,
     QuestionEvaluation,
 )
 from apps.rubrics.models import QuestionRubric
