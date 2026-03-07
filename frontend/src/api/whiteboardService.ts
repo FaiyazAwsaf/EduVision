@@ -76,12 +76,22 @@ export async function getCurrentUser(): Promise<CurrentUser> {
       if (response.status === 401) {
         throw new Error("Not authenticated. Please log in.");
       }
+      if (response.status === 404) {
+        throw new Error("Authentication endpoint not found. Please check if backend is configured correctly.");
+      }
       throw new Error(`Failed to get current user: ${response.statusText}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error("[Whiteboard API] Error getting current user:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("[Whiteboard API] Error getting current user:", errorMsg);
+    
+    // Provide more specific error messages
+    if (errorMsg.includes("Failed to fetch")) {
+      throw new Error("Cannot connect to backend. Is the server running? Check console for details.");
+    }
+    
     throw error;
   }
 }

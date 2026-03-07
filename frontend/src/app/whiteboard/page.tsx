@@ -66,13 +66,17 @@ function WhiteboardContent() {
         const errorMessage =
           err instanceof Error ? err.message : "An error occurred";
         console.error("[Whiteboard] Initialization error:", errorMessage);
+        console.error("[Whiteboard] Full error:", err);
         setError(errorMessage);
         setIsLoading(false);
 
         // If not authenticated, redirect to login
-        if (errorMessage.includes("not authenticated") || errorMessage.includes("401")) {
+        if (
+          errorMessage.includes("not authenticated") ||
+          errorMessage.includes("401")
+        ) {
           console.log("[Whiteboard] Redirecting to login...");
-          router.push("/auth/login");
+          setTimeout(() => router.push("/auth/login"), 2000);
         }
       }
     };
