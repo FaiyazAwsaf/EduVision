@@ -10,4 +10,5 @@ router.register(r'sessions', views.WhiteboardSessionViewSet, basename='session')
 urlpatterns = [
     path('', include(router.urls)),
     path('convert/', views.convert_to_latex, name="convert-to-latex"),
+    path('evaluate/', views.evaluate_equation, name="evaluate-equation"),
 ]

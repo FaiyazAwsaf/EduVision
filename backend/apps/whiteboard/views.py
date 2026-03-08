@@ -11,7 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
-from .services.prompt_builder import create_math_prompt, create_text_prompt
+from .services.prompt_builder import create_math_prompt, create_text_prompt, create_equation_solver_prompt
 from .models import WhiteboardSession, SessionMember, WhiteboardState
 from .serializers import (
     WhiteboardSessionSerializer,
@@ -111,6 +111,107 @@ def convert_to_latex(request):
             "error": str(e),
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def evaluate_equation(request):
+    """
+    Evaluate/solve a handwritten mathematical equation using Gemini Vision API
+    
+    Expected request body:
+    {
+        "image": "data:image/png;base64,iVBORw0KGgoAAAANS...",
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "original_latex": "2x + 5 = 13",
+        "solution_latex": "x = 4",
+        "evaluation_type": "solve",
+        "error": null
+    }
+    """
+    try:
+        data = json.loads(request.body)
+        image_data = data.get("image")
+        
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        
+        if not image_data:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "original_latex": None,
+                    "solution_latex": None,
+                    "evaluation_type": None,
+                    "error": "Image data not provided",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if "base64," in image_data:
+            image_data = image_data.split("base64,")[1]
+        
+        image_bytes = base64.b64decode(image_data)
+        prompt = create_equation_solver_prompt()
+        
+        image_parts = [
+            {
+                "mime_type": "image/png",
+                "data": image_bytes,
+            }
+        ]
+        
+        response = model.generate_content([prompt, image_parts[0]])
+        response_text = response.text.strip()
+        
+        # Clean up markdown code blocks if present
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+            response_text = response_text.strip()
+            if response_text.endswith("```"):
+                response_text = response_text[:-3].strip()
+        
+        # Parse JSON response
+        result = json.loads(response_text)
+        
+        return JsonResponse(
+            {
+                "success": True,
+                "original_latex": result.get("original_latex", ""),
+                "solution_latex": result.get("solution_latex", ""),
+                "evaluation_type": result.get("evaluation_type", "evaluate"),
+                "error": None,
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+    except json.JSONDecodeError as e:
+        return JsonResponse(
+            {
+                "success": False,
+                "original_latex": None,
+                "solution_latex": None,
+                "evaluation_type": None,
+                "error": f"Invalid JSON response from model: {str(e)}",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    except Exception as e:
+        return JsonResponse(
+            {
+                "success": False,
+                "original_latex": None,
+                "solution_latex": None,
+                "evaluation_type": None,
+                "error": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 

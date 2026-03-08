@@ -21,6 +21,7 @@ export type ToolbarProps = {
   isConnected: boolean;
   selectionReady?: boolean;
   onConvertSelection?: () => void;
+  onEvaluateEquation?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -60,6 +61,7 @@ export default function Toolbar(props: ToolbarProps) {
     isConnected,
     selectionReady = false,
     onConvertSelection,
+    onEvaluateEquation,
     canUndo = false,
     canRedo = false,
     onUndo,
@@ -245,6 +247,18 @@ export default function Toolbar(props: ToolbarProps) {
                 }`}
               >
                 📝 Convert to Notation
+              </button>
+              <button
+                type="button"
+                onClick={onEvaluateEquation}
+                disabled={!selectionReady || isDisabled}
+                className={`w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  selectionReady && !isDisabled
+                    ? "bg-[#48A6A7] text-white hover:bg-[#006A71]"
+                    : "bg-[#9ACBD0] text-[#006A71] opacity-60 cursor-not-allowed"
+                }`}
+              >
+                = Evaluate Equation
               </button>
             </div>
           )}

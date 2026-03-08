@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
 import LatexRenderer, { LatexObject } from "./LatexRenderer";
-import { convertHandwritingToLatex } from "@/api/geminiService";
+import { convertHandwritingToLatex, evaluateHandwrittenEquation } from "@/api/geminiService";
 import { saveState, WhiteboardState } from "@/api/whiteboardService";
 import Toolbar, { Tool } from "./Toolbar";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
@@ -685,6 +685,86 @@ export default function Whiteboard({
   }, [selectionData, handleSelectionComplete]);
 
   /**
+   * Evaluate a handwritten equation and display both original and solution
+   */
+  const handleEvaluateEquation = useCallback(() => {
+    if (!selectionData) return;
+    const { imageData, bounds } = selectionData;
+    setSelectionData(null);
+    setIsConverting(true);
+
+    (async () => {
+      try {
+        // Call evaluate endpoint
+        const result = await evaluateHandwrittenEquation(imageData);
+
+        if (result.success && result.original_latex && result.solution_latex) {
+          // Clear the hand-drawn content in the selected region
+          canvasRef.current?.clearRegion(bounds);
+
+          // Create original equation object on the left
+          const originalLatexObject: LatexObject = {
+            id: `latex-${Date.now()}`,
+            latex: result.original_latex,
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
+          };
+
+          // Create solution object to the right with some spacing
+          const solutionLatexObject: LatexObject = {
+            id: `latex-${Date.now() + 1}`,
+            latex: result.solution_latex,
+            left: bounds.left + bounds.width + 30, // 30px spacing from original
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
+          };
+
+          // Add both to state
+          const nextLatex = [
+            ...latexObjectsRef.current,
+            originalLatexObject,
+            solutionLatexObject,
+          ];
+          setLatexObjects(nextLatex);
+
+          // Broadcast to other users
+          if (websocket.isConnected) {
+            websocket.sendMessage({
+              type: "latex_added",
+              data: { latexObject: originalLatexObject },
+            });
+            websocket.sendMessage({
+              type: "latex_added",
+              data: { latexObject: solutionLatexObject },
+            });
+          }
+
+          captureHistory(nextLatex);
+
+          console.log(
+            "[Whiteboard] Equation evaluation successful:",
+            result.original_latex,
+            "=",
+            result.solution_latex,
+          );
+        } else {
+          console.error("[Whiteboard] Equation evaluation failed:", result.error);
+        }
+      } catch (error) {
+        console.error("[Whiteboard] Error during evaluation:", error);
+      } finally {
+        setIsConverting(false);
+        setCurrentTool("pen");
+      }
+    })();
+  }, [selectionData, websocket]);
+
+  /**
    * handle local drawing events
    * broadcasts path data to all connected peers
    */
@@ -829,6 +909,7 @@ export default function Whiteboard({
           isConnected={websocket.isConnected}
           selectionReady={!!selectionData}
           onConvertSelection={handleConvertSelection}
+          onEvaluateEquation={handleEvaluateEquation}
           canUndo={canUndo}
           canRedo={canRedo}
           onUndo={handleUndo}
