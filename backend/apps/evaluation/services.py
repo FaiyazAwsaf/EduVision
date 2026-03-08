@@ -243,6 +243,22 @@ class ScriptEvaluationService:
             except Exception as snap_err:
                 logger.warning(f"Analytics snapshot rebuild failed for script {script.id}: {snap_err}")
 
+            # Record SCRIPT_EVALUATED learning event (non-blocking)
+            try:
+                from apps.intelligence.services.event_service import EventService
+                topic = script.rubric_set.subject if script.rubric_set else None
+                EventService().record_event(
+                    event_type='script_evaluated',
+                    user_id=script.student_user.id,
+                    topic=topic,
+                    metadata={
+                        'score': float(script.total_score or 0),
+                        'percentage': float(script.percentage or 0),
+                    },
+                )
+            except Exception:
+                pass
+
             total_elapsed = time.perf_counter() - total_start_time
             
             logger.info(
