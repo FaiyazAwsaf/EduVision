@@ -14,6 +14,7 @@ import type { SubjectPerformance } from "@/api/analytics";
 
 interface Props {
   data: SubjectPerformance[];
+  onBarClick?: () => void;
 }
 
 const COLORS = [
@@ -21,7 +22,7 @@ const COLORS = [
   "#dc2626", "#ea580c", "#65a30d",
 ];
 
-export default function SubjectPerformanceChart({ data }: Props) {
+export default function SubjectPerformanceChart({ data, onBarClick }: Props) {
   if (!data.length) {
     return (
       <div className="flex items-center justify-center h-48 text-secondary text-sm">
@@ -56,7 +57,13 @@ export default function SubjectPerformanceChart({ data }: Props) {
           labelFormatter={(label) => `Subject: ${label}`}
           contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
         />
-        <Bar dataKey="avg_percentage" radius={[6, 6, 0, 0]} name="Avg Score">
+        <Bar
+          dataKey="avg_percentage"
+          radius={[6, 6, 0, 0]}
+          name="Avg Score"
+          onClick={onBarClick}
+          style={onBarClick ? { cursor: "pointer" } : undefined}
+        >
           {data.map((_, i) => (
             <Cell key={i} fill={COLORS[i % COLORS.length]} />
           ))}
