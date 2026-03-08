@@ -7,11 +7,13 @@ import Sidebar from "@/components/shared/Sidebar";
 import {
   getStudentOpenForms,
   getMyScripts,
+  getScript,
   submitStudentScript,
   getEvaluationReport,
   type SubmissionForm,
   type AnswerScript,
   type EvaluationReport,
+  type ScriptPage,
 } from "@/api/evaluation";
 import EvaluationReportView from "@/components/evaluation/EvaluationReportView";
 import {
@@ -24,6 +26,7 @@ import {
   Loader2,
   ClipboardList,
   ChevronLeft,
+  FileDown,
 } from "lucide-react";
 
 export default function StudentScriptsPage() {
@@ -46,6 +49,7 @@ export default function StudentScriptsPage() {
   const [selectedReport, setSelectedReport] = useState<EvaluationReport | null>(
     null,
   );
+  const [selectedScriptPages, setSelectedScriptPages] = useState<ScriptPage[]>([]);
 
   // Auth guard
   useEffect(() => {
@@ -80,12 +84,21 @@ export default function StudentScriptsPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const newFiles = Array.from(e.target.files).slice(0, 10);
-    setSubmitFiles(newFiles);
+    const incoming = Array.from(e.target.files);
+    // Reset the input so the same file can be re-selected if needed
+    e.target.value = "";
 
-    // Generate previews
-    const previews = newFiles.map((file) => URL.createObjectURL(file));
-    setSubmitPreviews(previews);
+    setSubmitFiles((prev) => {
+      const combined = [...prev, ...incoming].slice(0, 10);
+      // Revoke any old previews that are being replaced (none here, just append)
+      const newPreviews = combined.map((f, i) => {
+        // Reuse existing object URLs for files already in the list
+        if (i < prev.length) return submitPreviews[i];
+        return URL.createObjectURL(f);
+      });
+      setSubmitPreviews(newPreviews);
+      return combined;
+    });
   };
 
   const removeFile = (index: number) => {
@@ -123,8 +136,26 @@ export default function StudentScriptsPage() {
 
   const handleViewReport = async (scriptId: string) => {
     try {
-      const report = await getEvaluationReport(scriptId);
+      const [report, script] = await Promise.all([
+        getEvaluationReport(scriptId),
+        getScript(scriptId),
+      ]);
+      setSelectedScriptPages(script.pages || []);
       setSelectedReport(report);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load report");
+    }
+  };
+
+  const handleViewAsPdf = async (scriptId: string) => {
+    try {
+      const [report, script] = await Promise.all([
+        getEvaluationReport(scriptId),
+        getScript(scriptId),
+      ]);
+      setSelectedScriptPages(script.pages || []);
+      setSelectedReport(report);
+      setTimeout(() => window.print(), 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report");
     }
@@ -133,12 +164,18 @@ export default function StudentScriptsPage() {
   // Show report view
   if (selectedReport) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar role="student" />
-        <div className="ml-60 py-8 px-8">
+      <div className="bg-background h-screen overflow-hidden flex">
+        <div className="print:hidden">
+          <Sidebar role="student" />
+        </div>
+        <div className="flex-1 ml-60 overflow-hidden print:ml-0">
           <EvaluationReportView
             report={selectedReport}
-            onBack={() => setSelectedReport(null)}
+            pages={selectedScriptPages}
+            onBack={() => {
+              setSelectedReport(null);
+              setSelectedScriptPages([]);
+            }}
           />
         </div>
       </div>
@@ -243,7 +280,7 @@ export default function StudentScriptsPage() {
 
                     <div className="border-t border-secondary/30 pt-4">
                       <label className="block text-sm font-medium text-secondary mb-2">
-                        Upload Script Pages (max 10)
+                        Upload Script Pages (max 10) — click to add more
                       </label>
                       <div
                         onClick={() => fileInputRef.current?.click()}
@@ -429,11 +466,11 @@ export default function StudentScriptsPage() {
                                     </span>
                                     <span className="font-bold text-emerald-600">
                                       {typeof script.total_score === "number"
-                                        ? script.total_score.toFixed(1)
+                                        ? script.total_score.toFixed(2)
                                         : script.total_score}{" "}
                                       (
                                       {typeof script.percentage === "number"
-                                        ? script.percentage.toFixed(1)
+                                        ? script.percentage.toFixed(2)
                                         : script.percentage}
                                       %)
                                     </span>
@@ -442,12 +479,21 @@ export default function StudentScriptsPage() {
                               )}
 
                             {script.status === "evaluated" && (
-                              <button
-                                onClick={() => handleViewReport(script.id)}
-                                className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
-                              >
-                                View Report
-                              </button>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  onClick={() => handleViewReport(script.id)}
+                                  className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
+                                >
+                                  View Report
+                                </button>
+                                <button
+                                  onClick={() => handleViewAsPdf(script.id)}
+                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                >
+                                  <FileDown className="w-3 h-3" />
+                                  View as PDF
+                                </button>
+                              </div>
                             )}
 
                             {script.status === "pending" && (

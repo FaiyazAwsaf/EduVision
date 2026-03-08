@@ -14,11 +14,11 @@
     "katex": "^0.16.28",
     "livekit-client": "^2.16.1",
     "lucide-react": "^0.562.0",
-    "next": "16.0.5",
+    "next": "^16.1.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-markdown": "^9.1.0",
-    "recharts": "^3.7.0",
+    "recharts": "^3.8.0",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0"
