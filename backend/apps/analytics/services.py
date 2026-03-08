@@ -331,6 +331,49 @@ def _classify_misconception(text: str) -> str:
     return "other"
 
 
+def _classify_with_embeddings(texts: list[str], n_clusters: int = 6) -> dict[str, str]:
+    """
+    Use sentence embeddings + k-means to group similar mistake texts
+    into semantic clusters, then map each cluster to a misconception type.
+
+    Returns a dict mapping text → misconception_type.
+
+    Falls back silently to regex classification if the required libraries
+    are not installed (sentence_transformers, sklearn).
+    """
+    try:
+        from sentence_transformers import SentenceTransformer  # type: ignore
+        from sklearn.cluster import KMeans  # type: ignore
+        import numpy as np  # type: ignore
+
+        if not texts:
+            return {}
+
+        # Use a small, fast model for CPU inference
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        embeddings = model.encode(texts, show_progress_bar=False)
+
+        actual_clusters = min(n_clusters, len(texts))
+        kmeans = KMeans(n_clusters=actual_clusters, random_state=42, n_init="auto")
+        labels = kmeans.fit_predict(embeddings)
+
+        # For each cluster, pick the most frequent regex-derived type as the
+        # cluster label (majority vote within the cluster).
+        cluster_types: dict[int, str] = {}
+        for cluster_id in range(actual_clusters):
+            cluster_texts = [texts[i] for i, lbl in enumerate(labels) if lbl == cluster_id]
+            type_counts: Counter = Counter(
+                _classify_misconception(t) for t in cluster_texts
+            )
+            cluster_types[cluster_id] = type_counts.most_common(1)[0][0]
+
+        return {texts[i]: cluster_types[labels[i]] for i in range(len(texts))}
+
+    except Exception:
+        # Fallback: classify each text individually with regex
+        return {t: _classify_misconception(t) for t in texts}
+
+
 def detect_misconceptions(question_rubric_id: str) -> list[dict[str, Any]]:
     """
     Analyses all QuestionEvaluation records for a question and clusters
@@ -380,10 +423,16 @@ def detect_misconceptions(question_rubric_id: str) -> list[dict[str, Any]]:
             example_answers_pool.append(str(ev["student_answer_text"])[:200])
 
     # Classify each mistake text
+    # Use semantic embeddings when there are enough samples (≥10 texts); else regex
     classified: dict[str, list[str]] = defaultdict(list)
-    for text in mistake_texts:
-        mtype = _classify_misconception(text)
-        classified[mtype].append(text)
+    if len(mistake_texts) >= 10:
+        text_to_type = _classify_with_embeddings(mistake_texts)
+        for text, mtype in text_to_type.items():
+            classified[mtype].append(text)
+    else:
+        for text in mistake_texts:
+            mtype = _classify_misconception(text)
+            classified[mtype].append(text)
 
     # Missing keywords always map to missing_keyword type
     if missing_keywords:
