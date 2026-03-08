@@ -12,7 +12,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 import SessionStatusBadge from "@/components/tutoring/SessionStatus";
 import { ConnectionStatusBadge } from "@/components/tutoring/ConnectionStatus";
-import { SessionProvider, useSession } from "@/contexts/SessionContext";
+import {
+  SessionProvider,
+  useSession,
+} from "@/contexts/SessionContext";
 import { MediaSession } from "@/components/tutoring/media/MediaSession";
 import {
   TutoringUser,
@@ -59,36 +62,19 @@ function SessionView({
   // If session ended, show a return screen
   if (isEnded) {
     return (
-      <div
-        className="h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#F2EFE7" }}
-      >
+      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: "#F2EFE7" }}>
         <div className="text-center">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ backgroundColor: "#9ACBD0" }}
-          >
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#9ACBD0" }}>
             <ArrowLeft className="w-8 h-8 text-white" />
           </div>
-          <h2
-            className="text-xl font-semibold mb-2"
-            style={{ color: "#006A71" }}
-          >
-            Session Ended
-          </h2>
-          <p className="mb-6" style={{ color: "#48A6A7" }}>
-            The tutoring session has ended.
-          </p>
+          <h2 className="text-xl font-semibold mb-2" style={{ color: "#006A71" }}>Session Ended</h2>
+          <p className="mb-6" style={{ color: "#48A6A7" }}>The tutoring session has ended.</p>
           <button
             onClick={() => router.push("/teacher/dashboard")}
             className="px-6 py-2.5 text-white font-medium rounded-full transition-colors"
             style={{ backgroundColor: "#48A6A7" }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#006A71")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "#48A6A7")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#006A71")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#48A6A7")}
           >
             Return to Dashboard
           </button>
@@ -98,10 +84,7 @@ function SessionView({
   }
 
   return (
-    <div
-      className="h-screen flex flex-col"
-      style={{ backgroundColor: "#F2EFE7" }}
-    >
+    <div className="h-screen flex flex-col" style={{ backgroundColor: "#F2EFE7" }}>
       {/* Slim top bar */}
       <div
         className="flex items-center justify-between px-4 py-2 border-b"
@@ -119,15 +102,21 @@ function SessionView({
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm font-medium" style={{ color: "#006A71" }}>
-            {sectionLabel}
-          </span>
+          <span className="text-sm font-medium" style={{ color: "#006A71" }}>{sectionLabel}</span>
         </div>
         <div className="flex items-center gap-3">
           <ConnectionStatusBadge state={connectionState} showLabel={false} />
           <SessionStatusBadge status={effectiveStatus} />
         </div>
       </div>
+
+      {/* WS error banner */}
+      {wsError && (
+        <div className="mx-2 mt-1 px-3 py-1.5 rounded flex items-center gap-2 bg-red-50 border border-red-300">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+          <span className="text-sm text-red-700">{wsError}</span>
+        </div>
+      )}
 
       {/* Media fills remaining space */}
       <div className="flex-1 min-h-0">
@@ -212,7 +201,8 @@ export default function TeacherSessionPage() {
 
   // Restore session on mount
   useEffect(() => {
-    const { sessionData: savedSession, user: savedUser } = loadTeacherSession();
+    const { sessionData: savedSession, user: savedUser } =
+      loadTeacherSession();
     if (savedSession && savedUser) {
       setSessionData(savedSession);
       setUser(savedUser);
@@ -260,10 +250,7 @@ export default function TeacherSessionPage() {
         style={{ backgroundColor: "#F2EFE7" }}
       >
         <div className="text-center">
-          <Loader2
-            className="w-10 h-10 animate-spin mx-auto mb-4"
-            style={{ color: "#48A6A7" }}
-          />
+          <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" style={{ color: "#48A6A7" }} />
           <p style={{ color: "#006A71" }}>Loading session...</p>
         </div>
       </div>
@@ -284,12 +271,8 @@ export default function TeacherSessionPage() {
             onClick={() => router.push("/teacher/dashboard")}
             className="px-5 py-2 text-white rounded-full transition-colors"
             style={{ backgroundColor: "#48A6A7" }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#006A71")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "#48A6A7")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#006A71")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#48A6A7")}
           >
             Return to Dashboard
           </button>
