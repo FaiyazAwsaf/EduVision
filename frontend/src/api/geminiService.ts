@@ -14,6 +14,14 @@ export type ConversionResponse = {
   error: string | null;
 };
 
+export type EquationEvaluationResponse = {
+  success: boolean;
+  original_latex: string | null;
+  solution_latex: string | null;
+  evaluation_type: string | null;
+  error: string | null;
+};
+
 /**
  * two params -
  * @param imageData - b64 encoded img data
@@ -49,6 +57,44 @@ export async function convertHandwritingToLatex(
     return {
       success: false,
       latex: null,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Evaluate/solve a handwritten mathematical equation
+ * @param imageData - b64 encoded img data of the equation
+ * @returns Promise with original and solution LaTeX or error
+ */
+export async function evaluateHandwrittenEquation(
+  imageData: string,
+): Promise<EquationEvaluationResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/whiteboard/evaluate/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        image: imageData,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data: EquationEvaluationResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error("[Gemini Service] Evaluation error:", error);
+
+    return {
+      success: false,
+      original_latex: null,
+      solution_latex: null,
+      evaluation_type: null,
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
