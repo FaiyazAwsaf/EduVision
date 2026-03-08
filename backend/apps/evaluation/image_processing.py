@@ -10,18 +10,13 @@ def sharpen_image(image: np.ndarray) -> np.ndarray:
     """
     Apply image sharpening using a convolution kernel.
     
-    Uses an unsharp masking technique with a sharpening kernel:
-    [[ 0, -1,  0],
-     [-1,  5, -1],
-     [ 0, -1,  0]]
-    
     Args:
         image: Input image as numpy array (grayscale or BGR)
     
     Returns:
         Sharpened image as numpy array
     """
-    # Define sharpening kernel
+    # Sharpening kernel
     kernel = np.array([
         [0, -1, 0],
         [-1, 5, -1],

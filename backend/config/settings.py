@@ -31,6 +31,14 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if origin.strip()
+]
+
 
 # Application definition
 
@@ -61,6 +69,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files in production
     "corsheaders.middleware.CorsMiddleware",  # CORS - should be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

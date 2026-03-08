@@ -1,7 +1,7 @@
 import os
 import logging
 import time
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING
 from datetime import datetime
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
@@ -12,7 +12,6 @@ from .feedback_service import OverallFeedbackService
 
 from .models import (
     AnswerScript,
-    ScriptPage,
     QuestionEvaluation,
 )
 from apps.rubrics.models import QuestionRubric
@@ -115,6 +114,18 @@ class ScriptEvaluationService:
         Generate overall feedback summary for the entire script.
         """
         return self.feedback_service.generate_overall_feedback(script, evaluations)
+
+    def _round_up_to_half(self, value: Decimal) -> Decimal:
+        """
+        Round up to nearest 0.5 step.
+        Examples: 10.2 -> 10.5, 10.7 -> 11.0
+        """
+        if value is None:
+            return Decimal("0")
+
+        value = Decimal(value)
+        rounded = (value * 2).to_integral_value(rounding=ROUND_CEILING) / Decimal("2")
+        return rounded.quantize(Decimal("0.00"))
     
     def evaluate_script(self, script: AnswerScript) -> AnswerScript:
         """
@@ -203,10 +214,14 @@ class ScriptEvaluationService:
                 total_max_marks += Decimal(str(question_rubric.max_marks))
             
             # Step 5: Calculate totals and generate overall feedback
-            script.total_score = total_marks_awarded
+            rounded_total_score = self._round_up_to_half(total_marks_awarded)
+            if rounded_total_score > total_max_marks:
+                rounded_total_score = total_max_marks
+
+            script.total_score = rounded_total_score
             
             if total_max_marks > 0:
-                script.percentage = (total_marks_awarded / total_max_marks) * 100
+                script.percentage = (rounded_total_score / total_max_marks) * 100
             else:
                 script.percentage = Decimal("0")
             

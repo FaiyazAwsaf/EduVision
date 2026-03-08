@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import WhiteboardSession, SessionMember, WhiteboardState
-from backend.apps.authentication.models import CustomUser
+from apps.authentication.models import CustomUser
 
 class UserSummarySerializer(serializers.ModelSerializer):
     class Meta:
@@ -52,7 +52,7 @@ class WhiteboardSessionDetailSerializer(WhiteboardSessionSerializer):
         read_only_fields = WhiteboardSessionSerializer.Meta.read_only_fields + ['latest_state']
 
     def get_latest_state(self, obj):
-        latest = WhiteboardState.get_latest(obj)
+        latest = WhiteboardState.objects.filter(session=obj).order_by('-version').first()
         if latest:
             return WhiteboardStateSerializer(latest).data
         return None

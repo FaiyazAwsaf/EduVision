@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   evaluateScript,
-  deleteScript,
   type AnswerScript,
 } from "@/api/evaluation";
 
