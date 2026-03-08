@@ -718,6 +718,12 @@ export default function UsersPage() {
                 {filterRole === "teacher" && (
                   <th className="px-5 py-3 font-medium text-muted">Department</th>
                 )}
+                {filterRole === "student" && (
+                  <>
+                    <th className="px-5 py-3 font-medium text-muted">Class</th>
+                    <th className="px-5 py-3 font-medium text-muted">Section</th>
+                  </>
+                )}
                 <th className="px-5 py-3 font-medium text-muted">Status</th>
                 <th className="px-5 py-3 font-medium text-muted text-right">
                   Actions
@@ -748,6 +754,16 @@ export default function UsersPage() {
                     <td className="px-5 py-3.5 text-muted">
                       {u.department || <span className="text-secondary/40 italic text-xs">—</span>}
                     </td>
+                  )}
+                  {filterRole === "student" && (
+                    <>
+                      <td className="px-5 py-3.5 text-muted">
+                        {u.student_class || <span className="text-secondary/40 italic text-xs">—</span>}
+                      </td>
+                      <td className="px-5 py-3.5 text-muted">
+                        {u.student_section || <span className="text-secondary/40 italic text-xs">—</span>}
+                      </td>
+                    </>
                   )}
                   <td className="px-5 py-3.5">
                     {u.is_active ? (
