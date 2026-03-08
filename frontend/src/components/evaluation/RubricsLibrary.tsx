@@ -7,14 +7,10 @@ import {
   BookOpen,
   Archive,
   Eye,
-  CheckCircle,
   Loader2,
   AlertCircle,
-  Filter,
   X,
   Edit,
-  Check,
-  CircleDot,
 } from "lucide-react";
 import { listRubrics, archiveRubric, getRubricSet } from "@/api/rubrics";
 import type { RubricListItem, RubricSet } from "@/api/rubrics";
@@ -119,179 +115,152 @@ export default function RubricsLibrary({
   // Rubric Detail View
   if (selectedRubric) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl border border-secondary p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-primary-dark">
-              Rubric Details
+      <div className="max-w-3xl mx-auto">
+        {/* Back link */}
+        <button
+          onClick={() => setSelectedRubric(null)}
+          className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary-dark mb-4 transition-colors"
+        >
+          <X className="w-4 h-4" />
+          Close
+        </button>
+
+        <div className="bg-white border border-secondary/30 rounded-xl">
+          {/* Header */}
+          <div className="px-6 py-5 border-b border-secondary/20">
+            <h2 className="text-lg font-semibold text-primary-dark">
+              {selectedRubric.title}
             </h2>
-            <button
-              onClick={() => setSelectedRubric(null)}
-              className="text-primary hover:text-primary-dark transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-secondary mt-1">
+              <span>{selectedRubric.subject}</span>
+              <span>&middot;</span>
+              <span>{selectedRubric.total_marks} marks</span>
+              <span>&middot;</span>
+              <span>v{selectedRubric.version}</span>
+            </div>
           </div>
 
-          <div className="space-y-6">
-            {/* Header Info */}
-            <div className="pb-6 border-b border-secondary">
-              <h3 className="text-xl font-semibold text-primary-dark mb-2">
-                {selectedRubric.title}
-              </h3>
-              <div className="flex items-center gap-4 text-sm text-primary">
-                <span>Subject: {selectedRubric.subject}</span>
-                <span>•</span>
-                <span>Total Marks: {selectedRubric.total_marks}</span>
-                <span>•</span>
-                <span>Version: {selectedRubric.version}</span>
-              </div>
-            </div>
+          {/* Questions */}
+          <div className="divide-y divide-secondary/20">
+            {selectedRubric.questions?.map((question, qIndex) => (
+              <div key={question.id} className="px-6 py-5">
+                {/* Question header row */}
+                <div className="flex items-baseline justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-primary-dark">
+                    Q{qIndex + 1}
+                  </h3>
+                  <span className="text-xs text-secondary">
+                    {question.max_marks} marks
+                  </span>
+                </div>
 
-            {/* Questions */}
-            <div>
-              <h4 className="text-sm font-semibold text-primary-dark mb-3">
-                Questions ({selectedRubric.questions?.length || 0})
-              </h4>
-              <div className="space-y-6">
-                {selectedRubric.questions?.map((question, qIndex) => (
-                  <div
-                    key={question.id}
-                    className="border border-secondary rounded-lg p-5 bg-white"
-                  >
-                    {/* Question Header */}
-                    <div className="flex items-start justify-between mb-4 pb-3 border-b border-secondary">
-                      <h5 className="text-base font-semibold text-primary-dark">
-                        Question {qIndex + 1}
-                      </h5>
-                      <span className="text-sm font-semibold text-primary bg-background px-3 py-1 rounded">
-                        {question.max_marks} marks
-                      </span>
-                    </div>
+                {/* Question text */}
+                <p className="text-sm text-primary-dark bg-gray-50 rounded-lg px-3 py-2 mb-3">
+                  {question.question_text}
+                </p>
 
-                    {/* Question Text */}
-                    <div className="mb-4">
-                      <h6 className="text-xs font-semibold text-primary-dark mb-2">
-                        Question Text
-                      </h6>
-                      <p className="text-primary bg-background p-3 rounded text-sm">
-                        {question.question_text}
-                      </p>
-                    </div>
+                {/* Reference answer */}
+                {question.reference_answer && (
+                  <div className="mb-3">
+                    <span className="text-xs font-medium uppercase tracking-wide text-secondary">
+                      Reference Answer
+                    </span>
+                    <p className="text-sm text-secondary mt-1 whitespace-pre-wrap">
+                      {question.reference_answer}
+                    </p>
+                  </div>
+                )}
 
-                    {/* Reference Answer */}
-                    {question.reference_answer && (
-                      <div className="mb-4">
-                        <h6 className="text-xs font-semibold text-primary-dark mb-2">
-                          Reference Answer
-                        </h6>
-                        <p className="text-primary bg-background p-3 rounded text-sm whitespace-pre-wrap">
-                          {question.reference_answer}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Evaluation Rules */}
-                    <div>
-                      <h6 className="text-xs font-semibold text-primary-dark mb-2">
-                        Evaluation Rules ({question.evaluation_rules.length})
-                      </h6>
-                      <div className="space-y-2">
-                        {question.evaluation_rules.map((rule, rIndex) => (
-                          <div
-                            key={rule.id}
-                            className="bg-background p-3 rounded border border-secondary"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <span className="text-xs font-medium text-primary-dark">
-                                Rule {rIndex + 1} -{" "}
-                                {rule.type.charAt(0).toUpperCase() +
-                                  rule.type.slice(1)}
-                              </span>
-                              <span className="text-xs font-semibold text-primary">
-                                {rule.marks} marks
-                              </span>
-                            </div>
-                            <div className="text-xs text-primary space-y-2">
-                              {rule.type === "keyword" &&
-                                "required_keywords" in rule.config && (
-                                  <div>
-                                    <span className="font-medium">
-                                      Keywords:
-                                    </span>{" "}
-                                    {Array.isArray(
-                                      rule.config.required_keywords,
-                                    )
-                                      ? rule.config.required_keywords.join(", ")
-                                      : "None"}
-                                    <div className="text-xs mt-1">
-                                      Mode:{" "}
-                                      {rule.config.scoring_mode ===
-                                      "proportional"
-                                        ? "Proportional"
-                                        : "All or Nothing"}
-                                    </div>
-                                  </div>
-                                )}
-                              {rule.type === "numeric" &&
-                                "expected_value" in rule.config && (
-                                  <div>
-                                    <span className="font-medium">
-                                      Expected Value:
-                                    </span>{" "}
-                                    {String(rule.config.expected_value)}
-                                    <div className="text-xs mt-1">
-                                      Tolerance: ±{rule.config.tolerance}
-                                    </div>
-                                  </div>
-                                )}
-                              {rule.type === "stepwise" &&
-                                "step_description" in rule.config && (
-                                  <div>
-                                    <span className="font-medium">Step:</span>{" "}
-                                    {rule.config.step_description}
-                                    {rule.config.allow_partial_credit && (
-                                      <div className="text-xs mt-1">
-                                        Partial credit allowed
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              <div className="text-xs text-secondary mt-2 space-y-1">
-                                <div className="flex items-start gap-1">
-                                  <Check className="w-3 h-3 mt-0.5 text-emerald-500 shrink-0" /> Success: {rule.feedback.on_success}
-                                </div>
-                                {rule.feedback.on_partial && (
-                                  <div className="flex items-start gap-1">
-                                    <CircleDot className="w-3 h-3 mt-0.5 text-amber-500 shrink-0" /> Partial: {rule.feedback.on_partial}
-                                  </div>
-                                )}
-                                <div className="flex items-start gap-1">
-                                  <X className="w-3 h-3 mt-0.5 text-red-500 shrink-0" /> Failure: {rule.feedback.on_failure}
-                                </div>
-                              </div>
-                            </div>
+                {/* Evaluation rules */}
+                {question.evaluation_rules.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium uppercase tracking-wide text-secondary">
+                      Rules ({question.evaluation_rules.length})
+                    </span>
+                    <div className="mt-2 space-y-2">
+                      {question.evaluation_rules.map((rule, rIndex) => (
+                        <div
+                          key={rule.id}
+                          className="bg-gray-50 rounded-lg px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-primary-dark">
+                              {rIndex + 1}.{" "}
+                              {rule.type.charAt(0).toUpperCase() +
+                                rule.type.slice(1)}
+                            </span>
+                            <span className="text-xs text-secondary">
+                              {rule.marks} marks
+                            </span>
                           </div>
-                        ))}
-                      </div>
+
+                          <div className="text-xs text-secondary">
+                            {rule.type === "keyword" &&
+                              "required_keywords" in rule.config && (
+                                <p>
+                                  Keywords:{" "}
+                                  {Array.isArray(
+                                    rule.config.required_keywords,
+                                  )
+                                    ? rule.config.required_keywords.join(", ")
+                                    : "None"}
+                                  {" · "}
+                                  {rule.config.scoring_mode ===
+                                  "proportional"
+                                    ? "Proportional"
+                                    : "All or Nothing"}
+                                </p>
+                              )}
+                            {rule.type === "numeric" &&
+                              "expected_value" in rule.config && (
+                                <p>
+                                  Expected: {String(rule.config.expected_value)}
+                                  {" · "}Tolerance: ±{rule.config.tolerance}
+                                </p>
+                              )}
+                            {rule.type === "stepwise" &&
+                              "step_description" in rule.config && (
+                                <p>
+                                  {rule.config.step_description}
+                                  {rule.config.allow_partial_credit &&
+                                    " · Partial credit allowed"}
+                                </p>
+                              )}
+                          </div>
+
+                          <div className="mt-1.5 text-xs space-y-0.5">
+                            <p className="text-emerald-600">
+                              + {rule.feedback.on_success}
+                            </p>
+                            {rule.feedback.on_partial && (
+                              <p className="text-amber-600">
+                                ~ {rule.feedback.on_partial}
+                              </p>
+                            )}
+                            <p className="text-red-500">
+                              &minus; {rule.feedback.on_failure}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-
-            {/* Actions */}
-            {onSelectRubric && (
-              <div className="pt-6 border-t border-secondary">
-                <button
-                  onClick={() => handleUseRubric(selectedRubric)}
-                  className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium"
-                >
-                  Use This Rubric
-                </button>
-              </div>
-            )}
+            ))}
           </div>
+
+          {/* Use rubric action */}
+          {onSelectRubric && (
+            <div className="px-6 py-4 border-t border-secondary/20">
+              <button
+                onClick={() => handleUseRubric(selectedRubric)}
+                className="w-full py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                Use This Rubric
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -300,142 +269,112 @@ export default function RubricsLibrary({
   // Main Library View
   return (
     <div>
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-primary-dark mb-2">
-          Published Rubrics Library
-        </h2>
-        <p className="text-primary">
-          Browse and select from published rubrics to use in evaluation
-        </p>
-      </div>
-
-      {/* Error Display */}
+      {/* Error */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
+        <div className="mb-5 flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <p className="flex-1 text-sm text-red-700">{error}</p>
           <button
             onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-600 transition-colors"
+            className="text-red-400 hover:text-red-600"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-xl border border-secondary p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-            <input
-              type="text"
-              placeholder="Search rubrics by title or subject..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-          </div>
-
-          {/* Subject Filter */}
-          <div className="relative min-w-[200px]">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary pointer-events-none" />
-            <select
-              value={subjectFilter}
-              onChange={(e) => setSubjectFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent appearance-none bg-white"
-            >
-              <option value="all">All Subjects</option>
-              {subjects.map((subject) => (
-                <option key={subject} value={subject}>
-                  {subject}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Search & filter row */}
+      <div className="flex flex-col md:flex-row gap-3 mb-5">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
+          <input
+            type="text"
+            placeholder="Search rubrics..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-secondary/40 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+          />
         </div>
-
-        {/* Results Count */}
-        <div className="mt-3 text-sm text-primary">
-          Showing {filteredRubrics.length} of {rubrics.length} published rubrics
-        </div>
+        <select
+          value={subjectFilter}
+          onChange={(e) => setSubjectFilter(e.target.value)}
+          className="min-w-[180px] px-3 py-2 text-sm border border-secondary/40 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none bg-white"
+        >
+          <option value="all">All Subjects</option>
+          {subjects.map((subject) => (
+            <option key={subject} value={subject}>
+              {subject}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Loading State */}
+      {/* Count */}
+      <p className="text-xs text-secondary mb-4">
+        {filteredRubrics.length} of {rubrics.length} published
+      </p>
+
+      {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="flex items-center gap-3 text-primary">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <span>Loading rubrics...</span>
-          </div>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
       ) : filteredRubrics.length === 0 ? (
-        <div className="bg-white rounded-xl border border-secondary p-12 text-center">
-          <BookOpen className="w-12 h-12 mx-auto text-secondary mb-4" />
-          <h3 className="text-lg font-medium text-primary-dark mb-2">
+        <div className="bg-white border border-secondary/30 rounded-xl py-16 text-center">
+          <BookOpen className="w-10 h-10 mx-auto text-secondary/50 mb-3" />
+          <p className="text-sm text-secondary">
             {searchQuery || subjectFilter !== "all"
-              ? "No rubrics found"
-              : "No published rubrics yet"}
-          </h3>
-          <p className="text-primary text-sm">
-            {searchQuery || subjectFilter !== "all"
-              ? "Try adjusting your search or filters"
-              : "Create and publish rubrics in the Rubrics page"}
+              ? "No rubrics match your search."
+              : "No published rubrics yet."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {filteredRubrics.map((rubric) => (
             <div
               key={rubric.id}
-              className="bg-white rounded-xl border border-secondary p-5 hover:border-primary transition-all hover:shadow-md"
+              className="bg-white border border-secondary/30 rounded-xl p-5 hover:border-primary/40 transition-colors"
             >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-primary-dark mb-1 line-clamp-2">
+              <div className="flex items-start justify-between mb-1">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-primary-dark line-clamp-1">
                     {rubric.title}
                   </h3>
-                  <p className="text-sm text-primary">{rubric.subject}</p>
+                  <p className="text-xs text-secondary mt-0.5">
+                    {rubric.subject} &middot; {rubric.total_marks} marks &middot; v{rubric.version}
+                  </p>
                 </div>
-                <CheckCircle className="w-5 h-5 text-green-500 shrink-0 ml-2" />
+                <span className="shrink-0 ml-3 px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700">
+                  Published
+                </span>
               </div>
 
-              {/* Info */}
-              <div className="space-y-1 text-sm text-primary mb-4">
-                <p>Total Marks: {rubric.total_marks}</p>
-                <p>Version: {rubric.version}</p>
-                <p className="text-xs text-secondary">
-                  Updated: {new Date(rubric.updated_at).toLocaleDateString()}
-                </p>
-              </div>
+              <p className="text-xs text-secondary mb-3">
+                Updated {new Date(rubric.updated_at).toLocaleDateString()}
+              </p>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-4 border-t border-secondary">
+              <div className="flex items-center gap-2 pt-3 border-t border-secondary/20">
                 <button
                   onClick={() => handleViewRubric(rubric.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                  className="text-xs font-medium text-primary hover:text-primary-dark transition-colors flex items-center gap-1"
                 >
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-3.5 h-3.5" />
                   View
                 </button>
+                <span className="text-secondary/30">|</span>
                 <button
                   onClick={() => handleEditRubric(rubric.id)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 text-sm border border-primary text-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
-                  title="Edit rubric"
+                  className="text-xs font-medium text-primary hover:text-primary-dark transition-colors flex items-center gap-1"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5" />
+                  Edit
                 </button>
                 <button
                   onClick={() => handleArchiveRubric(rubric.id, rubric.title)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 text-sm border border-secondary text-primary rounded-lg hover:bg-background transition-colors"
+                  className="ml-auto text-xs text-secondary hover:text-red-500 transition-colors flex items-center gap-1"
                   title="Archive rubric"
                 >
-                  <Archive className="w-4 h-4" />
+                  <Archive className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
