@@ -84,12 +84,21 @@ export default function StudentScriptsPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const newFiles = Array.from(e.target.files).slice(0, 10);
-    setSubmitFiles(newFiles);
+    const incoming = Array.from(e.target.files);
+    // Reset the input so the same file can be re-selected if needed
+    e.target.value = "";
 
-    // Generate previews
-    const previews = newFiles.map((file) => URL.createObjectURL(file));
-    setSubmitPreviews(previews);
+    setSubmitFiles((prev) => {
+      const combined = [...prev, ...incoming].slice(0, 10);
+      // Revoke any old previews that are being replaced (none here, just append)
+      const newPreviews = combined.map((f, i) => {
+        // Reuse existing object URLs for files already in the list
+        if (i < prev.length) return submitPreviews[i];
+        return URL.createObjectURL(f);
+      });
+      setSubmitPreviews(newPreviews);
+      return combined;
+    });
   };
 
   const removeFile = (index: number) => {
@@ -271,7 +280,7 @@ export default function StudentScriptsPage() {
 
                     <div className="border-t border-secondary/30 pt-4">
                       <label className="block text-sm font-medium text-secondary mb-2">
-                        Upload Script Pages (max 10)
+                        Upload Script Pages (max 10) — click to add more
                       </label>
                       <div
                         onClick={() => fileInputRef.current?.click()}
