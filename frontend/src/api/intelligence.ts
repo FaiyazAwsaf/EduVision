@@ -236,5 +236,9 @@ export async function listInsights(
   userId?: string,
 ): Promise<LearnerInsight[]> {
   const qs = userId ? `?user_id=${userId}` : "";
-  return intelligenceFetch<LearnerInsight[]>(`/insights/${qs}`);
+  const data = await intelligenceFetch<
+    LearnerInsight[] | { results: LearnerInsight[] }
+  >(`/insights/${qs}`);
+  // Handle both paginated ({ results: [...] }) and plain array responses
+  return Array.isArray(data) ? data : (data.results ?? []);
 }
