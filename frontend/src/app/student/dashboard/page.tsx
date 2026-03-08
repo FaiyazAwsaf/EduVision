@@ -14,9 +14,19 @@ import {
   Calendar,
   Loader2,
   Video,
+  FileText,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSessionStatus, type SessionJoinResponse } from "@/api/tutoring";
+import {
+  getMyScripts,
+  getStudentOpenForms,
+  type AnswerScript,
+  type SubmissionForm,
+} from "@/api/evaluation";
 
 /* ─── Quick-action card data ─────────────────────────────────────────────── */
 
@@ -31,8 +41,8 @@ const actions = [
     iconColor: "text-primary-dark",
   },
   {
-    title: "Start Tutoring",
-    description: "1-on-1 personalized AI session",
+    title: "Join Tutoring Session",
+    description: "Classroom session",
     icon: MessageSquare,
     href: "/student/tutoring",
     cta: "Launch",
@@ -50,29 +60,6 @@ const actions = [
   },
 ];
 
-/* ─── Dummy recent-feedback data ─────────────────────────────────────────── */
-
-const recentFeedback = [
-  {
-    id: 1,
-    title: "Calculus Notes: Limits & Continuity",
-    meta: "Yesterday • Mathematics",
-    status: "PROCESSED",
-    statusColor: "bg-primary/15 text-primary-dark",
-    excerpt:
-      '"…OCR extraction complete. Analysis shows strong understanding of basic limit laws, but suggests review of Squeeze Theorem application…"',
-  },
-  {
-    id: 2,
-    title: "Organic Chemistry: Functional Groups",
-    meta: "2 days ago • Science",
-    status: "REVIEW REQUIRED",
-    statusColor: "bg-amber-100 text-amber-700",
-    excerpt:
-      "\"…Handwriting detected in margin: 'Review alcohol dehydration mechanism'. 3 key diagrams identified and digitized…\"",
-  },
-];
-
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 export default function StudentDashboard() {
@@ -84,6 +71,11 @@ export default function StudentDashboard() {
     string | null
   >(null);
   const [hasActiveSession, setHasActiveSession] = useState(false);
+
+  // Scripts & forms state
+  const [myScripts, setMyScripts] = useState<AnswerScript[]>([]);
+  const [dueForms, setDueForms] = useState<SubmissionForm[]>([]);
+  const [scriptsLoading, setScriptsLoading] = useState(true);
 
   // Authorization check - redirect to signin if not authenticated
   useEffect(() => {
@@ -123,6 +115,34 @@ export default function StudentDashboard() {
           });
       }
     } catch {}
+  }, [isReady, user]);
+
+  // Fetch student scripts and open forms
+  useEffect(() => {
+    if (!isReady || !user || user.role !== "student") return;
+
+    async function fetchData() {
+      setScriptsLoading(true);
+      try {
+        const [scripts, forms] = await Promise.all([
+          getMyScripts(),
+          getStudentOpenForms(),
+        ]);
+        setMyScripts(scripts);
+
+        // Filter to forms the student hasn't submitted yet
+        const submittedFormIds = new Set(
+          scripts.map((s) => s.submission_form).filter(Boolean),
+        );
+        setDueForms(forms.filter((f) => !submittedFormIds.has(f.id)));
+      } catch {
+        // silently fail – cards will show empty state
+      } finally {
+        setScriptsLoading(false);
+      }
+    }
+
+    fetchData();
   }, [isReady, user]);
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -217,62 +237,163 @@ export default function StudentDashboard() {
           ))}
         </div>
 
-        {/* Recent Feedback */}
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-primary-dark">
-            Recent Feedback
-          </h2>
-          <Link
-            href="/evaluation"
-            className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
-          >
-            View All
-          </Link>
-        </div>
-
-        <div className="space-y-4">
-          {recentFeedback.map((fb) => (
-            <div
-              key={fb.id}
-              className="bg-white rounded-2xl border border-secondary/30 p-5 shadow-sm"
-            >
-              {/* Header row */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-[#E8F4F5] rounded-lg flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-primary-dark">
-                      {fb.title}
-                    </p>
-                    <p className="text-xs text-muted">{fb.meta}</p>
-                  </div>
-                </div>
-                <span
-                  className={`text-[11px] font-semibold tracking-wide px-2.5 py-1 rounded-full ${fb.statusColor}`}
-                >
-                  {fb.status}
-                </span>
+        {/* Scripts & Due Forms */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+          {/* ── Due Scripts Card ──────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-secondary/30 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-600" />
               </div>
-
-              {/* Excerpt */}
-              <div className="bg-background rounded-lg px-4 py-3 mb-3">
-                <p className="text-xs text-muted italic leading-relaxed">
-                  {fb.excerpt}
-                </p>
-              </div>
-
-              {/* Link */}
-              <Link
-                href="/evaluation"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-dark transition-colors"
-              >
-                VIEW REPORT
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              <h2 className="text-lg font-semibold text-primary-dark">
+                Scripts Due
+              </h2>
             </div>
-          ))}
+
+            {scriptsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              </div>
+            ) : dueForms.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <CheckCircle2 className="w-10 h-10 text-green-400 mb-2" />
+                <p className="text-sm text-muted">No scripts due to submit</p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {dueForms.map((form) => {
+                  const deadlineDate = form.deadline
+                    ? new Date(form.deadline)
+                    : null;
+                  const isOverdue = deadlineDate && deadlineDate < new Date();
+
+                  return (
+                    <li
+                      key={form.id}
+                      className="flex items-start justify-between gap-3 rounded-xl border border-secondary/30 p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-primary-dark truncate">
+                          {form.title}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {form.subject_name} &middot; {form.class_name}{" "}
+                          {form.section_name}
+                        </p>
+                        {deadlineDate ? (
+                          <p
+                            className={`text-xs mt-1 font-medium ${
+                              isOverdue ? "text-red-600" : "text-amber-600"
+                            }`}
+                          >
+                            {isOverdue ? "Overdue" : "Due"}{" "}
+                            {deadlineDate.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}{" "}
+                            at{" "}
+                            {deadlineDate.toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        ) : (
+                          <p className="text-xs mt-1 text-muted">No deadline</p>
+                        )}
+                      </div>
+                      <Link
+                        href="/student/scripts"
+                        className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark transition-colors"
+                      >
+                        Submit
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* ── Submitted Scripts Card ────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-secondary/30 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-[#E8F4F5] rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary-dark" />
+              </div>
+              <h2 className="text-lg font-semibold text-primary-dark">
+                Submitted Scripts
+              </h2>
+            </div>
+
+            {scriptsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              </div>
+            ) : myScripts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <FileText className="w-10 h-10 text-gray-300 mb-2" />
+                <p className="text-sm text-muted">No scripts submitted yet</p>
+              </div>
+            ) : (
+              <ul className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {myScripts.map((script) => {
+                  const isEvaluated = script.status === "evaluated";
+                  const isPending =
+                    script.status === "pending" ||
+                    script.status === "processing";
+
+                  return (
+                    <li
+                      key={script.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-secondary/30 p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-primary-dark truncate">
+                          {script.submission_form_title ||
+                            script.rubric_set_title ||
+                            "Answer Script"}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {new Date(script.created_at).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
+                        </p>
+                      </div>
+
+                      {isEvaluated ? (
+                        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-semibold text-green-700">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          {script.total_score != null
+                            ? `${script.total_score}${
+                                script.percentage != null
+                                  ? ` (${Math.round(script.percentage)}%)`
+                                  : ""
+                              }`
+                            : "Evaluated"}
+                        </span>
+                      ) : isPending ? (
+                        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700">
+                          <Clock className="w-3.5 h-3.5" />
+                          Submitted
+                        </span>
+                      ) : (
+                        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-semibold text-red-600">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Error
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       </main>
     </div>
