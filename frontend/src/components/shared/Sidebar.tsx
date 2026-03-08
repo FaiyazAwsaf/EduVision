@@ -74,7 +74,6 @@ const teacherNavItems: NavEntry[] = [
   { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
-
 const studentNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
   {
@@ -89,7 +88,9 @@ const studentNavItems: NavEntry[] = [
   { label: "Tutoring", href: "/student/tutoring", icon: MessageSquare },
   { label: "Scripts", href: "/student/scripts", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
+  { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
+
 
 const adminNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },

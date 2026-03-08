@@ -193,6 +193,7 @@ const WhiteboardCanvas = forwardRef<
 
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const htmlCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRemoteUpdateRef = useRef(false);
   // store callback in ref to avoid canvas recreation when callback changes
   const onPathCreatedRef = useRef(onPathCreated);
@@ -213,7 +214,7 @@ const WhiteboardCanvas = forwardRef<
    * sets up canvas dimensions, brush, and event listeners
    */
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !htmlCanvasRef.current) return;
 
     console.log("[Canvas] initializing fabric.js canvas...");
 
@@ -230,7 +231,7 @@ const WhiteboardCanvas = forwardRef<
 
     console.log("[Canvas] initializing with dimensions:", canvasWidth, "x", canvasHeight);
 
-    const canvas = new fabric.Canvas("whiteboard-canvas", {
+    const canvas = new fabric.Canvas(htmlCanvasRef.current, {
       width: canvasWidth,
       height: canvasHeight,
       backgroundColor: "#ffffff",
@@ -710,21 +711,34 @@ const WhiteboardCanvas = forwardRef<
     },
 
     loadFromJSON: async (state: CanvasState) => {
-      if (canvasRef.current) {
-        isRemoteUpdateRef.current = true;
-        try {
-          await canvasRef.current.loadFromJSON({
-            version: fabric.version,
-            objects: state.objects,
-          });
-          canvasRef.current.backgroundColor = "#ffffff";
-          canvasRef.current.renderAll();
-          console.log("[Canvas] loaded canvas state from json");
-        } catch (error) {
-          console.error("[Canvas] error loading from json:", error);
-        } finally {
-          isRemoteUpdateRef.current = false;
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        console.warn("[Canvas] loadFromJSON skipped - canvas ref is null");
+        return;
+      }
+
+      // Guard against malformed persisted state.
+      const safeObjects = Array.isArray(state?.objects) ? state.objects : [];
+
+      isRemoteUpdateRef.current = true;
+      try {
+        await canvas.loadFromJSON({
+          version: fabric.version,
+          objects: safeObjects,
+        });
+
+        // Bail out if canvas was disposed/replaced while async load was running.
+        if (canvasRef.current !== canvas) {
+          return;
         }
+
+        canvas.backgroundColor = "#ffffff";
+        canvas.renderAll();
+        console.log("[Canvas] loaded canvas state from json");
+      } catch (error) {
+        console.error("[Canvas] error loading from json:", error);
+      } finally {
+        isRemoteUpdateRef.current = false;
       }
     },
 
@@ -790,7 +804,7 @@ const WhiteboardCanvas = forwardRef<
 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
-      <canvas id="whiteboard-canvas" />
+      <canvas ref={htmlCanvasRef} id="whiteboard-canvas" />
     </div>
   );
 });

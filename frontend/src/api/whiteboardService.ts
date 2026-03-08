@@ -45,6 +45,23 @@ export interface WhiteboardSessionDetail extends WhiteboardSession {
   latest_state?: WhiteboardState;
 }
 
+export interface SessionInviteResult {
+  session_id: string;
+  invited_count: number;
+  invited_members: Array<{
+    id: string;
+    user: {
+      id: string;
+      username: string;
+      email: string;
+      role: string;
+    };
+    role: string;
+    joined_at: string;
+    last_active_at: string;
+  }>;
+}
+
 export interface WhiteboardState {
   id: string;
   version: number;
@@ -140,6 +157,65 @@ export async function createSession(
   } 
   catch (error) {
     console.error("[Whiteboard API] Error creating session:", error);
+    throw error;
+  }
+}
+
+/**
+ * Deactivate (archive) a whiteboard session
+ * Only session owner can do this
+ */
+export async function deactivateSession(
+  sessionId: string,
+): Promise<WhiteboardSessionDetail> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/deactivate/`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders(),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to deactivate session: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } 
+  catch (error) {
+    console.error("[Whiteboard API] Error deactivating session:", error);
+    throw error;
+  }
+}
+
+/**
+ * Invite one or more students to an existing whiteboard session
+ */
+export async function inviteStudentsToSession(
+  sessionId: string,
+  studentIds: string[],
+): Promise<SessionInviteResult> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/invite/`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ student_ids: studentIds }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to invite students: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+  catch (error) {
+    console.error("[Whiteboard API] Error inviting students:", error);
     throw error;
   }
 }

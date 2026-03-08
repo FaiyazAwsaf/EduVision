@@ -10,6 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 from .services.prompt_builder import create_math_prompt, create_text_prompt
 from .models import WhiteboardSession, SessionMember, WhiteboardState
 from .serializers import (
@@ -17,7 +18,9 @@ from .serializers import (
     WhiteboardSessionDetailSerializer,
     WhiteboardStateSerializer,
     WhiteboardStateCreateSerializer,
+    SessionMemberSerializer,
 )
+from apps.authentication.models import CustomUser
 
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY_2"))
 
@@ -124,25 +127,33 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
-        """List all sessions where user is owner or member"""
+        """
+        List all sessions where user is owner or member
+        Query params:
+        - include_inactive: "true" to show inactive sessions (teachers only)
+        """
         user = request.user
-        
-        # Sessions where user is owner
-        owned_sessions = WhiteboardSession.objects.filter(owner=user)
-        
-        # Sessions where user is a member
-        member_sessions = WhiteboardSession.objects.filter(
-            members__user=user
-        ).distinct()
-        
-        # Combine
-        sessions = (owned_sessions | member_sessions).distinct()
+        include_inactive = request.query_params.get("include_inactive", "false").lower() == "true"
+        can_include_inactive = include_inactive and user.role == "teacher"
+
+        access_filter = Q(owner=user) | Q(members__user=user)
+        sessions = WhiteboardSession.objects.filter(access_filter)
+        if not can_include_inactive and user.role != "teacher":
+            sessions = sessions.filter(is_active=True)
+
+        sessions = sessions.distinct().order_by("-updated_at")
         
         serializer = WhiteboardSessionSerializer(sessions, many=True)
         return Response(serializer.data)
 
     def create(self, request):
         """Create a new whiteboard session"""
+        if request.user.role != "teacher":
+            return Response(
+                {"detail": "Only teachers can create whiteboard sessions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = WhiteboardSessionSerializer(
             data=request.data,
             context={"request": request}
@@ -160,6 +171,13 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
         user = request.user
         session = get_object_or_404(WhiteboardSession, id=pk)
         
+        # Students can only open active sessions.
+        if user.role == "student" and not session.is_active:
+            return Response(
+                {"detail": "This session is archived."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # Check permissions: user must be owner or member
         is_owner = session.owner_id == user.id
         is_member = SessionMember.objects.filter(
@@ -174,6 +192,73 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
         
         serializer = WhiteboardSessionDetailSerializer(session)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="invite")
+    def invite_student(self, request, pk=None):
+        """Invite one or more students to a whiteboard session."""
+        user = request.user
+        session = get_object_or_404(WhiteboardSession, id=pk)
+
+        if session.owner_id != user.id:
+            return Response(
+                {"detail": "Only session owner can invite students."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        student_ids = request.data.get("student_ids")
+        if student_ids is None:
+            single_student_id = request.data.get("student_id")
+            student_ids = [single_student_id] if single_student_id else []
+
+        if not isinstance(student_ids, list) or not student_ids:
+            return Response(
+                {"detail": "Provide student_id or non-empty student_ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invited_members = []
+        for student_id in student_ids:
+            student = CustomUser.objects.filter(id=student_id, role="student").first()
+            if not student:
+                continue
+
+            member, _ = SessionMember.objects.get_or_create(
+                session=session,
+                user=student,
+                defaults={"role": "student"},
+            )
+            invited_members.append(member)
+
+        serializer = SessionMemberSerializer(invited_members, many=True)
+        return Response(
+            {
+                "session_id": str(session.id),
+                "invited_count": len(invited_members),
+                "invited_members": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="deactivate")
+    def deactivate_session(self, request, pk=None):
+        """Mark session as inactive (archive it)"""
+        user = request.user
+        session = get_object_or_404(WhiteboardSession, id=pk)
+
+        # Only owner can deactivate
+        if session.owner_id != user.id:
+            return Response(
+                {"detail": "Only session owner can deactivate."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        session.is_active = False
+        session.save(update_fields=["is_active", "updated_at"])
+
+        return Response(
+            WhiteboardSessionDetailSerializer(session).data,
+            status=status.HTTP_200_OK
+        )
 
     @action(detail=True, methods=["post"], url_path="states")
     def save_state(self, request, pk=None):

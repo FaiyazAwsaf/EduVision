@@ -1,8 +1,6 @@
 /**
  * Whiteboard Page
- *
- * Entry point for the collaborative whiteboard
- * Authenticates user and loads/creates session from backend
+ * Session picker + canvas interface
  */
 
 "use client";
@@ -33,48 +31,35 @@ function WhiteboardContent() {
   const [showPicker, setShowPicker] = useState(true);
   const [newSessionName, setNewSessionName] = useState<string>("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
-  const canCreateSession = user?.role === "teacher";
 
   useEffect(() => {
     const initializeWhiteboard = async () => {
       try {
         setIsLoading(true);
-
-        // 1. Check authentication and get current user
-        console.log("[Whiteboard] Checking authentication...");
         const currentUser = await getCurrentUser();
         setUser(currentUser);
-        console.log("[Whiteboard] User authenticated:", currentUser);
 
-        const sessionId = searchParams.get("session");
-        if (sessionId) {
-          console.log("[Whiteboard] Loading session from URL:", sessionId);
-          const loadedSession = await getSession(sessionId);
+        const sessionIdParam = searchParams.get("session");
+        if (sessionIdParam) {
+          const loadedSession = await getSession(sessionIdParam);
           setSession(loadedSession);
           setShowPicker(false);
           setIsLoading(false);
           return;
         }
 
-        // 3. Load user's sessions
-        console.log("[Whiteboard] Loading user sessions...");
         const userSessions = await getUserSessions();
         setSessions(userSessions);
         setIsLoading(false);
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "An error occurred";
-        console.error("[Whiteboard] Initialization error:", errorMessage);
-        console.error("[Whiteboard] Full error:", err);
         setError(errorMessage);
         setIsLoading(false);
-
-        // If not authenticated, redirect to login
         if (
           errorMessage.includes("not authenticated") ||
           errorMessage.includes("401")
         ) {
-          console.log("[Whiteboard] Redirecting to login...");
           setTimeout(() => router.push("/auth/login"), 2000);
         }
       }
@@ -97,11 +82,6 @@ function WhiteboardContent() {
   };
 
   const handleCreateSession = async () => {
-    if (!canCreateSession) {
-      setError("Only teachers can create whiteboard sessions.");
-      return;
-    }
-
     try {
       setIsCreatingSession(true);
       const name =
@@ -198,56 +178,54 @@ function WhiteboardContent() {
             </div>
           )}
 
-          {canCreateSession && (
-            <div
-              style={{
-                backgroundColor: "#252525",
-                border: "1px solid #405d5d",
-                borderRadius: "8px",
-                padding: "24px",
-                marginBottom: "40px",
-              }}
-            >
-              <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "1.2em" }}>
-                Create New Session
-              </h2>
-              <div style={{ display: "flex", gap: "12px" }}>
-                <input
-                  type="text"
-                  placeholder="Session name (optional)"
-                  value={newSessionName}
-                  onChange={(e) => setNewSessionName(e.target.value)}
-                  disabled={isCreatingSession}
-                  style={{
-                    flex: 1,
-                    padding: "10px 14px",
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #405d5d",
-                    borderRadius: "6px",
-                    color: "#fff",
-                    fontSize: "14px",
-                  }}
-                />
-                <button
-                  onClick={handleCreateSession}
-                  disabled={isCreatingSession}
-                  style={{
-                    padding: "10px 24px",
-                    backgroundColor: "#48A6A7",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "6px",
-                    cursor: isCreatingSession ? "not-allowed" : "pointer",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    opacity: isCreatingSession ? 0.6 : 1,
-                  }}
-                >
-                  {isCreatingSession ? "Creating..." : "Create New"}
-                </button>
-              </div>
+          <div
+            style={{
+              backgroundColor: "#252525",
+              border: "1px solid #405d5d",
+              borderRadius: "8px",
+              padding: "24px",
+              marginBottom: "40px",
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "1.2em" }}>
+              Create New Session
+            </h2>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <input
+                type="text"
+                placeholder="Session name (optional)"
+                value={newSessionName}
+                onChange={(e) => setNewSessionName(e.target.value)}
+                disabled={isCreatingSession}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #405d5d",
+                  borderRadius: "6px",
+                  color: "#fff",
+                  fontSize: "14px",
+                }}
+              />
+              <button
+                onClick={handleCreateSession}
+                disabled={isCreatingSession}
+                style={{
+                  padding: "10px 24px",
+                  backgroundColor: "#48A6A7",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: isCreatingSession ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  opacity: isCreatingSession ? 0.6 : 1,
+                }}
+              >
+                {isCreatingSession ? "Creating..." : "Create New"}
+              </button>
             </div>
-          )}
+          </div>
 
           <div>
             <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "1.2em" }}>
@@ -264,9 +242,7 @@ function WhiteboardContent() {
                   color: "#888",
                 }}
               >
-                {canCreateSession
-                  ? "No sessions yet. Create one to get started!"
-                  : "No whiteboard sessions shared with you yet."}
+                No sessions yet. Create one to get started!
               </div>
             ) : (
               <div
