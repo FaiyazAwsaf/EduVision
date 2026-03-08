@@ -37,6 +37,7 @@ export type WhiteboardProps = {
   userId: string;
   role: "teacher" | "student";
   initialState?: WhiteboardState | null;
+  onExitSession?: () => Promise<void> | void;
 };
 
 /**
@@ -80,6 +81,7 @@ export default function Whiteboard({
   userId,
   role,
   initialState,
+  onExitSession,
 }: WhiteboardProps) {
   // ============================================================
   // state management
@@ -92,6 +94,7 @@ export default function Whiteboard({
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const pagesContainerRef = useRef<HTMLDivElement>(null);
   const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
+  const [isCanvasReady, setIsCanvasReady] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedStateRef = useRef<string>("");
 
@@ -132,18 +135,27 @@ export default function Whiteboard({
   // Load initial state from backend
   // ============================================================
   useEffect(() => {
-    if (hasLoadedInitialState || !initialState) return;
+    if (hasLoadedInitialState || !initialState || !isCanvasReady || !canvasRef.current) return;
 
     console.log("[Whiteboard] Loading initial state from backend:", initialState);
 
-    try {
+    const loadInitialState = async () => {
+      try {
+      const canvasHandle = canvasRef.current;
+      if (!canvasHandle) return;
+
       // Load canvas state
-      if (initialState.snapshot_json) {
-        canvasRef.current?.loadFromJSON(initialState.snapshot_json);
+      const snapshot =
+        typeof initialState.snapshot_json === "string"
+          ? JSON.parse(initialState.snapshot_json)
+          : initialState.snapshot_json;
+
+      if (snapshot && typeof snapshot === "object") {
+        await canvasHandle.loadFromJSON(snapshot);
         setPages([
           {
             id: "page-1",
-            canvasState: initialState.snapshot_json,
+            canvasState: snapshot,
             latexObjects: initialState.latex_objects || [],
           },
         ]);
@@ -152,11 +164,14 @@ export default function Whiteboard({
       }
 
       setHasLoadedInitialState(true);
-    } catch (error) {
-      console.error("[Whiteboard] Error loading initial state:", error);
-      setHasLoadedInitialState(true);
-    }
-  }, [initialState, hasLoadedInitialState]);
+      } catch (error) {
+        console.error("[Whiteboard] Error loading initial state:", error);
+        setHasLoadedInitialState(true);
+      }
+    };
+
+    void loadInitialState();
+  }, [initialState, hasLoadedInitialState, isCanvasReady]);
 
   // ============================================================
   // Periodic state saving to backend
@@ -508,6 +523,30 @@ export default function Whiteboard({
     void applySnapshot(next);
   }, [applySnapshot]);
 
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleSaveAndExit = useCallback(async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+    try {
+      const currentCanvasState = canvasRef.current?.exportToJSON();
+      if (currentCanvasState) {
+        await saveState(
+          sessionId,
+          currentCanvasState,
+          latexObjectsRef.current,
+          `Saved on exit at ${new Date().toLocaleTimeString()}`,
+        );
+      }
+
+      await onExitSession?.();
+    } catch (error) {
+      console.error("[Whiteboard] Error during save and exit:", error);
+    } finally {
+      setIsExiting(false);
+    }
+  }, [isExiting, onExitSession, sessionId]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isModifier = e.ctrlKey || e.metaKey;
@@ -804,6 +843,28 @@ export default function Whiteboard({
         />
       </div>
 
+      <button
+        onClick={() => void handleSaveAndExit()}
+        disabled={isExiting}
+        style={{
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          zIndex: 1200,
+          padding: "10px 20px",
+          backgroundColor: "#ff6b6b",
+          color: "#fff",
+          border: "none",
+          borderRadius: "6px",
+          cursor: isExiting ? "not-allowed" : "pointer",
+          fontSize: "14px",
+          fontWeight: "600",
+          opacity: isExiting ? 0.7 : 1,
+        }}
+      >
+        {isExiting ? "Saving..." : "Save & Exit"}
+      </button>
+
       {/* pages container - scrollable */}
       <div
         ref={pagesContainerRef}
@@ -836,6 +897,7 @@ export default function Whiteboard({
                   onPathCreated={handlePathCreated}
                   onSelectionReady={handleSelectionReady}
                   onCanvasReady={() => {
+                    setIsCanvasReady(true);
                     historyRef.current.undo = [];
                     historyRef.current.redo = [];
                     lastSnapshotRef.current = "";

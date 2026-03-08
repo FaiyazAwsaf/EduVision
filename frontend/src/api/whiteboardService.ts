@@ -191,6 +191,30 @@ export async function deactivateSession(
 }
 
 /**
+ * Delete a whiteboard session (owner only)
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/`,
+      {
+        method: "DELETE",
+        credentials: "include",
+        headers: getAuthHeaders(),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete session: ${response.statusText}`);
+    }
+  }
+  catch (error) {
+    console.error("[Whiteboard API] Error deleting session:", error);
+    throw error;
+  }
+}
+
+/**
  * Invite one or more students to an existing whiteboard session
  */
 export async function inviteStudentsToSession(

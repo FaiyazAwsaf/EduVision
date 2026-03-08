@@ -160,11 +160,30 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
         )
         if serializer.is_valid():
             session = serializer.save()
+            SessionMember.objects.get_or_create(
+                session=session,
+                user=request.user,
+                defaults={"role": "owner"},
+            )
             return Response(
                 WhiteboardSessionDetailSerializer(session).data,
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        """Delete a whiteboard session (owner only)."""
+        user = request.user
+        session = get_object_or_404(WhiteboardSession, id=pk)
+
+        if session.owner_id != user.id:
+            return Response(
+                {"detail": "Only session owner can delete this session."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        session.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def retrieve(self, request, pk=None):
         """Get session details with latest state"""
@@ -228,6 +247,10 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
                 defaults={"role": "student"},
             )
             invited_members.append(member)
+
+        if invited_members and not session.is_active:
+            session.is_active = True
+            session.save(update_fields=["is_active", "updated_at"])
 
         serializer = SessionMemberSerializer(invited_members, many=True)
         return Response(
