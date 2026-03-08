@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/shared/Sidebar";
@@ -13,6 +13,12 @@ export default function AdminLayout({
   const { isReady, isAuthenticated, user } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    if (isReady && (!isAuthenticated || !user || user.role !== "admin")) {
+      router.replace("/signin");
+    }
+  }, [isReady, isAuthenticated, user, router]);
+
   if (!isReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -22,7 +28,6 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated || !user || user.role !== "admin") {
-    router.replace("/signin");
     return null;
   }
 

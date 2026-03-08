@@ -33,6 +33,12 @@ class EventTypeChoices(models.TextChoices):
     SESSION_STARTED = 'session_started', 'Session Started'
     SESSION_ENDED = 'session_ended', 'Session Ended'
     FEEDBACK_SUBMITTED = 'feedback_submitted', 'Feedback Submitted'
+    # Evaluation pipeline events (Phase 7)
+    SCRIPT_SUBMITTED = 'script_submitted', 'Script Submitted'
+    SCRIPT_EVALUATED = 'script_evaluated', 'Script Evaluated'
+    CONTENT_GENERATED = 'content_generated', 'Content Generated'
+    CONTENT_VIEWED = 'content_viewed', 'Content Viewed'
+    SESSION_JOINED = 'session_joined', 'Session Joined'
 
 
 class RecommendationTypeChoices(models.TextChoices):

@@ -10,11 +10,11 @@ import {
   resetUserPassword,
   createTeacherProfile,
   createStudentProfile,
-  getSections,
+  getClasses,
   type CreateUserPayload,
 } from "@/api/admin";
 import type { User } from "@/api/auth";
-import type { SchoolSection } from "@/api/school";
+import type { SchoolClass } from "@/api/school";
 import {
   Search,
   Plus,
@@ -85,13 +85,14 @@ function CreateUserForm({
     roll_number: "",
     section: "",
   });
-  const [sections, setSections] = useState<SchoolSection[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getSections()
-      .then(setSections)
+    getClasses()
+      .then(setClasses)
       .catch(() => {});
   }, []);
 
@@ -309,20 +310,40 @@ function CreateUserForm({
             />
           </div>
           <div>
+            <label className="block text-xs text-muted mb-1">Class</label>
+            <select
+              value={selectedClassId}
+              onChange={(e) => {
+                setSelectedClassId(e.target.value);
+                setProfileForm({ ...profileForm, section: "" });
+              }}
+              className="w-full px-3 py-2 rounded-lg border border-secondary/40 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+            >
+              <option value="">Select Class</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.stream ? ` — ${c.stream}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-xs text-muted mb-1">Section</label>
             <select
               value={profileForm.section}
               onChange={(e) =>
                 setProfileForm({ ...profileForm, section: e.target.value })
               }
-              className="w-full px-3 py-2 rounded-lg border border-secondary/40 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+              disabled={!selectedClassId}
+              className="w-full px-3 py-2 rounded-lg border border-secondary/40 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">No Section</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  Section {s.name} (ID: {s.id})
-                </option>
-              ))}
+              {selectedClassId &&
+                (classes.find((c) => c.id === Number(selectedClassId))?.sections ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Section {s.name}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
@@ -562,6 +583,7 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [resetUser, setResetUser] = useState<User | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<User | null>(null);
+  const [actionError, setActionError] = useState("");
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -588,13 +610,23 @@ export default function UsersPage() {
     setFilterRole(roleFilter);
   }, [roleFilter]);
 
+  const handleDeactivate = async (user: User) => {
+    try {
+      await updateUser(user.id, { is_active: false });
+      setDeleteConfirm(null);
+      fetchUsers();
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to deactivate user");
+    }
+  };
+
   const handleDelete = async (user: User) => {
     try {
       await deleteUser(user.id);
       setDeleteConfirm(null);
       fetchUsers();
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to delete user");
     }
   };
 
@@ -693,7 +725,7 @@ export default function UsersPage() {
               {users.map((u) => (
                 <tr
                   key={u.id}
-                  className="hover:bg-primary/[0.02] transition-colors"
+                  className="hover:bg-primary/2 transition-colors"
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
@@ -793,33 +825,61 @@ export default function UsersPage() {
         )}
       </Modal>
 
-      {/* Delete Confirmation */}
+      {/* Deactivate / Delete Confirmation */}
       <Modal
         open={!!deleteConfirm}
-        onClose={() => setDeleteConfirm(null)}
-        title="Deactivate User"
+        onClose={() => { setDeleteConfirm(null); setActionError(""); }}
+        title="Manage User"
       >
         {deleteConfirm && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <p className="text-sm text-muted">
-              Are you sure you want to deactivate{" "}
+              What would you like to do with{" "}
               <span className="font-medium text-primary-dark">
                 {deleteConfirm.first_name} {deleteConfirm.last_name}
               </span>
-              ? They will no longer be able to log in.
+              ?
             </p>
+
+            {actionError && (
+              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
+                {actionError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl border border-orange-200 bg-orange-50/50">
+                <p className="text-sm font-medium text-orange-700 mb-0.5">Deactivate</p>
+                <p className="text-xs text-orange-600/80">
+                  The account is kept but the user can no longer log in. This can be undone.
+                </p>
+              </div>
+              <div className="p-3 rounded-xl border border-red-200 bg-red-50/50">
+                <p className="text-sm font-medium text-red-700 mb-0.5">Delete</p>
+                <p className="text-xs text-red-600/80">
+                  Permanently removes the user and all their data. This cannot be undone.
+                </p>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setDeleteConfirm(null)}
+                onClick={() => { setDeleteConfirm(null); setActionError(""); }}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-muted hover:bg-background transition"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="px-5 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition"
+                onClick={() => handleDeactivate(deleteConfirm)}
+                className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition"
               >
                 Deactivate
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm)}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition"
+              >
+                Delete
               </button>
             </div>
           </div>

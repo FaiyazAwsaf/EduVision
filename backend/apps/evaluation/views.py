@@ -580,6 +580,21 @@ class StudentSubmitScriptView(APIView):
                 image=page_image,
             )
 
+        # Record SCRIPT_SUBMITTED learning event (non-blocking)
+        try:
+            from apps.intelligence.services.event_service import EventService
+            topic = None
+            if form.assignment and hasattr(form.assignment, 'subject'):
+                topic = form.assignment.subject.name
+            EventService().record_event(
+                event_type='script_submitted',
+                user_id=user.id,
+                topic=topic,
+                metadata={'script_id': str(script.id)},
+            )
+        except Exception:
+            pass
+
         return Response(
             AnswerScriptListEnhancedSerializer(script).data,
             status=status.HTTP_201_CREATED,

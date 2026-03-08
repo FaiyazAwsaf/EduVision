@@ -41,6 +41,7 @@ import {
   type EvaluationReport,
   type SubmissionForm,
   type SubmissionFormCreate,
+  type ScriptPage,
 } from "@/api/evaluation";
 import { getMyTeachingAssignments, type TeachingAssignment } from "@/api/school";
 import ScriptUploadForm from "@/components/evaluation/ScriptUploadForm";
@@ -59,6 +60,7 @@ export default function EvaluationPage() {
   const [selectedReport, setSelectedReport] = useState<EvaluationReport | null>(
     null,
   );
+  const [selectedScriptPages, setSelectedScriptPages] = useState<ScriptPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,7 +136,11 @@ export default function EvaluationPage() {
 
   const handleViewReport = async (scriptId: string) => {
     try {
-      const report = await getEvaluationReport(scriptId);
+      const [report, script] = await Promise.all([
+        getEvaluationReport(scriptId),
+        getScript(scriptId),
+      ]);
+      setSelectedScriptPages(script.pages || []);
       setSelectedReport(report);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report");
@@ -246,12 +252,18 @@ export default function EvaluationPage() {
 
   if (selectedReport) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar role="teacher" />
-        <div className="ml-60 py-8 px-8">
+      <div className="bg-background h-screen overflow-hidden flex">
+        <div className="print:hidden">
+          <Sidebar role="teacher" />
+        </div>
+        <div className="flex-1 ml-60 overflow-hidden print:ml-0">
           <EvaluationReportView
             report={selectedReport}
-            onBack={() => setSelectedReport(null)}
+            pages={selectedScriptPages}
+            onBack={() => {
+              setSelectedReport(null);
+              setSelectedScriptPages([]);
+            }}
           />
         </div>
       </div>
@@ -746,11 +758,11 @@ export default function EvaluationPage() {
                                   </span>
                                   <span className="font-bold text-emerald-600">
                                     {typeof script.total_score === "number"
-                                      ? script.total_score.toFixed(1)
+                                      ? script.total_score.toFixed(2)
                                       : script.total_score}{" "}
                                     (
                                     {typeof script.percentage === "number"
-                                      ? script.percentage.toFixed(1)
+                                      ? script.percentage.toFixed(2)
                                       : script.percentage}
                                     %)
                                   </span>
