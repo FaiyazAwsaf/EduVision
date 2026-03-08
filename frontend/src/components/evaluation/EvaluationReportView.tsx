@@ -42,7 +42,7 @@ export default function EvaluationReportView({
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-primary hover:text-primary-dark transition-colors"
+            className="flex items-center gap-2 text-primary hover:text-primary-dark transition-colors print:hidden"
           >
             <svg
               className="w-5 h-5"
@@ -108,10 +108,10 @@ export default function EvaluationReportView({
             <div
               className={`text-5xl font-bold ${getScoreColor(evaluation_summary.percentage)}`}
             >
-              {evaluation_summary.percentage.toFixed(1)}%
+              {evaluation_summary.percentage.toFixed(2)}%
             </div>
             <div className="mt-2 text-lg text-primary">
-              {evaluation_summary.total_score.toFixed(1)} /{" "}
+              {evaluation_summary.total_score.toFixed(2)} /{", "}
               {evaluation_summary.max_score} marks
             </div>
             <div
@@ -158,7 +158,7 @@ export default function EvaluationReportView({
                     (result.marks.total / result.marks.max_total) * 100,
                   )}`}
                 >
-                  {result.marks.total.toFixed(1)} / {result.marks.max_total}
+                  {result.marks.total.toFixed(2)} / {(+result.marks.max_total).toFixed(2)}
                 </div>
                 <div className="text-xs text-primary font-medium">marks</div>
               </div>
@@ -173,7 +173,7 @@ export default function EvaluationReportView({
                     Method
                   </span>
                   <div className="text-lg font-semibold text-primary">
-                    {result.marks.method.awarded} / {result.marks.method.max}
+                    {(+result.marks.method.awarded).toFixed(2)} / {(+result.marks.method.max).toFixed(2)}
                   </div>
                 </div>
                 <div className="flex-1 text-sm text-primary-dark">
@@ -188,8 +188,7 @@ export default function EvaluationReportView({
                     Calculation
                   </span>
                   <div className="text-lg font-semibold text-primary">
-                    {result.marks.calculation.awarded} /{" "}
-                    {result.marks.calculation.max}
+                    {(+result.marks.calculation.awarded).toFixed(2)} / {(+result.marks.calculation.max).toFixed(2)}
                   </div>
                 </div>
                 <div className="flex-1 text-sm text-primary-dark">
@@ -204,7 +203,7 @@ export default function EvaluationReportView({
                     Answer
                   </span>
                   <div className="text-lg font-semibold text-primary">
-                    {result.marks.answer.awarded} / {result.marks.answer.max}
+                    {(+result.marks.answer.awarded).toFixed(2)} / {(+result.marks.answer.max).toFixed(2)}
                   </div>
                 </div>
                 <div className="flex-1 text-sm text-primary-dark">
@@ -387,7 +386,7 @@ export default function EvaluationReportView({
       </div>
 
       {/* Print/Export Button */}
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center gap-4 print:hidden">
         <button
           onClick={() => window.print()}
           className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"

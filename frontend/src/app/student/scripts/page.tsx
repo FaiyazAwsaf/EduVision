@@ -24,6 +24,7 @@ import {
   Loader2,
   ClipboardList,
   ChevronLeft,
+  FileDown,
 } from "lucide-react";
 
 export default function StudentScriptsPage() {
@@ -130,12 +131,24 @@ export default function StudentScriptsPage() {
     }
   };
 
+  const handleViewAsPdf = async (scriptId: string) => {
+    try {
+      const report = await getEvaluationReport(scriptId);
+      setSelectedReport(report);
+      setTimeout(() => window.print(), 500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load report");
+    }
+  };
+
   // Show report view
   if (selectedReport) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar role="student" />
-        <div className="ml-60 py-8 px-8">
+        <div className="print:hidden">
+          <Sidebar role="student" />
+        </div>
+        <div className="ml-60 py-8 px-8 print:ml-0 print:p-0">
           <EvaluationReportView
             report={selectedReport}
             onBack={() => setSelectedReport(null)}
@@ -429,11 +442,11 @@ export default function StudentScriptsPage() {
                                     </span>
                                     <span className="font-bold text-emerald-600">
                                       {typeof script.total_score === "number"
-                                        ? script.total_score.toFixed(1)
+                                        ? script.total_score.toFixed(2)
                                         : script.total_score}{" "}
                                       (
                                       {typeof script.percentage === "number"
-                                        ? script.percentage.toFixed(1)
+                                        ? script.percentage.toFixed(2)
                                         : script.percentage}
                                       %)
                                     </span>
@@ -442,12 +455,21 @@ export default function StudentScriptsPage() {
                               )}
 
                             {script.status === "evaluated" && (
-                              <button
-                                onClick={() => handleViewReport(script.id)}
-                                className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
-                              >
-                                View Report
-                              </button>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  onClick={() => handleViewReport(script.id)}
+                                  className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
+                                >
+                                  View Report
+                                </button>
+                                <button
+                                  onClick={() => handleViewAsPdf(script.id)}
+                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                                >
+                                  <FileDown className="w-3 h-3" />
+                                  View as PDF
+                                </button>
+                              </div>
                             )}
 
                             {script.status === "pending" && (

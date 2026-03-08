@@ -746,11 +746,11 @@ export default function EvaluationPage() {
                                   </span>
                                   <span className="font-bold text-emerald-600">
                                     {typeof script.total_score === "number"
-                                      ? script.total_score.toFixed(1)
+                                      ? script.total_score.toFixed(2)
                                       : script.total_score}{" "}
                                     (
                                     {typeof script.percentage === "number"
-                                      ? script.percentage.toFixed(1)
+                                      ? script.percentage.toFixed(2)
                                       : script.percentage}
                                     %)
                                   </span>

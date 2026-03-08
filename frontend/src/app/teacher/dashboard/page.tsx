@@ -732,11 +732,11 @@ export default function TeacherDashboard() {
                                     : "text-red-600"
                             }`}
                           >
-                            {script.percentage.toFixed(1)}%
+                            {script.percentage.toFixed(2)}%
                           </p>
                           {script.total_score != null && (
                             <p className="text-[10px] text-muted">
-                              {script.total_score.toFixed(1)} marks
+                              {script.total_score.toFixed(2)} marks
                             </p>
                           )}
                         </div>
