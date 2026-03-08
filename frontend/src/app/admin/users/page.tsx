@@ -715,6 +715,9 @@ export default function UsersPage() {
                 <th className="px-5 py-3 font-medium text-muted">Username</th>
                 <th className="px-5 py-3 font-medium text-muted">Email</th>
                 <th className="px-5 py-3 font-medium text-muted">Role</th>
+                {filterRole === "teacher" && (
+                  <th className="px-5 py-3 font-medium text-muted">Department</th>
+                )}
                 <th className="px-5 py-3 font-medium text-muted">Status</th>
                 <th className="px-5 py-3 font-medium text-muted text-right">
                   Actions
@@ -741,6 +744,11 @@ export default function UsersPage() {
                   <td className="px-5 py-3.5 text-muted">{u.username}</td>
                   <td className="px-5 py-3.5 text-muted">{u.email}</td>
                   <td className="px-5 py-3.5">{roleBadge(u.role)}</td>
+                  {filterRole === "teacher" && (
+                    <td className="px-5 py-3.5 text-muted">
+                      {u.department || <span className="text-secondary/40 italic text-xs">—</span>}
+                    </td>
+                  )}
                   <td className="px-5 py-3.5">
                     {u.is_active ? (
                       <span className="flex items-center gap-1.5 text-green-600 text-xs font-medium">

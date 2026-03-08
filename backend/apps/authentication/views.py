@@ -168,7 +168,7 @@ class AdminUserListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        qs = CustomUser.objects.all().order_by("-date_joined")
+        qs = CustomUser.objects.select_related("teacher_profile").all().order_by("-date_joined")
 
         role = request.query_params.get("role")
         if role:
