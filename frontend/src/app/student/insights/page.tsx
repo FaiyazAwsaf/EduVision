@@ -458,7 +458,9 @@ export default function StudentInsightsPage() {
               <p className="text-xs text-gray-400 text-right">
                 Insight computed from {insight.events_analyzed_count} events ·
                 Last updated{" "}
-                {new Date(insight.computed_at).toLocaleDateString()}
+                {insight.computed_at
+                  ? new Date(insight.computed_at).toLocaleDateString()
+                  : "—"}
               </p>
             </>
           )}

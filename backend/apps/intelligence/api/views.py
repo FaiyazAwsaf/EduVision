@@ -240,10 +240,7 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
         insight = insight_service.get_latest_insight(UUID(user_id))
         
         if not insight:
-            return Response(
-                {"error": "No insight found for this user"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
         
         return Response(LearnerInsightSerializer(insight).data)
     

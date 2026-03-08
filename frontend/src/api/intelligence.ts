@@ -124,15 +124,11 @@ export interface RecommendationStats {
 export async function getLatestInsight(
   userId: string,
 ): Promise<LearnerInsight | null> {
-  try {
-    const raw = await intelligenceFetch<Record<string, unknown>>(
-      `/insights/latest/?user_id=${userId}`,
-    );
-    return normaliseInsight(raw);
-  } catch (err) {
-    if (err instanceof NotFoundError) return null;
-    throw err;
-  }
+  const raw = await intelligenceFetch<Record<string, unknown> | undefined>(
+    `/insights/latest/?user_id=${userId}`,
+  );
+  if (!raw) return null;
+  return normaliseInsight(raw);
 }
 
 /**
