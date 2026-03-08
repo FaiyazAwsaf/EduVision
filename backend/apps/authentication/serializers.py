@@ -83,10 +83,19 @@ class AdminUserCreateSerializer(serializers.Serializer):
 class AdminUserUpdateSerializer(serializers.Serializer):
     """Serializer for admin to update user details."""
     email = serializers.EmailField(required=False)
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     is_active = serializers.BooleanField(required=False)
-    role = serializers.ChoiceField(choices=['teacher', 'student'], required=False)
+    role = serializers.ChoiceField(choices=['teacher', 'student', 'admin'], required=False)
+
+    def validate_email(self, value):
+        user_id = self.context.get('user_id')
+        qs = CustomUser.objects.filter(email=value)
+        if user_id:
+            qs = qs.exclude(id=user_id)
+        if qs.exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
 
 
 class ChangePasswordSerializer(serializers.Serializer):
