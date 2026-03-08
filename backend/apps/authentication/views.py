@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.db import transaction
 from django.db.models.deletion import Collector
 from django.contrib.admin.models import LogEntry
+from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -14,6 +15,10 @@ from .serializers import (
 )
 from .models import CustomUser
 from secrets import randbelow
+from uuid import uuid4
+
+
+WS_TICKET_TTL_SECONDS = 60
 
 # Create your views here.
 class RegisterView(APIView):
@@ -64,7 +69,7 @@ class LoginView(APIView):
                 value=str(refresh),
                 httponly=True,
                 secure=False,
-                samesite="Strict",
+                samesite="Lax",
                 path="/"
             )
 
@@ -75,7 +80,6 @@ class LoginView(APIView):
 class RefreshView(APIView):
 
     def post(self, request):
-        
         refresh_token = request.COOKIES.get("refresh_token")
 
         if not refresh_token:
@@ -105,13 +109,19 @@ class RefreshView(APIView):
                 value=new_refresh,
                 httponly=True,
                 secure=False,
-                samesite="Strict",
+                samesite="Lax",
                 path="/"
             )
             
             return response
         except Exception as e :
-            self.handle_exception(e)
+            return Response(
+                {
+                    "message": "Invalid or expired refresh token",
+                    "detail": str(e),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 class MeView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -130,6 +140,27 @@ class MeView(APIView):
         )
 
         return response
+
+
+class WebSocketTicketView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ticket = uuid4().hex
+        cache_key = f"ws_ticket:{ticket}"
+        cache.set(cache_key, str(request.user.id), timeout=WS_TICKET_TTL_SECONDS)
+
+        return Response(
+            {
+                "message": "WebSocket ticket created",
+                "payload": {
+                    "ticket": ticket,
+                    "expires_in": WS_TICKET_TTL_SECONDS,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class LogoutView(APIView):
     def post(self, request):

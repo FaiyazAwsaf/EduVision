@@ -6,9 +6,19 @@
  */
 
 // Backend API base URL
-// In production, use environment variable
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+// In production, use NEXT_PUBLIC_API_URL.
+// In local dev, default to the same hostname as the frontend to keep cookie site consistent.
+const DEFAULT_API_ORIGIN =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : "http://localhost:8000";
+
+const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_ORIGIN;
+const NORMALIZED_API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, "");
+
+export const API_BASE_URL = NORMALIZED_API_BASE_URL.endsWith("/api")
+  ? NORMALIZED_API_BASE_URL
+  : `${NORMALIZED_API_BASE_URL}/api`;
 
 // API endpoints
 export const API_ENDPOINTS = {

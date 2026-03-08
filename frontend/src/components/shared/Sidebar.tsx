@@ -27,6 +27,7 @@ import {
   UserCog,
   ShieldCheck,
   Brain,
+  PenTool,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -74,8 +75,8 @@ const teacherNavItems: NavEntry[] = [
   { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
   { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
   { label: "Class Intelligence", href: "/teacher/intelligence", icon: Brain },
+  { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
-
 const studentNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
   {
@@ -91,7 +92,9 @@ const studentNavItems: NavEntry[] = [
   { label: "Scripts", href: "/student/scripts", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
   { label: "My Insights", href: "/student/insights", icon: Brain },
+  { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
+
 
 const adminNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },

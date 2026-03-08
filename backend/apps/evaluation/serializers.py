@@ -345,6 +345,9 @@ class AnswerScriptListEnhancedSerializer(serializers.ModelSerializer):
     rubric_set_title = serializers.CharField(
         source="rubric_set.title", read_only=True, default=""
     )
+    submission_form_title = serializers.CharField(
+        source="submission_form.title", read_only=True, default=""
+    )
     page_count = serializers.SerializerMethodField()
     total_score = serializers.FloatField(read_only=True)
     percentage = serializers.FloatField(read_only=True)
@@ -367,6 +370,8 @@ class AnswerScriptListEnhancedSerializer(serializers.ModelSerializer):
             "student_class",
             "rubric_set",
             "rubric_set_title",
+            "submission_form",
+            "submission_form_title",
             "status",
             "total_score",
             "percentage",
