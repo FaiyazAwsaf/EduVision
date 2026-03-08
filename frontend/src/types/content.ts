@@ -67,6 +67,7 @@ export interface ContentRequest {
   role?: string;
   subject?: string;
   created_by_id?: string;
+  error_message?: string;
   created_at: string;
   updated_at: string;
 }

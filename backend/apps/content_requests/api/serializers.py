@@ -140,10 +140,11 @@ class ContentRequestResponseSerializer(serializers.ModelSerializer):
             'role',
             'subject',
             'created_by_id',
+            'error_message',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at', 'created_by_id']
+        read_only_fields = ['id', 'status', 'created_at', 'updated_at', 'created_by_id', 'error_message']
     
     def get_created_by_id(self, obj):
         return str(obj.created_by.id) if obj.created_by else None

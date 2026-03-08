@@ -159,6 +159,13 @@ class ContentRequestModel(models.Model):
         help_text=_('Original request this was regenerated from')
     )
     
+    # Failure reason (set by background task when processing fails)
+    error_message = models.TextField(
+        null=True,
+        blank=True,
+        help_text=_('Human-readable error message when request fails')
+    )
+    
     class Meta:
         db_table = 'content_requests'
         verbose_name = _('Content Request')

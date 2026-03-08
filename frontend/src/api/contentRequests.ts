@@ -51,6 +51,14 @@ export async function createContentRequest(
     const error: ApiError = await response.json().catch(() => ({
       error: "Failed to create content request",
     }));
+    // Extract field-level validation errors (e.g. off-topic) for a clearer message
+    const fieldErrors = (error as Record<string, unknown>).errors as
+      | Record<string, string[]>
+      | undefined;
+    if (fieldErrors) {
+      const firstMsg = Object.values(fieldErrors).flat()[0];
+      if (firstMsg) throw new Error(firstMsg);
+    }
     throw new Error(error.error || error.detail || "Unknown error occurred");
   }
 

@@ -26,6 +26,22 @@ def build_system_prompt(role: str = 'student') -> str:
     Teacher prompts emphasize classroom-ready material.
     Student prompts emphasize learning.
     """
+    off_topic_guard = """\n
+CRITICAL RULE — TOPIC RELEVANCE CHECK:
+Before generating any content, evaluate whether the requested topic is genuinely
+related to academics, education, or learning. If the topic is clearly unrelated
+(e.g. weather, time, jokes, personal questions, news, sports scores, shopping,
+recipes, greetings, or any non-educational query), you MUST respond with ONLY
+the following text and nothing else:
+
+[OFF_TOPIC]
+
+Do NOT generate any educational content for off-topic requests. Do NOT explain
+why. Just return [OFF_TOPIC].
+
+If the topic IS educational, proceed normally with the content generation below.
+"""
+
     if role == 'teacher':
         return """You are an expert educational content creator helping teachers build
 classroom-ready materials. Your goal is to create professional, structured content
@@ -38,7 +54,7 @@ Guidelines:
 - Use proper formatting (headers, lists, emphasis)
 - Support mathematical notation when needed
 - Make content engaging and age-appropriate for the target class
-- Include assessment-ready elements (questions, rubrics) when relevant"""
+- Include assessment-ready elements (questions, rubrics) when relevant""" + off_topic_guard
     
     return """You are an expert educational content creator specializing in clear, 
 accurate, and pedagogically sound explanations. Your goal is to help students 
@@ -51,7 +67,7 @@ Guidelines:
 - Use proper formatting (headers, lists, emphasis)
 - Support mathematical notation when needed
 - Be thorough but concise
-- Focus on understanding, not just memorization"""
+- Focus on understanding, not just memorization""" + off_topic_guard
 
 
 def build_context_aware_prompt(
