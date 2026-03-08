@@ -236,6 +236,13 @@ class ScriptEvaluationService:
             script.evaluated_at = datetime.now()
             script.save()
 
+            # Rebuild analytics snapshot (non-blocking; failures are logged only)
+            try:
+                from apps.analytics.services import rebuild_snapshot_for_script
+                rebuild_snapshot_for_script(script)
+            except Exception as snap_err:
+                logger.warning(f"Analytics snapshot rebuild failed for script {script.id}: {snap_err}")
+
             total_elapsed = time.perf_counter() - total_start_time
             
             logger.info(

@@ -99,6 +99,9 @@ urlpatterns = [
 
     # school (classes, sections, teachers, students)
     path('api/school/', include('apps.students.urls', namespace='students')),
+
+    # analytics
+    path('api/analytics/', include('apps.analytics.urls', namespace='analytics')),
 ]
 
 # Serve media files in development
