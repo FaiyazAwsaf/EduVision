@@ -71,6 +71,7 @@ const teacherNavItems: NavEntry[] = [
     ],
   },
   { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
+  { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
 ];
 
 const studentNavItems: NavEntry[] = [
