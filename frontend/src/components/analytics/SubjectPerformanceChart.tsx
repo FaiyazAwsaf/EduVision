@@ -52,7 +52,7 @@ export default function SubjectPerformanceChart({ data }: Props) {
           tickFormatter={(v) => `${v}%`}
         />
         <Tooltip
-          formatter={(value: number) => [`${value}%`, "Avg Score"]}
+          formatter={(value) => [`${value}%`, "Avg Score"]}
           labelFormatter={(label) => `Subject: ${label}`}
           contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
         />

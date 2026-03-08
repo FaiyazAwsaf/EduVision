@@ -55,7 +55,7 @@ export default function TopicRadarChart({ data }: Props) {
           dot={{ r: 4, fill: "#2563eb", strokeWidth: 0 }}
         />
         <Tooltip
-          formatter={(value: number, _name, props) => [
+          formatter={(value, _name, props) => [
             `${value}%`,
             props.payload?.fullText || "Score",
           ]}

@@ -56,7 +56,7 @@ export default function StudentProgressChart({ data }: Props) {
           tickFormatter={(v) => `${v}%`}
         />
         <Tooltip
-          formatter={(value: number, _name: string, props) => [
+          formatter={(value, _name, props) => [
             `${value}%`,
             props.payload?.subject || "Score",
           ]}

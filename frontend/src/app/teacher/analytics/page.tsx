@@ -131,11 +131,13 @@ export default function TeacherAnalyticsPage() {
     // Fetch questions from rubric set detail
     import("@/api/rubrics").then(({ getRubricSet }) => {
       getRubricSet(selectedRubricSetId).then((rs) => {
-        const qs = (rs.questions ?? []).map((q) => ({
-          id: q.id,
-          number: q.question_number,
-          text: q.question_text,
-        }));
+        const qs = (rs.questions ?? [])
+          .filter((q) => q.id !== undefined)
+          .map((q) => ({
+            id: q.id as string,
+            number: Number(q.question_number),
+            text: q.question_text,
+          }));
         setQuestions(qs);
         if (qs.length > 0) setSelectedQuestionId(qs[0].id);
       });

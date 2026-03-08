@@ -1,23 +1,50 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Check,
   X as XIcon,
   AlertTriangle,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { EvaluationReport } from "@/api/evaluation";
+import { EvaluationReport, ScriptPage } from "@/api/evaluation";
+import { API_BASE_URL } from "@/config/api";
+
+// Derive the backend media origin from the API base URL
+const BACKEND_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return "http://127.0.0.1:8000";
+  }
+})();
+
+function resolveImageUrl(page: ScriptPage): string {
+  if (page.image_url) return page.image_url;
+  const img = page.image;
+  if (img.startsWith("http")) return img;
+  // Ensure leading slash so it resolves from the backend root
+  return `${BACKEND_ORIGIN}${img.startsWith("/") ? img : `/${img}`}`;
+}
 
 interface EvaluationReportViewProps {
   report: EvaluationReport;
+  pages?: ScriptPage[];
   onBack?: () => void;
 }
 
 export default function EvaluationReportView({
   report,
+  pages,
   onBack,
 }: EvaluationReportViewProps) {
+  const [activePageIdx, setActivePageIdx] = useState(0);
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+
+  const markBroken = (url: string) =>
+    setBrokenImages((prev) => new Set(prev).add(url));
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return "text-emerald-500";
     if (percentage >= 60) return "text-primary";
@@ -36,7 +63,10 @@ export default function EvaluationReportView({
     report;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="flex h-full">
+      {/* ── Left: Report ── */}
+      <div className="flex-1 min-w-0 overflow-y-auto py-8 px-8 print:w-full">
+        <div className="max-w-3xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         {onBack && (
@@ -407,6 +437,99 @@ export default function EvaluationReportView({
           Print Report
         </button>
       </div>
+        </div>
+      </div>
+
+      {/* ── Right: Script Image Viewer ── */}
+      {pages && pages.length > 0 && (
+        <div className="w-80 xl:w-96 shrink-0 border-l border-secondary/30 bg-white flex flex-col overflow-hidden print:hidden">
+          {/* Panel header */}
+          <div className="sticky top-0 z-10 bg-white border-b border-secondary/30 px-4 py-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-primary-dark">
+              Script Pages
+            </h3>
+            <span className="text-xs text-secondary bg-secondary/20 px-2 py-0.5 rounded-full">
+              {activePageIdx + 1} / {pages.length}
+            </span>
+          </div>
+
+          {/* Main image */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="rounded-lg overflow-hidden border border-secondary/50 shadow-sm bg-gray-50">
+              {brokenImages.has(resolveImageUrl(pages[activePageIdx])) ? (
+                <div className="w-full h-64 flex flex-col items-center justify-center text-secondary gap-2">
+                  <svg className="w-10 h-10 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-xs text-center px-4">Image unavailable.<br/>The original file may have been deleted.</p>
+                </div>
+              ) : (
+                <img
+                  src={resolveImageUrl(pages[activePageIdx])}
+                  alt={`Page ${pages[activePageIdx].page_number}`}
+                  className="w-full object-contain"
+                  onError={() => markBroken(resolveImageUrl(pages[activePageIdx]))}
+                />
+              )}
+            </div>
+
+            {/* Page navigation */}
+            {pages.length > 1 && (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setActivePageIdx((i) => Math.max(0, i - 1))}
+                  disabled={activePageIdx === 0}
+                  className="p-1.5 rounded-lg border border-secondary text-primary hover:bg-secondary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs text-secondary">
+                  Page {pages[activePageIdx].page_number}
+                </span>
+                <button
+                  onClick={() =>
+                    setActivePageIdx((i) => Math.min(pages.length - 1, i + 1))
+                  }
+                  disabled={activePageIdx === pages.length - 1}
+                  className="p-1.5 rounded-lg border border-secondary text-primary hover:bg-secondary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Thumbnails */}
+            {pages.length > 1 && (
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-secondary/30">
+                {pages.map((page, idx) => (
+                  <button
+                    key={page.id}
+                    onClick={() => setActivePageIdx(idx)}
+                    className={`rounded-md overflow-hidden border-2 transition-all ${
+                      idx === activePageIdx
+                        ? "border-primary shadow-md"
+                        : "border-secondary/40 hover:border-secondary"
+                    }`}
+                  >
+                    <img
+                      src={resolveImageUrl(page)}
+                      alt={`Thumb ${page.page_number}`}
+                      className="w-full h-20 object-cover"
+                      onError={(e) => {
+                        markBroken(resolveImageUrl(page));
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                    <div className="text-center text-[10px] text-secondary py-0.5">
+                      {page.page_number}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

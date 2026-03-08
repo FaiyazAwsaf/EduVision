@@ -73,7 +73,7 @@ export interface LearnerInsight {
 /** Normalise a raw API response into a fully-typed LearnerInsight. */
 function normaliseInsight(raw: Record<string, unknown>): LearnerInsight {
   return {
-    ...(raw as LearnerInsight),
+    ...(raw as unknown as LearnerInsight),
     weak_topics: Array.isArray(raw.weak_topics) ? (raw.weak_topics as string[]) : [],
     strong_topics: Array.isArray(raw.strong_topics) ? (raw.strong_topics as string[]) : [],
     topic_metrics:

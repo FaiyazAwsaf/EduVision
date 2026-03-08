@@ -68,7 +68,7 @@ export default function ClassDistributionChart({ data }: Props) {
             label={{ value: "Students", angle: -90, position: "insideLeft", offset: 14, fontSize: 11, fill: "#9ca3af" }}
           />
           <Tooltip
-            formatter={(value: number) => [value, "Students"]}
+            formatter={(value) => [value, "Students"]}
             labelFormatter={(label) => `Score range: ${label}%`}
             contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
           />

@@ -70,7 +70,7 @@ export default function QuestionDifficultyChart({ data }: Props) {
           label={{ value: "60%", position: "insideRight", fontSize: 10, fill: "#94a3b8" }}
         />
         <Tooltip
-          formatter={(value: number, _name, props) => [
+          formatter={(value, _name, props) => [
             `${value}% (${props.payload?.avg_marks}/${props.payload?.max_marks} marks)`,
             props.payload?.text || "Score",
           ]}

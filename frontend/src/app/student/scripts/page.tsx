@@ -7,11 +7,13 @@ import Sidebar from "@/components/shared/Sidebar";
 import {
   getStudentOpenForms,
   getMyScripts,
+  getScript,
   submitStudentScript,
   getEvaluationReport,
   type SubmissionForm,
   type AnswerScript,
   type EvaluationReport,
+  type ScriptPage,
 } from "@/api/evaluation";
 import EvaluationReportView from "@/components/evaluation/EvaluationReportView";
 import {
@@ -47,6 +49,7 @@ export default function StudentScriptsPage() {
   const [selectedReport, setSelectedReport] = useState<EvaluationReport | null>(
     null,
   );
+  const [selectedScriptPages, setSelectedScriptPages] = useState<ScriptPage[]>([]);
 
   // Auth guard
   useEffect(() => {
@@ -124,7 +127,11 @@ export default function StudentScriptsPage() {
 
   const handleViewReport = async (scriptId: string) => {
     try {
-      const report = await getEvaluationReport(scriptId);
+      const [report, script] = await Promise.all([
+        getEvaluationReport(scriptId),
+        getScript(scriptId),
+      ]);
+      setSelectedScriptPages(script.pages || []);
       setSelectedReport(report);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report");
@@ -133,7 +140,11 @@ export default function StudentScriptsPage() {
 
   const handleViewAsPdf = async (scriptId: string) => {
     try {
-      const report = await getEvaluationReport(scriptId);
+      const [report, script] = await Promise.all([
+        getEvaluationReport(scriptId),
+        getScript(scriptId),
+      ]);
+      setSelectedScriptPages(script.pages || []);
       setSelectedReport(report);
       setTimeout(() => window.print(), 500);
     } catch (err) {
@@ -144,14 +155,18 @@ export default function StudentScriptsPage() {
   // Show report view
   if (selectedReport) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="bg-background h-screen overflow-hidden flex">
         <div className="print:hidden">
           <Sidebar role="student" />
         </div>
-        <div className="ml-60 py-8 px-8 print:ml-0 print:p-0">
+        <div className="flex-1 ml-60 overflow-hidden print:ml-0">
           <EvaluationReportView
             report={selectedReport}
-            onBack={() => setSelectedReport(null)}
+            pages={selectedScriptPages}
+            onBack={() => {
+              setSelectedReport(null);
+              setSelectedScriptPages([]);
+            }}
           />
         </div>
       </div>
