@@ -1,254 +1,43 @@
-from rest_framework import viewsets, status, permissions
+import logging
+
+from rest_framework import viewsets, status, permissions, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.core.files.storage import default_storage
+from django.db.models import Q, Avg, Count, Case, When, IntegerField, F
+from django.utils import timezone
+from datetime import timedelta
 import os
 import tempfile
 
+from apps.authentication.backends import CustomUserJWTAuthentication
+from apps.students.models import TeacherSubjectAssignment, StudentProfile
+
 from .models import (
-    QuestionPaper,
-    Question,
-    Rubric,
     AnswerScript,
     ScriptPage,
     QuestionEvaluation,
+    ScriptSubmissionForm,
 )
 from .serializers import (
-    QuestionPaperListSerializer,
-    QuestionPaperDetailSerializer,
-    QuestionPaperCreateSerializer,
-    QuestionSerializer,
-    QuestionCreateSerializer,
-    RubricSerializer,
     AnswerScriptListSerializer,
     AnswerScriptDetailSerializer,
     AnswerScriptCreateSerializer,
     ScriptPageSerializer,
     QuestionEvaluationSerializer,
+    ScriptSubmissionFormSerializer,
+    ScriptSubmissionFormCreateSerializer,
+    AnswerScriptListEnhancedSerializer,
+    StudentScriptSubmitSerializer,
 )
 from .services import ScriptEvaluationService
-from .pdf_service import PDFExtractionService
 
+logger = logging.getLogger(__name__)
 
-class QuestionPaperViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing question papers.
-    
-    Endpoints:
-    - GET /api/evaluation/question-papers/ - List all question papers
-    - POST /api/evaluation/question-papers/ - Create new question paper
-    - GET /api/evaluation/question-papers/{id}/ - Get question paper details
-    - PUT /api/evaluation/question-papers/{id}/ - Update question paper
-    - DELETE /api/evaluation/question-papers/{id}/ - Delete question paper
-    - POST /api/evaluation/question-papers/{id}/add-question/ - Add question to paper
-    """
-    queryset = QuestionPaper.objects.all()
-    parser_classes = [JSONParser, MultiPartParser, FormParser]
-    
-    def get_serializer_class(self):
-        if self.action == "list":
-            return QuestionPaperListSerializer
-        elif self.action in ["create"]:
-            return QuestionPaperCreateSerializer
-        return QuestionPaperDetailSerializer
-    
-    @action(detail=True, methods=["post"])
-    def add_question(self, request, pk=None):
-        """Add a new question to an existing question paper."""
-        question_paper = self.get_object()
-        serializer = QuestionCreateSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            question = serializer.save(question_paper=question_paper)
-            
-            # Update total marks
-            question_paper.total_marks = question_paper.calculate_total_marks()
-            question_paper.save()
-            
-            return Response(
-                QuestionSerializer(question).data,
-                status=status.HTTP_201_CREATED
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=["get"])
-    def questions(self, request, pk=None):
-        """Get all questions for a question paper."""
-        question_paper = self.get_object()
-        questions = question_paper.questions.all()
-        serializer = QuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser, FormParser])
-    def upload_pdf(self, request):
-        """
-        Upload a PDF file containing questions and/or rubrics.
-        
-        Parameters:
-        - pdf: The PDF file
-        - paper_type: "question", "rubric", or "combined" (default: "combined")
-        - title: Optional title override
-        - subject: Optional subject override  
-        - class_level: Optional class level override ("9", "10", "11", "12")
-        """
-        if "pdf" not in request.FILES:
-            return Response(
-                {"detail": "No PDF file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        pdf_file = request.FILES["pdf"]
-        paper_type = request.data.get("paper_type", "combined")
-        
-        # Validate file type
-        if not pdf_file.name.lower().endswith('.pdf'):
-            return Response(
-                {"detail": "File must be a PDF"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Save temporarily
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, pdf_file.name)
-        
-        try:
-            with open(temp_path, 'wb+') as destination:
-                for chunk in pdf_file.chunks():
-                    destination.write(chunk)
-            
-            # Extract using Gemini
-            pdf_service = PDFExtractionService()
-            extracted_data = pdf_service.extract_from_pdf(temp_path, paper_type)
-            
-            # Create question paper
-            question_paper = pdf_service.create_question_paper_from_extraction(
-                extracted_data,
-                title_override=request.data.get("title"),
-                subject_override=request.data.get("subject"),
-                class_level_override=request.data.get("class_level")
-            )
-            
-            serializer = QuestionPaperDetailSerializer(question_paper)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            return Response(
-                {"detail": f"Failed to process PDF: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        finally:
-            # Clean up temp file
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if os.path.exists(temp_dir):
-                os.rmdir(temp_dir)
-    
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
-    def upload_rubric_pdf(self, request, pk=None):
-        """
-        Upload a rubric/marking scheme PDF for an existing question paper.
-        
-        This updates the rubrics for existing questions.
-        """
-        question_paper = self.get_object()
-        
-        if "pdf" not in request.FILES:
-            return Response(
-                {"detail": "No PDF file provided"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        pdf_file = request.FILES["pdf"]
-        
-        if not pdf_file.name.lower().endswith('.pdf'):
-            return Response(
-                {"detail": "File must be a PDF"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        temp_dir = tempfile.mkdtemp()
-        temp_path = os.path.join(temp_dir, pdf_file.name)
-        
-        try:
-            with open(temp_path, 'wb+') as destination:
-                for chunk in pdf_file.chunks():
-                    destination.write(chunk)
-            
-            # Extract rubrics
-            pdf_service = PDFExtractionService()
-            rubric_data = pdf_service.extract_from_pdf(temp_path, "rubric")
-            
-            # Update question paper with rubrics
-            updated_paper = pdf_service.update_rubrics_from_extraction(
-                question_paper, rubric_data
-            )
-            
-            serializer = QuestionPaperDetailSerializer(updated_paper)
-            return Response(serializer.data)
-            
-        except Exception as e:
-            return Response(
-                {"detail": f"Failed to process rubric PDF: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if os.path.exists(temp_dir):
-                os.rmdir(temp_dir)
-
-
-class QuestionViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing individual questions.
-    """
-    queryset = Question.objects.all()
-    parser_classes = [JSONParser]
-    
-    def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update"]:
-            return QuestionCreateSerializer
-        return QuestionSerializer
-    
-    @action(detail=True, methods=["get", "put", "patch"])
-    def rubric(self, request, pk=None):
-        """Get or update the rubric for a question."""
-        question = self.get_object()
-        
-        try:
-            rubric = question.rubric
-        except Rubric.DoesNotExist:
-            if request.method == "GET":
-                return Response(
-                    {"detail": "No rubric defined for this question."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            rubric = None
-        
-        if request.method == "GET":
-            serializer = RubricSerializer(rubric)
-            return Response(serializer.data)
-        
-        elif request.method in ["PUT", "PATCH"]:
-            if rubric:
-                serializer = RubricSerializer(
-                    rubric,
-                    data=request.data,
-                    partial=(request.method == "PATCH")
-                )
-            else:
-                serializer = RubricSerializer(data=request.data)
-            
-            if serializer.is_valid():
-                if rubric:
-                    serializer.save()
-                else:
-                    serializer.save(question=question)
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AnswerScriptViewSet(viewsets.ModelViewSet):
@@ -256,8 +45,8 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
     ViewSet for managing answer scripts.
     
     Endpoints:
-    - GET /api/evaluation/scripts/ - List all scripts
-    - POST /api/evaluation/scripts/ - Upload new script
+    - GET /api/evaluation/scripts/ - List all scripts (scoped to teacher's sections)
+    - POST /api/evaluation/scripts/ - Upload new script (teacher manual upload)
     - GET /api/evaluation/scripts/{id}/ - Get script details
     - DELETE /api/evaluation/scripts/{id}/ - Delete script
     - POST /api/evaluation/scripts/{id}/evaluate/ - Trigger evaluation
@@ -265,21 +54,38 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
     """
     queryset = AnswerScript.objects.all()
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         if self.action == "list":
-            return AnswerScriptListSerializer
+            return AnswerScriptListEnhancedSerializer
         elif self.action == "create":
             return AnswerScriptCreateSerializer
         return AnswerScriptDetailSerializer
     
     def get_queryset(self):
-        queryset = AnswerScript.objects.all()
-        
-        # Filter by question paper
-        question_paper_id = self.request.query_params.get("question_paper")
-        if question_paper_id:
-            queryset = queryset.filter(question_paper_id=question_paper_id)
+        user = self.request.user
+        queryset = AnswerScript.objects.select_related(
+            "rubric_set", "student_user", "submission_form"
+        ).prefetch_related("pages")
+
+        # Scope to teacher's assigned sections
+        if user.role == "teacher":
+            teacher_sections = TeacherSubjectAssignment.objects.filter(
+                teacher=user
+            ).values_list("section_id", flat=True)
+
+            queryset = queryset.filter(
+                Q(uploaded_by=user)
+                | Q(submission_form__assignment__teacher=user)
+                | Q(student_user__student_profile__section_id__in=teacher_sections)
+            ).distinct()
+
+        # Filter by rubric set
+        rubric_set_id = self.request.query_params.get("rubric_set")
+        if rubric_set_id:
+            queryset = queryset.filter(rubric_set_id=rubric_set_id)
         
         # Filter by status
         status_filter = self.request.query_params.get("status")
@@ -296,6 +102,12 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
         This endpoint starts the AI-powered evaluation process.
         """
         script = self.get_object()
+        
+        if not script.rubric_set:
+            return Response(
+                {"detail": "Cannot evaluate: No rubric set associated with this script."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         if script.status == "processing":
             return Response(
@@ -319,6 +131,11 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
             
         except Exception as e:
+            import traceback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Evaluation failed for script {script.id}: {str(e)}")
+            logger.error(traceback.format_exc())
             return Response(
                 {"detail": f"Evaluation failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -344,15 +161,15 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
             "script_id": str(script.id),
             "student_name": script.student_name,
             "student_id": script.student_id,
-            "question_paper": {
-                "title": script.question_paper.title,
-                "subject": script.question_paper.subject,
-                "class_level": script.question_paper.class_level,
-                "total_marks": script.question_paper.total_marks,
+            "rubric_set": {
+                "id": str(script.rubric_set.id),
+                "title": script.rubric_set.title,
+                "subject": script.rubric_set.subject,
+                "total_marks": float(script.rubric_set.total_marks),
             },
             "evaluation_summary": {
                 "total_score": float(script.total_score) if script.total_score else 0,
-                "max_score": script.question_paper.total_marks,
+                "max_score": float(script.rubric_set.total_marks),
                 "percentage": float(script.percentage) if script.percentage else 0,
                 "status": script.status,
                 "evaluated_at": script.evaluated_at.isoformat() if script.evaluated_at else None,
@@ -367,28 +184,33 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
         
         # Add detailed question results
         for evaluation in evaluations:
+            # Calculate marks breakdown (30% method, 40% calculation, 30% answer)
+            total_max = float(evaluation.question_rubric.max_marks)
+            method_max = total_max * 0.3
+            calc_max = total_max * 0.4
+            answer_max = total_max * 0.3
+            
             question_result = {
-                "question_number": evaluation.question.question_number,
-                "question_text": evaluation.question.question_text,
-                "question_type": evaluation.question.question_type,
+                "question_number": evaluation.question_rubric.question_number,
+                "question_text": evaluation.question_rubric.question_text,
                 "marks": {
                     "method": {
                         "awarded": float(evaluation.method_marks_awarded),
-                        "max": evaluation.question.rubric.method_marks if hasattr(evaluation.question, 'rubric') else 0,
+                        "max": method_max,
                         "feedback": evaluation.method_feedback,
                     },
                     "calculation": {
                         "awarded": float(evaluation.calculation_marks_awarded),
-                        "max": evaluation.question.rubric.calculation_marks if hasattr(evaluation.question, 'rubric') else 0,
+                        "max": calc_max,
                         "feedback": evaluation.calculation_feedback,
                     },
                     "answer": {
                         "awarded": float(evaluation.answer_marks_awarded),
-                        "max": evaluation.question.rubric.answer_marks if hasattr(evaluation.question, 'rubric') else 0,
+                        "max": answer_max,
                         "feedback": evaluation.answer_feedback,
                     },
                     "total": float(evaluation.total_marks_awarded),
-                    "max_total": evaluation.question.max_marks,
+                    "max_total": float(evaluation.question_rubric.max_marks),
                 },
                 "student_answer": evaluation.student_answer_text,
                 "key_points_found": evaluation.key_points_found,
@@ -487,8 +309,459 @@ class QuestionEvaluationViewSet(viewsets.ReadOnlyModelViewSet):
             for e in script.question_evaluations.all()
         )
         script.total_score = total
-        if script.question_paper.total_marks > 0:
-            script.percentage = (total / script.question_paper.total_marks) * 100
+        if script.rubric_set.total_marks > 0:
+            script.percentage = (total / script.rubric_set.total_marks) * 100
         script.save()
         
         return Response(QuestionEvaluationSerializer(evaluation).data)
+
+
+# ─── Submission Form Views (Teacher) ─────────────────────────────────────────
+
+
+class SubmissionFormListCreateView(generics.ListCreateAPIView):
+    """
+    GET  /api/evaluation/forms/       → list teacher's submission forms
+    POST /api/evaluation/forms/       → create a new submission form
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return ScriptSubmissionFormCreateSerializer
+        return ScriptSubmissionFormSerializer
+
+    def get_queryset(self):
+        # Teacher sees only their own forms
+        return (
+            ScriptSubmissionForm.objects.filter(
+                assignment__teacher=self.request.user
+            )
+            .select_related(
+                "assignment__subject",
+                "assignment__section__class_ref",
+                "assignment__teacher",
+            )
+            .prefetch_related("scripts")
+        )
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class SubmissionFormDetailView(generics.RetrieveUpdateAPIView):
+    """
+    GET   /api/evaluation/forms/<id>/   → form detail
+    PATCH /api/evaluation/forms/<id>/   → close/reopen form (status field)
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = ScriptSubmissionFormSerializer
+
+    def get_queryset(self):
+        return (
+            ScriptSubmissionForm.objects.filter(
+                assignment__teacher=self.request.user
+            )
+            .select_related(
+                "assignment__subject",
+                "assignment__section__class_ref",
+                "assignment__teacher",
+            )
+            .prefetch_related("scripts")
+        )
+
+    def patch(self, request, *args, **kwargs):
+        instance = self.get_object()
+        new_status = request.data.get("status")
+        if new_status and new_status in ("open", "closed"):
+            instance.status = new_status
+            instance.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(instance).data)
+
+
+class SubmissionFormScriptsView(generics.ListAPIView):
+    """
+    GET /api/evaluation/forms/<form_id>/submissions/
+    List all scripts submitted to a specific form.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = AnswerScriptListEnhancedSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        form_id = self.kwargs["form_id"]
+        form = get_object_or_404(
+            ScriptSubmissionForm,
+            pk=form_id,
+            assignment__teacher=self.request.user,
+        )
+        return (
+            AnswerScript.objects.filter(submission_form=form)
+            .select_related("rubric_set", "student_user")
+            .prefetch_related("pages")
+        )
+
+
+class BatchEvaluateView(APIView):
+    """
+    POST /api/evaluation/forms/<form_id>/evaluate-all/
+    Body: { "rubric_set_id": "<uuid>" }
+
+    Evaluates all pending scripts in this form using the given rubric.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, form_id):
+        form = get_object_or_404(
+            ScriptSubmissionForm,
+            pk=form_id,
+            assignment__teacher=request.user,
+        )
+
+        rubric_set_id = request.data.get("rubric_set_id")
+        if not rubric_set_id:
+            return Response(
+                {"detail": "rubric_set_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.rubrics.models import RubricSet
+
+        try:
+            rubric_set = RubricSet.objects.get(pk=rubric_set_id)
+        except RubricSet.DoesNotExist:
+            return Response(
+                {"detail": "Rubric set not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        pending_scripts = form.scripts.filter(status="pending")
+
+        if not pending_scripts.exists():
+            return Response(
+                {"detail": "No pending scripts to evaluate."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Assign rubric to all pending scripts that don't have one
+        pending_scripts.filter(rubric_set__isnull=True).update(rubric_set=rubric_set)
+
+        results = {"total": pending_scripts.count(), "success": 0, "failed": 0, "errors": []}
+
+        service = ScriptEvaluationService()
+        for script in pending_scripts:
+            try:
+                if not script.rubric_set:
+                    script.rubric_set = rubric_set
+                    script.save(update_fields=["rubric_set"])
+                service.evaluate_script(script)
+                results["success"] += 1
+            except Exception as e:
+                results["failed"] += 1
+                results["errors"].append(
+                    {"script_id": str(script.id), "error": str(e)}
+                )
+                logger.error(f"Batch evaluate failed for script {script.id}: {e}")
+
+        return Response(results, status=status.HTTP_200_OK)
+
+
+# ─── Student Submission Views ────────────────────────────────────────────────
+
+
+class StudentOpenFormsView(generics.ListAPIView):
+    """
+    GET /api/evaluation/my-forms/
+    Lists open submission forms available to the logged-in student
+    based on their section's teaching assignments.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = ScriptSubmissionFormSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        try:
+            student_profile = user.student_profile
+        except StudentProfile.DoesNotExist:
+            return ScriptSubmissionForm.objects.none()
+
+        if not student_profile.section:
+            return ScriptSubmissionForm.objects.none()
+
+        return (
+            ScriptSubmissionForm.objects.filter(
+                status="open",
+                assignment__section=student_profile.section,
+            )
+            .select_related(
+                "assignment__subject",
+                "assignment__section__class_ref",
+                "assignment__teacher",
+            )
+            .prefetch_related("scripts")
+        )
+
+
+class StudentSubmitScriptView(APIView):
+    """
+    POST /api/evaluation/my-forms/<form_id>/submit/
+    Student uploads script pages to an open submission form.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, form_id):
+        user = request.user
+
+        try:
+            student_profile = user.student_profile
+        except StudentProfile.DoesNotExist:
+            return Response(
+                {"detail": "Student profile not found."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        form = get_object_or_404(ScriptSubmissionForm, pk=form_id)
+
+        # Verify the form is open
+        if form.status != "open":
+            return Response(
+                {"detail": "This submission form is closed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Verify student belongs to the section
+        if student_profile.section != form.assignment.section:
+            return Response(
+                {"detail": "You are not in the section for this form."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Check for duplicate submission
+        if AnswerScript.objects.filter(
+            submission_form=form, student_user=user
+        ).exists():
+            return Response(
+                {"detail": "You have already submitted to this form."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = StudentScriptSubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        pages_data = serializer.validated_data["pages"]
+
+        # Create the answer script
+        script = AnswerScript.objects.create(
+            student_user=user,
+            submission_form=form,
+            student_name=f"{user.first_name} {user.last_name}",
+            student_id=student_profile.roll_number,
+        )
+
+        for i, page_image in enumerate(pages_data, start=1):
+            ScriptPage.objects.create(
+                script=script,
+                page_number=i,
+                image=page_image,
+            )
+
+        return Response(
+            AnswerScriptListEnhancedSerializer(script).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StudentMyScriptsView(generics.ListAPIView):
+    """
+    GET /api/evaluation/my-scripts/
+    Student's own submitted scripts with results.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = AnswerScriptListEnhancedSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            AnswerScript.objects.filter(student_user=self.request.user)
+            .select_related("rubric_set", "student_user", "submission_form__assignment__subject")
+            .prefetch_related("pages")
+        )
+
+
+# ─── Evaluation Insights (Teacher) ──────────────────────────────────────────
+
+
+class EvaluationInsightsView(APIView):
+    """
+    GET /api/evaluation/insights/
+    Returns aggregated evaluation analytics scoped to the logged-in teacher's
+    assigned sections/subjects.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # All sections this teacher is assigned to
+        teacher_sections = TeacherSubjectAssignment.objects.filter(
+            teacher=user
+        ).values_list("section_id", flat=True)
+
+        # All scripts the teacher can see
+        scripts = AnswerScript.objects.filter(
+            Q(uploaded_by=user)
+            | Q(submission_form__assignment__teacher=user)
+            | Q(student_user__student_profile__section_id__in=teacher_sections)
+        ).distinct()
+
+        total_scripts = scripts.count()
+        evaluated_scripts = scripts.filter(status="evaluated")
+        pending_scripts = scripts.filter(status="pending")
+
+        agg = evaluated_scripts.aggregate(
+            avg_score=Avg("total_score"),
+            avg_percentage=Avg("percentage"),
+        )
+
+        # ── Section Performance ──────────────────────────────────────────
+        section_perf = (
+            evaluated_scripts
+            .filter(
+                student_user__student_profile__section__isnull=False,
+            )
+            .values(
+                section_name=F("student_user__student_profile__section__name"),
+                class_name=F("student_user__student_profile__section__class_ref__name"),
+            )
+            .annotate(
+                avg_percentage=Avg("percentage"),
+                script_count=Count("id"),
+            )
+            .order_by("class_name", "section_name")
+        )
+
+        # ── Score Distribution (10 buckets) ──────────────────────────────
+        buckets = []
+        for lo in range(0, 100, 10):
+            hi = lo + 10
+            label = f"{lo}-{hi}"
+            cnt = evaluated_scripts.filter(
+                percentage__gte=lo,
+                percentage__lt=(hi if hi < 100 else 101),
+            ).count()
+            buckets.append({"bucket": label, "count": cnt})
+
+        # ── Question Analysis (from the most recent submission form) ─────
+        recent_form = (
+            ScriptSubmissionForm.objects.filter(assignment__teacher=user)
+            .order_by("-created_at")
+            .first()
+        )
+        question_analysis = []
+        if recent_form:
+            form_scripts = evaluated_scripts.filter(submission_form=recent_form)
+            q_stats = (
+                QuestionEvaluation.objects.filter(script__in=form_scripts)
+                .values(
+                    question_number=F("question_rubric__question_number"),
+                    question_text=F("question_rubric__question_text"),
+                    max_marks=F("question_rubric__max_marks"),
+                )
+                .annotate(avg_marks=Avg("total_marks_awarded"))
+                .order_by("question_number")
+            )
+            question_analysis = list(q_stats)
+            # Convert Decimal to float for JSON
+            for q in question_analysis:
+                q["avg_marks"] = float(q["avg_marks"]) if q["avg_marks"] else 0
+                q["max_marks"] = float(q["max_marks"]) if q["max_marks"] else 0
+
+        # ── Top / Bottom Performers ──────────────────────────────────────
+        student_avgs = (
+            evaluated_scripts
+            .filter(student_user__isnull=False)
+            .values("student_user")
+            .annotate(avg_pct=Avg("percentage"), script_count=Count("id"))
+            .filter(script_count__gte=1)
+        )
+
+        def _build_performer(entry):
+            try:
+                sp = StudentProfile.objects.select_related(
+                    "user", "section__class_ref"
+                ).get(user_id=entry["student_user"])
+                return {
+                    "user_id": str(sp.user_id),
+                    "name": f"{sp.user.first_name} {sp.user.last_name}",
+                    "roll_number": sp.roll_number,
+                    "section": sp.section.name if sp.section else "",
+                    "class_name": sp.section.class_ref.name if sp.section else "",
+                    "avg_percentage": round(float(entry["avg_pct"]), 1),
+                    "script_count": entry["script_count"],
+                }
+            except StudentProfile.DoesNotExist:
+                return None
+
+        top_entries = student_avgs.order_by("-avg_pct")[:5]
+        bottom_entries = student_avgs.order_by("avg_pct")[:5]
+
+        top_performers = [p for p in (_build_performer(e) for e in top_entries) if p]
+        bottom_performers = [p for p in (_build_performer(e) for e in bottom_entries) if p]
+
+        # ── Submission Timeline (last 30 days, weekly) ───────────────────
+        now = timezone.now()
+        thirty_days_ago = now - timedelta(days=30)
+        recent_scripts = scripts.filter(created_at__gte=thirty_days_ago)
+
+        timeline = []
+        for week_offset in range(4, -1, -1):
+            week_start = now - timedelta(days=7 * (week_offset + 1))
+            week_end = now - timedelta(days=7 * week_offset)
+            submitted = recent_scripts.filter(
+                created_at__gte=week_start, created_at__lt=week_end
+            ).count()
+            evaluated = recent_scripts.filter(
+                created_at__gte=week_start,
+                created_at__lt=week_end,
+                status="evaluated",
+            ).count()
+            timeline.append({
+                "week": week_start.strftime("%b %d"),
+                "submitted": submitted,
+                "evaluated": evaluated,
+            })
+
+        return Response({
+            "overview": {
+                "total_scripts": total_scripts,
+                "evaluated_count": evaluated_scripts.count(),
+                "pending_count": pending_scripts.count(),
+                "avg_score": round(float(agg["avg_score"] or 0), 1),
+                "avg_percentage": round(float(agg["avg_percentage"] or 0), 1),
+            },
+            "section_performance": list(section_perf),
+            "score_distribution": buckets,
+            "question_analysis": question_analysis,
+            "top_performers": top_performers,
+            "bottom_performers": bottom_performers,
+            "submission_timeline": timeline,
+        })

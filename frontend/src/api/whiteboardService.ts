@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL } from "@/config/api";
+import { getAccessToken } from "@/api/auth";
 
 export interface CurrentUser {
   id: string;
@@ -60,16 +61,30 @@ export interface WhiteboardState {
 }
 
 /**
+ * Helper to get auth headers with Bearer token
+ */
+function getAuthHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+  
+  return headers;
+}
+
+/**
  * Get current authenticated user
  */
 export async function getCurrentUser(): Promise<CurrentUser> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/whiteboard/me/`, {
+    const response = await fetch(`${API_BASE_URL}/auth/me/`, {
       method: "GET",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -82,8 +97,11 @@ export async function getCurrentUser(): Promise<CurrentUser> {
       throw new Error(`Failed to get current user: ${response.statusText}`);
     }
 
-    return await response.json();
-  } catch (error) {
+    const data = await response.json();
+    // Extract user data from the payload wrapper
+    return data.payload;
+  } 
+  catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error("[Whiteboard API] Error getting current user:", errorMsg);
     
@@ -104,12 +122,10 @@ export async function createSession(
   metadata?: Record<string, any>,
 ): Promise<WhiteboardSessionDetail> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/whiteboard/sessions/`, {
+    const response = await fetch(`${API_BASE_URL}/whiteboard/sessions/`, {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         name,
         metadata: metadata || {},
@@ -121,7 +137,8 @@ export async function createSession(
     }
 
     return await response.json();
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("[Whiteboard API] Error creating session:", error);
     throw error;
   }
@@ -135,13 +152,11 @@ export async function getSession(
 ): Promise<WhiteboardSessionDetail> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/whiteboard/sessions/${sessionId}/`,
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/`,
       {
         method: "GET",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
       },
     );
 
@@ -156,7 +171,8 @@ export async function getSession(
     }
 
     return await response.json();
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("[Whiteboard API] Error getting session:", error);
     throw error;
   }
@@ -167,12 +183,10 @@ export async function getSession(
  */
 export async function getUserSessions(): Promise<WhiteboardSession[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/whiteboard/sessions/`, {
+    const response = await fetch(`${API_BASE_URL}/whiteboard/sessions/`, {
       method: "GET",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -180,7 +194,8 @@ export async function getUserSessions(): Promise<WhiteboardSession[]> {
     }
 
     return await response.json();
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("[Whiteboard API] Error getting sessions:", error);
     throw error;
   }
@@ -194,13 +209,11 @@ export async function getLatestState(
 ): Promise<WhiteboardState | null> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/whiteboard/sessions/${sessionId}/latest-state/`,
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/latest-state/`,
       {
         method: "GET",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
       },
     );
 
@@ -213,7 +226,8 @@ export async function getLatestState(
     }
 
     return await response.json();
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("[Whiteboard API] Error getting latest state:", error);
     throw error;
   }
@@ -230,13 +244,11 @@ export async function saveState(
 ): Promise<WhiteboardState> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/whiteboard/sessions/${sessionId}/states/`,
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/states/`,
       {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           snapshot_json: snapshotJson,
           latex_objects: latexObjects,
@@ -250,7 +262,8 @@ export async function saveState(
     }
 
     return await response.json();
-  } catch (error) {
+  } 
+  catch (error) {
     console.error("[Whiteboard API] Error saving state:", error);
     throw error;
   }

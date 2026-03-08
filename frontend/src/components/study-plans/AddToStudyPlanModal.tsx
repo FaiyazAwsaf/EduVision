@@ -152,14 +152,14 @@ export default function AddToStudyPlanModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-[#006A71]/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto border border-[#9ACBD0]">
+    <div className="fixed inset-0 bg-primary-dark/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto border border-secondary">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-[#006A71]">Add to Study Plan</h2>
+          <h2 className="text-xl font-bold text-primary-dark">Add to Study Plan</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-[#9ACBD0] hover:text-[#006A71] transition-colors"
+            className="text-secondary hover:text-primary-dark transition-colors"
           >
             <svg
               className="w-6 h-6"
@@ -179,21 +179,21 @@ export default function AddToStudyPlanModal({
 
         {isLoading ? (
           <div className="text-center py-8">
-            <div className="inline-block rounded-full h-8 w-8 border-4 border-[#48A6A7] border-t-transparent animate-spin"></div>
-            <p className="text-[#48A6A7] mt-4">Loading study plans...</p>
+            <div className="inline-block rounded-full h-8 w-8 border-4 border-primary border-t-transparent animate-spin"></div>
+            <p className="text-primary mt-4">Loading study plans...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Plan Selection or Creation */}
             {!showCreateNew && plans.length > 0 ? (
               <div>
-                <label className="block text-sm font-medium text-[#006A71] mb-1">
+                <label className="block text-sm font-medium text-primary-dark mb-1">
                   Select Study Plan <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedPlanId}
                   onChange={(e) => setSelectedPlanId(e.target.value)}
-                  className="w-full px-3 py-2 border text-[#006A71] border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+                  className="w-full px-3 py-2 border text-primary-dark border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   disabled={isSubmitting}
                   required
                 >
@@ -206,7 +206,7 @@ export default function AddToStudyPlanModal({
                 <button
                   type="button"
                   onClick={() => setShowCreateNew(true)}
-                  className="text-sm text-[#48A6A7] hover:text-[#006A71] mt-2 transition-colors"
+                  className="text-sm text-primary hover:text-primary-dark mt-2 transition-colors"
                   disabled={isSubmitting}
                 >
                   + Create new plan instead
@@ -214,7 +214,7 @@ export default function AddToStudyPlanModal({
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-[#006A71] mb-1">
+                <label className="block text-sm font-medium text-primary-dark mb-1">
                   New Plan Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -222,7 +222,7 @@ export default function AddToStudyPlanModal({
                   value={newPlanName}
                   onChange={(e) => setNewPlanName(e.target.value)}
                   placeholder="e.g., Math Final Exam"
-                  className="w-full px-3 py-2 border border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7] text-[#006A71] placeholder:text-[#9ACBD0]"
+                  className="w-full px-3 py-2 border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-primary-dark placeholder:text-secondary"
                   disabled={isSubmitting}
                   required
                   maxLength={200}
@@ -234,7 +234,7 @@ export default function AddToStudyPlanModal({
                       setShowCreateNew(false);
                       setSelectedPlanId(plans[0].id);
                     }}
-                    className="text-sm text-[#48A6A7] hover:text-[#006A71] mt-2 transition-colors"
+                    className="text-sm text-primary hover:text-primary-dark mt-2 transition-colors"
                     disabled={isSubmitting}
                   >
                     ← Use existing plan instead
@@ -245,32 +245,32 @@ export default function AddToStudyPlanModal({
 
             {/* Topic (pre-filled, editable) */}
             <div>
-              <label className="block text-sm font-medium text-[#006A71] mb-1">
+              <label className="block text-sm font-medium text-primary-dark mb-1">
                 Topic <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                className="w-full px-3 py-2 border text-[#006A71] border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+                className="w-full px-3 py-2 border text-primary-dark border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
                 required
                 maxLength={500}
               />
-              <p className="text-xs text-[#48A6A7] mt-1">
+              <p className="text-xs text-primary mt-1">
                 Pre-filled from generated content, you can edit
               </p>
             </div>
 
             {/* Priority */}
             <div>
-              <label className="block text-sm font-medium text-[#006A71] mb-1">
+              <label className="block text-sm font-medium text-primary-dark mb-1">
                 Priority
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(parseInt(e.target.value))}
-                className="w-full px-3 py-2 border text-[#006A71] border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+                className="w-full px-3 py-2 border text-primary-dark border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               >
                 <option value={1}>1 - Highest (Urgent)</option>
@@ -283,15 +283,15 @@ export default function AddToStudyPlanModal({
 
             {/* Scheduled Date */}
             <div>
-              <label className="block text-sm font-medium text-[#006A71] mb-1">
+              <label className="block text-sm font-medium text-primary-dark mb-1">
                 Scheduled Date{" "}
-                <span className="text-[#48A6A7] text-xs">(Optional)</span>
+                <span className="text-primary text-xs">(Optional)</span>
               </label>
               <input
                 type="date"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full px-3 py-2 border text-[#006A71] border-[#9ACBD0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#48A6A7]"
+                className="w-full px-3 py-2 border text-primary-dark border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               />
             </div>
@@ -307,7 +307,7 @@ export default function AddToStudyPlanModal({
               <button
                 type="submit"
                 disabled={isSubmitting || !topic.trim()}
-                className="flex-1 bg-[#48A6A7] text-white px-4 py-2 rounded-md hover:bg-[#006A71] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSubmitting ? "Adding..." : "Add to Study Plan"}
               </button>
@@ -315,7 +315,7 @@ export default function AddToStudyPlanModal({
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 border text-[#006A71] border-[#9ACBD0] rounded-md hover:bg-[#F2EFE7] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 border text-primary-dark border-secondary rounded-md hover:bg-background disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>

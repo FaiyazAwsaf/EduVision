@@ -81,7 +81,7 @@ export function useWebRTC({
     await manager.handleSignal(
       event.signal_type,
       event.signal_data,
-      event.sender_role
+      event.sender_role,
     );
   }, []);
 

@@ -39,7 +39,7 @@ class WhiteboardConsumer(AsyncWebsocketConsumer):
         self.room_group_name = f"whiteboard_{self.session_id}"
 
         # Check if user is authenticated
-        if isinstance(self.user, AnonymousUser) or not self.user:
+        if not self.user or not getattr(self.user, "is_authenticated", False):
             print(f"[WebSocket] Anonymous user attempted to connect to session: {self.session_id}")
             await self.close(code=4001, reason="Authentication required")
             return
@@ -47,7 +47,8 @@ class WhiteboardConsumer(AsyncWebsocketConsumer):
         # Check if user has access to this session
         has_access = await self._check_session_access()
         if not has_access:
-            print(f"[WebSocket] User {self.user.username} denied access to session: {self.session_id}")
+            username = getattr(self.user, "username", "Unknown")
+            print(f"[WebSocket] User {username} denied access to session: {self.session_id}")
             await self.close(code=4003, reason="Access denied")
             return
 
@@ -55,7 +56,8 @@ class WhiteboardConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
-        print(f"[WebSocket] User {self.user.username} connected to session: {self.session_id}")
+        username = getattr(self.user, "username", "Unknown")
+        print(f"[WebSocket] User {username} connected to session: {self.session_id}")
 
         # Notify others that user joined
         await self.channel_layer.group_send(

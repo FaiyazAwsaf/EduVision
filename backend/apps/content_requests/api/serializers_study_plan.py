@@ -171,6 +171,9 @@ class StudyPlanSerializer(serializers.ModelSerializer):
         help_text="Reference to Module 3 analytics snapshot (future)"
     )
     
+    # User (read-only, set from request.user in view)
+    user_id = serializers.UUIDField(source='user.id', read_only=True, allow_null=True)
+    
     class Meta:
         model = StudyPlan
         fields = [
@@ -184,7 +187,7 @@ class StudyPlanSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'analytics_snapshot_id']
+        read_only_fields = ['id', 'user_id', 'created_at', 'updated_at', 'analytics_snapshot_id']
     
     def validate_mode(self, value):
         """
@@ -230,11 +233,12 @@ class StudyPlanCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating study plans.
     Phase 5: Enforces manual mode constraints.
+    user is set from request.user in the view, not from client payload.
     """
     
     class Meta:
         model = StudyPlan
-        fields = ['user_id', 'name']
+        fields = ['name']
     
     def create(self, validated_data):
         """

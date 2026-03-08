@@ -26,8 +26,6 @@ from apps.content_requests.domain.enums import (
 class ContentRequestCreateSerializer(serializers.Serializer):
     """
     Serializer for creating a new content request.
-    
-    Accepts user input for creating educational content generation requests.
     """
     
     topic = serializers.CharField(
@@ -56,7 +54,9 @@ class ContentRequestCreateSerializer(serializers.Serializer):
     
     difficulty = serializers.ChoiceField(
         choices=Difficulty.choices(),
-        required=True,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
         help_text="Content difficulty level"
     )
     
@@ -65,6 +65,25 @@ class ContentRequestCreateSerializer(serializers.Serializer):
         allow_blank=True,
         max_length=2000,
         help_text="Additional notes or requirements"
+    )
+    
+    subject = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=100,
+        help_text="Academic subject (e.g., Mathematics)"
+    )
+    
+    target_class_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Target class ID (for teachers)"
+    )
+    
+    target_section_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Target section ID (for teachers)"
     )
     
     def validate_topic(self, value: str) -> str:
@@ -104,9 +123,8 @@ class ContentRequestCreateSerializer(serializers.Serializer):
 class ContentRequestResponseSerializer(serializers.ModelSerializer):
     """
     Serializer for content request detail responses.
-    
-    Provides complete information for a single request.
     """
+    created_by_id = serializers.SerializerMethodField()
     
     class Meta:
         model = ContentRequestModel
@@ -119,17 +137,21 @@ class ContentRequestResponseSerializer(serializers.ModelSerializer):
             'difficulty',
             'notes',
             'status',
+            'role',
+            'subject',
+            'created_by_id',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'created_at', 'updated_at', 'created_by_id']
+    
+    def get_created_by_id(self, obj):
+        return str(obj.created_by.id) if obj.created_by else None
 
 
 class ContentRequestListSerializer(serializers.ModelSerializer):
     """
     Serializer for content request list responses.
-    
-    Provides summary information for multiple requests.
     """
     
     class Meta:
@@ -139,6 +161,8 @@ class ContentRequestListSerializer(serializers.ModelSerializer):
             'topic',
             'content_type',
             'status',
+            'role',
+            'subject',
             'created_at',
         ]
         read_only_fields = fields
@@ -234,3 +258,45 @@ class ErrorResponseSerializer(serializers.Serializer):
         if details:
             response['details'] = details
         return response
+
+
+class SharedContentListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for content shared with a student's class/section.
+    Shows completed teacher-generated content targeted at the student's class.
+    """
+    teacher_name = serializers.SerializerMethodField()
+    class_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContentRequestModel
+        fields = [
+            'id',
+            'topic',
+            'content_type',
+            'subject',
+            'difficulty',
+            'style',
+            'teacher_name',
+            'class_name',
+            'section_name',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_teacher_name(self, obj):
+        if obj.created_by:
+            name = f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+            return name or obj.created_by.username
+        return None
+
+    def get_class_name(self, obj):
+        if obj.target_class:
+            return obj.target_class.name
+        return None
+
+    def get_section_name(self, obj):
+        if obj.target_section:
+            return obj.target_section.name
+        return None

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import WhiteboardSession, SessionMember, WhiteboardState
-from backend.apps.authentication.models import CustomUser
+from apps.authentication.models import CustomUser
 
 class UserSummarySerializer(serializers.ModelSerializer):
     class Meta:

@@ -11,12 +11,22 @@
  */
 
 import { API_ENDPOINTS } from "@/config/api";
+import { authenticatedFetch } from "@/api/auth";
 import type {
   CreateContentRequestPayload,
   ContentRequest,
   GeneratedContent,
   ApiError,
   OutputFormat,
+  Feedback,
+  FeedbackPayload,
+  LearningContext,
+  LearningContextPayload,
+  StudyPlan,
+  StudyPlanItem,
+  CreateStudyPlanPayload,
+  CreateStudyPlanItemPayload,
+  UpdateStudyPlanItemPayload,
 } from "@/types/content";
 
 /**
@@ -27,9 +37,9 @@ import type {
  * @throws Error if request fails
  */
 export async function createContentRequest(
-  payload: CreateContentRequestPayload
+  payload: CreateContentRequestPayload,
 ): Promise<ContentRequest> {
-  const response = await fetch(API_ENDPOINTS.CONTENT_REQUESTS, {
+  const response = await authenticatedFetch(API_ENDPOINTS.CONTENT_REQUESTS, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -55,16 +65,16 @@ export async function createContentRequest(
  * @throws Error if request not found or network fails
  */
 export async function getRequestStatus(
-  requestId: string
+  requestId: string,
 ): Promise<ContentRequest> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     API_ENDPOINTS.CONTENT_REQUEST_DETAIL(requestId),
     {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -93,11 +103,11 @@ export async function getRequestStatus(
  */
 export async function getGeneratedContent(
   requestId: string,
-  format: "json" | "text" = "json"
+  format: "json" | "text" = "json",
 ): Promise<GeneratedContent> {
   const url = `${API_ENDPOINTS.GENERATED_CONTENT(requestId)}?format=${format}`;
 
-  const response = await fetch(url, {
+  const response = await authenticatedFetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -128,14 +138,14 @@ export async function getGeneratedContent(
  */
 export async function downloadGeneratedContent(
   requestId: string,
-  format: Extract<OutputFormat, OutputFormat.PDF | OutputFormat.WORKSHEET>
+  format: Extract<OutputFormat, OutputFormat.PDF | OutputFormat.WORKSHEET>,
 ): Promise<void> {
   const formatParam = format.toLowerCase();
   const url = `${API_ENDPOINTS.GENERATED_CONTENT(
-    requestId
+    requestId,
   )}download/?format=${formatParam}`;
 
-  const response = await fetch(url, {
+  const response = await authenticatedFetch(url, {
     method: "GET",
   });
 
@@ -178,12 +188,48 @@ export async function downloadGeneratedContent(
 }
 
 /**
- * List all content requests (for future use)
- *
- * @returns Array of content requests
+ * Filter options for listing content requests
  */
-export async function listContentRequests(): Promise<ContentRequest[]> {
-  const response = await fetch(API_ENDPOINTS.CONTENT_REQUESTS, {
+export interface ContentRequestFilters {
+  status?: string;
+  content_type?: string;
+  subject?: string;
+  search?: string;
+  created_after?: string;
+  created_before?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ContentRequestListResponse {
+  results: ContentRequest[];
+  count: number;
+  total: number;
+}
+
+/**
+ * List content requests with optional filters
+ *
+ * @param filters - Optional filter parameters
+ * @returns Paginated content request list with total count
+ */
+export async function listContentRequests(
+  filters?: ContentRequestFilters,
+): Promise<ContentRequestListResponse> {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== "" && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+  }
+
+  const url = params.toString()
+    ? `${API_ENDPOINTS.CONTENT_REQUESTS}?${params.toString()}`
+    : API_ENDPOINTS.CONTENT_REQUESTS;
+
+  const response = await authenticatedFetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -197,11 +243,38 @@ export async function listContentRequests(): Promise<ContentRequest[]> {
   return response.json();
 }
 
+/**
+ * Regenerate content from an existing request
+ *
+ * @param requestId - UUID of the original content request
+ * @returns Newly created content request
+ */
+export async function regenerateContentRequest(
+  requestId: string,
+): Promise<ContentRequest> {
+  const response = await authenticatedFetch(
+    API_ENDPOINTS.REGENERATE_CONTENT(requestId),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const error: ApiError = await response.json().catch(() => ({
+      error: "Failed to regenerate content",
+    }));
+    throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
 // ============================================================================
 // Phase 3: Feedback API Functions
 // ============================================================================
-
-import type { Feedback, FeedbackPayload } from "@/types/content";
 
 /**
  * Submit feedback for generated content
@@ -213,9 +286,9 @@ import type { Feedback, FeedbackPayload } from "@/types/content";
  */
 export async function submitFeedback(
   contentId: string,
-  feedback: FeedbackPayload
+  feedback: FeedbackPayload,
 ): Promise<Feedback> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}generated-content/${contentId}/feedback/`,
     {
       method: "POST",
@@ -223,13 +296,13 @@ export async function submitFeedback(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(feedback),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorData: ApiError = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error || errorData.detail || "Failed to submit feedback"
+      errorData.error || errorData.detail || "Failed to submit feedback",
     );
   }
 
@@ -244,14 +317,14 @@ export async function submitFeedback(
  * @throws Error if request fails (other than 404)
  */
 export async function getFeedback(contentId: string): Promise<Feedback | null> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}generated-content/${contentId}/feedback/`,
     {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (response.status === 404) {
@@ -269,8 +342,6 @@ export async function getFeedback(contentId: string): Promise<Feedback | null> {
 // Phase 4: Learning Context API Functions
 // ============================================================================
 
-import type { LearningContext, LearningContextPayload } from "@/types/content";
-
 /**
  * Submit learning context for a content request
  *
@@ -284,9 +355,9 @@ import type { LearningContext, LearningContextPayload } from "@/types/content";
  */
 export async function submitLearningContext(
   requestId: string,
-  context: LearningContextPayload
+  context: LearningContextPayload,
 ): Promise<LearningContext> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
     {
       method: "POST",
@@ -294,13 +365,15 @@ export async function submitLearningContext(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(context),
-    }
+    },
   );
 
   if (!response.ok) {
     const errorData: ApiError = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.error || errorData.detail || "Failed to submit learning context"
+      errorData.error ||
+        errorData.detail ||
+        "Failed to submit learning context",
     );
   }
 
@@ -315,16 +388,16 @@ export async function submitLearningContext(
  * @throws Error if request fails (other than 404)
  */
 export async function getLearningContext(
-  requestId: string
+  requestId: string,
 ): Promise<LearningContext | null> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_ENDPOINTS.CONTENT_REQUESTS}${requestId}/context/`,
     {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (response.status === 404) {
@@ -342,14 +415,6 @@ export async function getLearningContext(
 // Phase 5: Study Plan API Functions (Manual Mode Only)
 // ============================================================================
 
-import type {
-  StudyPlan,
-  StudyPlanItem,
-  CreateStudyPlanPayload,
-  CreateStudyPlanItemPayload,
-  UpdateStudyPlanItemPayload,
-} from "@/types/content";
-
 /**
  * Create a new study plan
  *
@@ -360,9 +425,9 @@ import type {
  * @throws Error if request fails
  */
 export async function createStudyPlan(
-  payload: CreateStudyPlanPayload
+  payload: CreateStudyPlanPayload,
 ): Promise<StudyPlan> {
-  const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
+  const response = await authenticatedFetch(API_ENDPOINTS.STUDY_PLANS, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -389,7 +454,7 @@ export async function createStudyPlan(
  * @throws Error if request fails
  */
 export async function listStudyPlans(): Promise<StudyPlan[]> {
-  const response = await fetch(API_ENDPOINTS.STUDY_PLANS, {
+  const response = await authenticatedFetch(API_ENDPOINTS.STUDY_PLANS, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -411,12 +476,15 @@ export async function listStudyPlans(): Promise<StudyPlan[]> {
  * @throws Error if request fails or plan not found
  */
 export async function getStudyPlan(planId: string): Promise<StudyPlan> {
-  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.STUDY_PLANS}${planId}/`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -435,9 +503,12 @@ export async function getStudyPlan(planId: string): Promise<StudyPlan> {
  * @throws Error if request fails
  */
 export async function deleteStudyPlan(planId: string): Promise<void> {
-  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/`, {
-    method: "DELETE",
-  });
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.STUDY_PLANS}${planId}/`,
+    {
+      method: "DELETE",
+    },
+  );
 
   if (!response.ok) {
     throw new Error("Failed to delete study plan");
@@ -456,15 +527,18 @@ export async function deleteStudyPlan(planId: string): Promise<void> {
  */
 export async function addStudyPlanItem(
   planId: string,
-  payload: CreateStudyPlanItemPayload
+  payload: CreateStudyPlanItemPayload,
 ): Promise<StudyPlanItem> {
-  const response = await fetch(`${API_ENDPOINTS.STUDY_PLANS}${planId}/items/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.STUDY_PLANS}${planId}/items/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+  );
 
   if (!response.ok) {
     const error: ApiError = await response.json().catch(() => ({
@@ -484,13 +558,13 @@ export async function addStudyPlanItem(
  * @throws Error if request fails
  */
 export async function listStudyPlanItems(
-  studyPlanId?: string
+  studyPlanId?: string,
 ): Promise<StudyPlanItem[]> {
   const url = studyPlanId
     ? `${API_ENDPOINTS.STUDY_PLAN_ITEMS}?study_plan_id=${studyPlanId}`
     : API_ENDPOINTS.STUDY_PLAN_ITEMS;
 
-  const response = await fetch(url, {
+  const response = await authenticatedFetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -512,12 +586,15 @@ export async function listStudyPlanItems(
  * @throws Error if request fails
  */
 export async function getStudyPlanItem(itemId: string): Promise<StudyPlanItem> {
-  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -541,15 +618,18 @@ export async function getStudyPlanItem(itemId: string): Promise<StudyPlanItem> {
  */
 export async function updateStudyPlanItem(
   itemId: string,
-  payload: UpdateStudyPlanItemPayload
+  payload: UpdateStudyPlanItemPayload,
 ): Promise<StudyPlanItem> {
-  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+  );
 
   if (!response.ok) {
     const error: ApiError = await response.json().catch(() => ({
@@ -568,9 +648,12 @@ export async function updateStudyPlanItem(
  * @throws Error if request fails
  */
 export async function deleteStudyPlanItem(itemId: string): Promise<void> {
-  const response = await fetch(`${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`, {
-    method: "DELETE",
-  });
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/`,
+    {
+      method: "DELETE",
+    },
+  );
 
   if (!response.ok) {
     throw new Error("Failed to delete study plan item");
@@ -587,16 +670,16 @@ export async function deleteStudyPlanItem(itemId: string): Promise<void> {
  * @throws Error if request fails
  */
 export async function markStudyPlanItemComplete(
-  itemId: string
+  itemId: string,
 ): Promise<StudyPlanItem> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/complete/`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
@@ -616,9 +699,9 @@ export async function markStudyPlanItemComplete(
  */
 export async function linkRequestToStudyPlanItem(
   itemId: string,
-  requestId: string
+  requestId: string,
 ): Promise<StudyPlanItem> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_ENDPOINTS.STUDY_PLAN_ITEMS}${itemId}/link-request/`,
     {
       method: "POST",
@@ -626,7 +709,7 @@ export async function linkRequestToStudyPlanItem(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ request_id: requestId }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -634,6 +717,65 @@ export async function linkRequestToStudyPlanItem(
       error: "Failed to link content request",
     }));
     throw new Error(error.error || error.detail || "Unknown error occurred");
+  }
+
+  return response.json();
+}
+
+// ─── Shared Content (for students) ─────────────────────────────────────────
+
+export interface SharedContentItem {
+  id: string;
+  topic: string;
+  content_type: string;
+  subject: string | null;
+  difficulty: string | null;
+  style: string;
+  teacher_name: string | null;
+  class_name: string | null;
+  section_name: string | null;
+  created_at: string;
+}
+
+export interface SharedContentListResponse {
+  results: SharedContentItem[];
+  total: number;
+  count: number;
+}
+
+export interface SharedContentFilters {
+  content_type?: string;
+  subject?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * List content shared with the student's class/section by teachers.
+ */
+export async function listSharedContent(
+  filters?: SharedContentFilters,
+): Promise<SharedContentListResponse> {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== "" && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+  }
+
+  const base = `${API_ENDPOINTS.CONTENT_REQUESTS}shared/`;
+  const url = params.toString() ? `${base}?${params.toString()}` : base;
+
+  const response = await authenticatedFetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch shared content");
   }
 
   return response.json();

@@ -272,7 +272,7 @@ export default function Whiteboard({
         case "lock_state":
           // update drawing lock state for students
           if (role === "student") {
-            setIsDrawingLocked(message.data?.isLocked || false);
+            setIsDrawingLocked(Boolean(message.data?.isLocked));
             console.log(
               "[Whiteboard] Drawing lock state:",
               message.data?.isLocked,
@@ -290,7 +290,10 @@ export default function Whiteboard({
 
         case "latex_added":
           if (message.data?.latexObject) {
-            setLatexObjects((prev) => [...prev, message.data.latexObject]);
+            setLatexObjects((prev) => [
+              ...prev,
+              message.data!.latexObject as LatexObject,
+            ]);
             console.log("[Whiteboard] Remote LaTeX object added");
           }
           break;

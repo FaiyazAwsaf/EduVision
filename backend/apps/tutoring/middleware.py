@@ -1,13 +1,8 @@
 """
-Temporary Authentication Middleware
+Tutoring Authentication Middleware
 
-Provides a temporary authentication mechanism for development
-using X-User-Id header. This will be replaced with proper
-authentication in production.
-
-Security Note:
-    This middleware is for development only! Do not use in production.
-    It trusts the X-User-Id header without verification.
+Provides authentication for tutoring API endpoints.
+Supports both JWT Bearer tokens and X-User-Id header (development fallback).
 """
 
 import logging
@@ -19,24 +14,17 @@ logger = logging.getLogger(__name__)
 
 class TempAuthMiddleware(MiddlewareMixin):
     """
-    Temporary authentication middleware that reads X-User-Id header.
+    Authentication middleware for tutoring endpoints.
     
-    How it works:
-    1. Reads X-User-Id header from request
-    2. Fetches corresponding TutoringUser from database
-    3. Attaches user to request object as request.tutoring_user
-    4. Returns 401 if header missing or user not found
-    
-    Exempt paths:
-    - /api/tutoring/users/ (for creating/listing test users)
-    - /admin/
-    - Paths not starting with /api/tutoring/
+    How it works (in order of priority):
+    1. Checks for JWT Bearer token in Authorization header
+    2. Falls back to X-User-Id header (development only)
+    3. Attaches user to request.tutoring_user
+    4. Returns 401 if neither method succeeds
     """
     
     # Paths that don't require authentication
     EXEMPT_PATHS = [
-        '/api/tutoring/users/',
-        '/api/tutoring/users',
         '/admin/',
     ]
     
@@ -53,32 +41,49 @@ class TempAuthMiddleware(MiddlewareMixin):
             if request.path.startswith(exempt_path):
                 return None
         
-        # Get user ID from header
+        # Try JWT Bearer token first
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            user = self._authenticate_jwt(token)
+            if user:
+                request.tutoring_user = user
+                return None
+            # If JWT fails, don't fall back - return 401
+            return JsonResponse(
+                {
+                    'error': 'Authentication failed',
+                    'detail': 'Invalid or expired JWT token',
+                    'code': 'auth_failed'
+                },
+                status=401
+            )
+        
+        # Fall back to X-User-Id header (development)
         user_id = request.headers.get('X-User-Id')
         
         if not user_id:
             logger.warning(
-                f"Missing X-User-Id header for path: {request.path}"
+                f"Missing authentication for path: {request.path}"
             )
             return JsonResponse(
                 {
                     'error': 'Authentication required',
-                    'detail': 'X-User-Id header is required',
+                    'detail': 'Authorization header or X-User-Id header is required',
                     'code': 'auth_required'
                 },
                 status=401
             )
         
-        # Import here to avoid circular imports
-        from apps.tutoring.models import TutoringUser
+        from apps.authentication.models import CustomUser
         
         try:
-            user = TutoringUser.objects.get(id=user_id)
+            user = CustomUser.objects.get(id=user_id)
             request.tutoring_user = user
             logger.debug(
-                f"Authenticated user: {user.full_name} ({user.role})"
+                f"Authenticated user via X-User-Id: {user.first_name} {user.last_name} ({user.role})"
             )
-        except TutoringUser.DoesNotExist:
+        except CustomUser.DoesNotExist:
             logger.warning(f"User not found: {user_id}")
             return JsonResponse(
                 {
@@ -100,3 +105,25 @@ class TempAuthMiddleware(MiddlewareMixin):
             )
         
         return None
+    
+    def _authenticate_jwt(self, token):
+        """
+        Validate JWT token and return the associated user.
+        
+        Returns:
+            CustomUser instance or None if token is invalid
+        """
+        try:
+            from rest_framework_simplejwt.tokens import AccessToken
+            from apps.authentication.models import CustomUser
+            
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            user = CustomUser.objects.get(id=user_id)
+            logger.debug(
+                f"Authenticated user via JWT: {user.first_name} {user.last_name} ({user.role})"
+            )
+            return user
+        except Exception as e:
+            logger.warning(f"JWT authentication failed: {str(e)}")
+            return None

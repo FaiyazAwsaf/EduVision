@@ -1,0 +1,379 @@
+"""
+Management command to seed the database with sample Bangladeshi data.
+
+Usage:
+    python manage.py seed_school_data          # creates everything
+    python manage.py seed_school_data --flush  # wipes existing seed data first
+"""
+
+import random
+from django.core.management.base import BaseCommand
+from apps.authentication.models import CustomUser
+from apps.students.models import (
+    Class, Section, TeacherProfile, StudentProfile,
+    Subject, TeacherSubjectAssignment,
+)
+
+
+# ─── Bangladeshi name pools ──────────────────────────────────────────────────
+
+MALE_FIRST = [
+    "Rahim", "Karim", "Farhan", "Tanvir", "Shakib", "Mahfuz", "Arif",
+    "Nayeem", "Sabbir", "Jubayer", "Rakib", "Mehedi", "Shihab", "Imran",
+    "Ashraf", "Rifat", "Sohel", "Mamun", "Fahim", "Nazmul", "Sajid",
+    "Rezaul", "Mushfiq", "Tamim", "Liton", "Soumya", "Mominul", "Taskin",
+    "Ebadot", "Shoriful", "Towhid", "Rony", "Shanto", "Naim", "Mahmudul",
+    "Rayhan", "Hasib", "Kamrul", "Zahid", "Monir",
+]
+
+FEMALE_FIRST = [
+    "Fatema", "Ayesha", "Nusrat", "Tasnim", "Rabeya", "Sultana", "Marium",
+    "Jannatul", "Sharmin", "Nafisa", "Lamia", "Sadia", "Tamanna", "Farzana",
+    "Sumaiya", "Israt", "Taslima", "Rumana", "Mahbuba", "Nasreen", "Salma",
+    "Reshma", "Farjana", "Tania", "Poly", "Habiba", "Munni", "Shirin",
+    "Laboni", "Sabrina", "Ruma", "Mithila", "Nahar", "Ratna", "Afroza",
+]
+
+LAST_NAMES = [
+    "Hasan", "Islam", "Rahman", "Ahmed", "Chowdhury", "Khan", "Uddin",
+    "Akter", "Begum", "Mia", "Hossain", "Talukder", "Sarkar", "Mondal",
+    "Bhuiyan", "Siddique", "Alam", "Kabir", "Mostafa", "Kamal", "Zaman",
+    "Haque", "Biswas", "Khandaker", "Mahmud",
+]
+
+DEPARTMENTS = [
+    "Mathematics", "Physics", "Chemistry", "Biology", "English",
+    "Bengali", "ICT", "History", "Geography", "Islamic Studies",
+    "Accounting", "Business Studies",
+]
+
+QUALIFICATIONS = [
+    "M.Sc. Mathematics", "M.Sc. Physics", "M.Sc. Chemistry",
+    "M.A. English", "M.A. Bengali", "M.A. History",
+    "M.S.S. Geography", "B.Ed", "M.Ed",
+    "M.B.S. Accounting", "M.Com", "B.Sc. (Hons) ICT",
+]
+
+BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+
+STREETS = [
+    "Mirpur", "Dhanmondi", "Uttara", "Mohammadpur", "Banani",
+    "Gulshan", "Tejgaon", "Motijheel", "Badda", "Khilgaon",
+    "Rampura", "Jatrabari", "Shyamoli", "Lalmatia", "Mohakhali",
+    "Gazipur", "Narayanganj", "Tongi", "Savar", "Keraniganj",
+]
+
+
+def _random_phone():
+    return f"01{random.choice(['3','5','6','7','8','9'])}{random.randint(10000000,99999999)}"
+
+
+def _random_dob(min_year, max_year):
+    from datetime import date
+    y = random.randint(min_year, max_year)
+    m = random.randint(1, 12)
+    d = random.randint(1, 28)
+    return date(y, m, d)
+
+
+def _random_address():
+    house = random.randint(1, 300)
+    road = random.randint(1, 30)
+    area = random.choice(STREETS)
+    return f"House {house}, Road {road}, {area}, Dhaka"
+
+
+class Command(BaseCommand):
+    help = "Seed database with sample Bangladeshi school data"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--flush",
+            action="store_true",
+            help="Delete existing seed data before creating new entries",
+        )
+
+    def handle(self, *args, **options):
+        if options["flush"]:
+            self.stdout.write("Flushing existing seed data …")
+            TeacherSubjectAssignment.objects.all().delete()
+            Subject.objects.all().delete()
+            TeacherProfile.objects.all().delete()
+            StudentProfile.objects.all().delete()
+            Section.objects.all().delete()
+            Class.objects.all().delete()
+            # Use raw SQL to bypass Django's ORM cascade which fails on PG
+            # because django_admin_log.user_id is integer but CustomUser.id is UUID
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM django_admin_log")
+                cursor.execute("DELETE FROM authentication_user WHERE username LIKE 'seed_%%'")
+            # Reset passwords for all remaining users to pass1234
+            for u in CustomUser.objects.all():
+                u.set_password("pass1234")
+                u.save(update_fields=["password"])
+                self.stdout.write(f"  reset password: {u.username}")
+
+        self._create_classes_and_sections()
+        self._create_subjects()
+        self._create_teachers()
+        self._create_students()
+        self._create_teaching_assignments()
+
+        self.stdout.write(self.style.SUCCESS("\n✓ Seeding complete!"))
+        self.stdout.write(f"  Classes     : {Class.objects.count()}")
+        self.stdout.write(f"  Sections    : {Section.objects.count()}")
+        self.stdout.write(f"  Subjects    : {Subject.objects.count()}")
+        self.stdout.write(f"  Teachers    : {TeacherProfile.objects.count()}")
+        self.stdout.write(f"  Students    : {StudentProfile.objects.count()}")
+        self.stdout.write(f"  Assignments : {TeacherSubjectAssignment.objects.count()}")
+
+    # ── Subjects ──────────────────────────────────────────────────────────
+
+    SUBJECTS = [
+        ("Mathematics", "MATH"),
+        ("Physics", "PHY"),
+        ("Chemistry", "CHEM"),
+        ("Biology", "BIO"),
+        ("English", "ENG"),
+        ("Bengali", "BAN"),
+        ("ICT", "ICT"),
+        ("History", "HIST"),
+        ("Geography", "GEO"),
+        ("Islamic Studies", "IS"),
+        ("Accounting", "ACC"),
+        ("Business Studies", "BUS"),
+    ]
+
+    def _create_subjects(self):
+        self.stdout.write("Creating subjects …")
+        for name, code in self.SUBJECTS:
+            obj, created = Subject.objects.get_or_create(
+                code=code,
+                defaults={"name": name},
+            )
+            if created:
+                self.stdout.write(f"  + {obj}")
+        self.stdout.write(f"  {Subject.objects.count()} subjects total")
+
+    # ── Classes & Sections ────────────────────────────────────────────────
+
+    def _create_classes_and_sections(self):
+        self.stdout.write("Creating classes 9-12 with sections A, B, C …")
+        academic_year = "2025-2026"
+        streams = {
+            "9": [""],
+            "10": [""],
+            "11": ["Science", "Commerce", "Arts"],
+            "12": ["Science", "Commerce", "Arts"],
+        }
+
+        for grade, grade_streams in streams.items():
+            for stream in grade_streams:
+                cls, created = Class.objects.get_or_create(
+                    name=grade,
+                    stream=stream,
+                    academic_year=academic_year,
+                )
+                if created:
+                    self.stdout.write(f"  + Class {cls}")
+
+                for sec_name in ["A", "B", "C"]:
+                    sec, sec_created = Section.objects.get_or_create(
+                        class_ref=cls,
+                        name=sec_name,
+                        defaults={"capacity": random.randint(35, 50)},
+                    )
+                    if sec_created:
+                        self.stdout.write(f"    + Section {sec}")
+
+    # ── Teachers ──────────────────────────────────────────────────────────
+
+    def _create_teachers(self):
+        self.stdout.write("Creating teacher profiles …")
+        sections = list(Section.objects.select_related("class_ref").all())
+        used_names = set()
+        teacher_count = 0
+
+        # Create ~12 teachers (one per department roughly)
+        for i, dept in enumerate(DEPARTMENTS):
+            # Pick a unique name
+            while True:
+                first = random.choice(MALE_FIRST + FEMALE_FIRST)
+                last = random.choice(LAST_NAMES)
+                full = f"{first} {last}"
+                if full not in used_names:
+                    used_names.add(full)
+                    break
+
+            username = f"seed_teacher_{i+1}"
+            email = f"{first.lower()}.{last.lower()}.t{i+1}@eduvision.bd"
+
+            if CustomUser.objects.filter(username=username).exists():
+                continue
+
+            user = CustomUser.objects.create(
+                email=email,
+                username=username,
+                first_name=first,
+                last_name=last,
+                role="teacher",
+            )
+            user.set_password("pass1234")
+            user.save()
+
+            # Assign class teacher to a section (round-robin, one teacher → one section)
+            ct_section = sections[i % len(sections)] if sections else None
+
+            TeacherProfile.objects.create(
+                user=user,
+                employee_id=f"TCH-{1000 + i}",
+                department=dept,
+                qualification=random.choice(QUALIFICATIONS),
+                date_of_birth=_random_dob(1970, 1995),
+                phone=_random_phone(),
+                address=_random_address(),
+                class_teacher_of=ct_section,
+            )
+            teacher_count += 1
+            self.stdout.write(f"  + {first} {last} — {dept}")
+
+        self.stdout.write(f"  Created {teacher_count} teachers")
+
+    # ── Students ──────────────────────────────────────────────────────────
+
+    def _create_students(self):
+        self.stdout.write("Creating student profiles …")
+        sections = list(
+            Section.objects.select_related("class_ref").order_by(
+                "class_ref__name", "name"
+            )
+        )
+        used_names = set()
+        student_count = 0
+
+        for section in sections:
+            # 5-8 students per section
+            num_students = random.randint(5, 8)
+            for j in range(num_students):
+                while True:
+                    is_female = random.random() < 0.5
+                    first = random.choice(
+                        FEMALE_FIRST if is_female else MALE_FIRST
+                    )
+                    last = random.choice(LAST_NAMES)
+                    full = f"{first} {last}"
+                    if full not in used_names:
+                        used_names.add(full)
+                        break
+
+                student_count += 1
+                username = f"seed_student_{student_count}"
+                email = f"{first.lower()}.{last.lower()}.s{student_count}@eduvision.bd"
+
+                if CustomUser.objects.filter(username=username).exists():
+                    continue
+
+                user = CustomUser.objects.create(
+                    email=email,
+                    username=username,
+                    first_name=first,
+                    last_name=last,
+                    role="student",
+                )
+                user.set_password("pass1234")
+                user.save()
+
+                roll_prefix = section.class_ref.name + section.name
+                if section.class_ref.stream:
+                    stream_code = section.class_ref.stream[:3].upper()
+                    roll_prefix = f"{section.class_ref.name}{stream_code}{section.name}"
+                roll = f"{roll_prefix}-{str(j + 1).zfill(3)}"
+
+                # Parent names
+                father_first = random.choice(MALE_FIRST)
+                mother_first = random.choice(FEMALE_FIRST)
+
+                StudentProfile.objects.create(
+                    user=user,
+                    roll_number=roll,
+                    section=section,
+                    blood_group=random.choice(BLOOD_GROUPS),
+                    date_of_birth=_random_dob(2008, 2012),
+                    address=_random_address(),
+                    father_name=f"{father_first} {last}",
+                    father_phone=_random_phone(),
+                    mother_name=f"{mother_first} {last}",
+                    mother_phone=_random_phone(),
+                )
+
+            self.stdout.write(
+                f"  + {section} -> {num_students} students"
+            )
+
+        self.stdout.write(f"  Created {student_count} students total")
+
+    # ── Teaching Assignments ──────────────────────────────────────────────
+
+    def _create_teaching_assignments(self):
+        """
+        Assign each seed teacher to all eligible sections for their department.
+        Science/Commerce/Arts teachers are scoped to correct streams.
+        """
+        self.stdout.write("Creating teaching assignments...")
+
+        subject_map = {s.name: s for s in Subject.objects.all()}
+
+        general = list(Section.objects.filter(
+            class_ref__name__in=["9", "10"]
+        ).select_related("class_ref"))
+        science = list(Section.objects.filter(
+            class_ref__name__in=["11", "12"], class_ref__stream="Science"
+        ).select_related("class_ref"))
+        commerce = list(Section.objects.filter(
+            class_ref__name__in=["11", "12"], class_ref__stream="Commerce"
+        ).select_related("class_ref"))
+        arts = list(Section.objects.filter(
+            class_ref__name__in=["11", "12"], class_ref__stream="Arts"
+        ).select_related("class_ref"))
+
+        dept_sections = {
+            "Mathematics":      general + science + commerce + arts,
+            "English":          general + science + commerce + arts,
+            "Bengali":          general + science + commerce + arts,
+            "ICT":              general + science + commerce + arts,
+            "Islamic Studies":  general + science + commerce + arts,
+            "Physics":          general + science,
+            "Chemistry":        general + science,
+            "Biology":          general + science,
+            "History":          general + arts,
+            "Geography":        general + arts,
+            "Accounting":       commerce,
+            "Business Studies": commerce,
+        }
+
+        teachers = TeacherProfile.objects.filter(
+            user__username__startswith="seed_teacher_"
+        ).select_related("user")
+
+        assignment_count = 0
+        for tp in teachers:
+            subject = subject_map.get(tp.department)
+            if not subject:
+                continue
+            eligible = dept_sections.get(tp.department, [])
+            for sec in eligible:
+                _, created = TeacherSubjectAssignment.objects.get_or_create(
+                    teacher=tp.user,
+                    subject=subject,
+                    section=sec,
+                )
+                if created:
+                    assignment_count += 1
+            self.stdout.write(
+                f"  {tp.user.first_name} {tp.user.last_name} ({tp.department})"
+                f" -> {len(eligible)} sections"
+            )
+
+        self.stdout.write(f"  Created {assignment_count} teaching assignments")
+

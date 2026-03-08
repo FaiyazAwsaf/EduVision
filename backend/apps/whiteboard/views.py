@@ -243,17 +243,3 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
                 {"detail": "No state found for this session."},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_current_user(request):
-    """Get current authenticated user's info (role, ID, username)"""
-    user = request.user
-    return Response({
-        "id": str(user.id),
-        "username": user.username,
-        "email": user.email,
-        "role": user.role,
-        "is_authenticated": True
-    })

@@ -1,552 +1,765 @@
 "use client";
 
-/**
- * Teacher Dashboard Page (Phase 2 - WebSocket Version)
- *
- * Allows teachers to create and manage tutoring sessions.
- * Uses WebSocket for real-time updates instead of polling.
- * Phase 3: Audio-only WebRTC integration.
- */
-
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  AlertTriangle,
+  Plus,
+  Eye,
+  ArrowRight,
+  Loader2,
+  Users,
   Clock,
-  Square,
-  User,
+  Video,
   GraduationCap,
-  Check,
-  Circle,
+  BookOpen,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Hourglass,
+  X,
 } from "lucide-react";
-import UserSelector from "@/components/tutoring/UserSelector";
-import SessionStatusBadge from "@/components/tutoring/SessionStatus";
+import { useAuth } from "@/contexts/AuthContext";
 import {
-  ConnectionStatusBadge,
-  ParticipantStatus,
-} from "@/components/tutoring/ConnectionStatus";
-import { SessionProvider, useSession } from "@/contexts/SessionContext";
-import { MediaSession } from "@/components/tutoring/media/MediaSession";
-import {
-  TutoringUser,
-  SessionCreateResponse,
+  listSessions,
   createSession,
-  endSession,
-  getErrorMessage,
-  ApiError,
+  rejoinSession,
+  type SessionStatus,
 } from "@/api/tutoring";
+import { getMyClass, type MyClassInfo } from "@/api/school";
 import {
-  ParticipantEvent,
-  StatusChangeEvent,
-  SessionEndedEvent,
-} from "@/lib/websocket";
+  getMyTeachingAssignments,
+  type TeachingAssignment,
+} from "@/api/school";
+import { getScripts, type AnswerScript } from "@/api/evaluation";
 
-// Inner component that uses WebSocket context
-function SessionView({
-  sessionData,
-  user,
-  onEndSession,
-  onNewSession,
-  isLoading,
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+
+function formatSessionTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return date.toLocaleDateString();
+}
+
+const AVATAR_COLORS = [
+  "#9ACBD0",
+  "#48A6A7",
+  "#006A71",
+  "#D4C5A9",
+  "#B39DDB",
+  "#F0C987",
+  "#FFD6A5",
+];
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+/* ─── Section Picker Modal ───────────────────────────────────────────────── */
+
+interface UniqueSection {
+  id: number;
+  section_name: string;
+  class_name: string;
+  stream: string;
+  academic_year: string;
+}
+
+function SectionPickerModal({
+  sections,
+  onSelect,
+  onClose,
+  isCreating,
 }: {
-  sessionData: SessionCreateResponse;
-  user: TutoringUser;
-  onEndSession: () => void;
-  onNewSession: () => void;
-  isLoading: boolean;
+  sections: UniqueSection[];
+  onSelect: (sectionId: number) => void;
+  onClose: () => void;
+  isCreating: boolean;
 }) {
-  const {
-    sessionState,
-    connectionState,
-    isConnected,
-    isSessionActive,
-    isSessionEnded,
-    error: wsError,
-  } = useSession();
-
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyLink = async () => {
-    if (!sessionData.join_url) return;
-
-    try {
-      await navigator.clipboard.writeText(sessionData.join_url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy link:", err);
-    }
-  };
-
-  // Get effective status from WebSocket or fallback to initial
-  const effectiveStatus = (sessionState?.status || sessionData.status) as
-    | "WAITING"
-    | "ACTIVE"
-    | "GRACE"
-    | "ENDED";
-  const isEnded = effectiveStatus === "ENDED";
-  const isActive = effectiveStatus === "ACTIVE";
-  const isWaiting = effectiveStatus === "WAITING";
-
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      {/* Session Header */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Tutoring Session
-          </h2>
-          <div className="flex items-center gap-4">
-            <ConnectionStatusBadge state={connectionState} showLabel={true} />
-            <SessionStatusBadge status={effectiveStatus} />
-          </div>
-        </div>
-      </div>
-
-      {/* Session Details */}
-      <div className="p-6 space-y-6">
-        {/* WebSocket Error */}
-        {wsError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <p className="text-red-700">{wsError}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Status Message */}
-        {isWaiting && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-yellow-600" />
-              <div>
-                <p className="font-medium text-yellow-800">
-                  Waiting for student to join...
-                </p>
-                <p className="text-sm text-yellow-600">
-                  Share the link below with your student. You&apos;ll be
-                  notified automatically when they join.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isActive && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <Circle className="w-6 h-6 text-green-600 fill-green-600" />
-              <div>
-                <p className="font-medium text-green-800">
-                  {sessionState?.student?.name
-                    ? `${sessionState.student.name} has joined!`
-                    : "Student has joined!"}
-                </p>
-                <p className="text-sm text-green-600">
-                  The tutoring session is now active.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isEnded && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <Square className="w-6 h-6 text-gray-600 fill-gray-600" />
-              <div>
-                <p className="font-medium text-gray-800">Session has ended</p>
-                <p className="text-sm text-gray-600">
-                  You can start a new session anytime.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Participants */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Participants
-          </label>
-          <div className="space-y-2">
-            <ParticipantStatus
-              name={user.full_name}
-              role="teacher"
-              connected={isConnected}
-            />
-            {sessionState?.student ? (
-              <ParticipantStatus
-                name={sessionState.student.name}
-                role="student"
-                connected={sessionState.isStudentConnected}
-              />
-            ) : (
-              <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-dashed border-gray-300 bg-gray-50">
-                <GraduationCap className="w-6 h-6 text-gray-400" />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-400">
-                    Waiting for student...
-                  </p>
-                  <p className="text-xs text-gray-400">Student</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Join Link */}
-        {!isEnded && sessionData.join_url && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-secondary/20">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Share this link with your student:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={sessionData.join_url}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 text-sm"
-              />
-              <button
-                onClick={handleCopyLink}
-                className="px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4" /> Copied!
-                  </>
-                ) : (
-                  "Copy Link"
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Session Info */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
-              Session ID
-            </label>
-            <p className="text-sm text-gray-700 font-mono">
-              {sessionData.session_id?.substring(0, 8)}...
+            <h2 className="text-lg font-semibold text-primary-dark">
+              Start a Tutoring Session
+            </h2>
+            <p className="text-sm text-muted mt-0.5">
+              Choose the section for this session
             </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
-              Room ID
-            </label>
-            <p className="text-sm text-gray-700 font-mono">
-              {sessionData.room_id?.substring(0, 20)}...
-            </p>
-          </div>
+          <button
+            onClick={onClose}
+            disabled={isCreating}
+            className="p-2 rounded-lg text-muted hover:text-primary-dark hover:bg-background transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Video + Audio Session - Phase 4 */}
-        {!isEnded && (
-          <MediaSession
-            wsUrl={sessionData.livekit_ws_url}
-            token={sessionData.token}
-            role="teacher"
-            sessionId={sessionData.session_id}
-          />
-        )}
-      </div>
-
-      {/* Session Actions */}
-      <div className="p-6 border-t border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-end gap-3">
-          {!isEnded ? (
-            <button
-              onClick={onEndSession}
-              disabled={isLoading}
-              className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? "Ending..." : "End Session"}
-            </button>
+        {/* Section list */}
+        <div className="p-4 max-h-80 overflow-y-auto">
+          {sections.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
+                No assigned sections
+              </p>
+              <p className="text-xs text-muted">
+                You have not been assigned to any section yet
+              </p>
+            </div>
           ) : (
-            <button
-              onClick={onNewSession}
-              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Start New Session
-            </button>
+            <div className="space-y-2">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => onSelect(section.id)}
+                  disabled={isCreating}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border border-secondary/30 hover:border-primary/50 hover:bg-primary/5 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-primary-dark">
+                      Class {section.class_name} - Section{" "}
+                      {section.section_name}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {section.stream && `${section.stream} · `}
+                      {section.academic_year}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted shrink-0" />
+                </button>
+              ))}
+            </div>
           )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-secondary/20">
+          <button
+            onClick={onClose}
+            disabled={isCreating}
+            className="w-full text-sm text-muted hover:text-primary-dark transition-colors"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// Storage keys for session persistence
-const STORAGE_KEY_TEACHER_SESSION = "tutoring_teacher_session";
-const STORAGE_KEY_TEACHER_USER = "tutoring_teacher_user";
+/* ─── Page ───────────────────────────────────────────────────────────────── */
 
-// Helper functions for session persistence
-function saveTeacherSession(
-  sessionData: SessionCreateResponse,
-  user: TutoringUser,
-) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(
-      STORAGE_KEY_TEACHER_SESSION,
-      JSON.stringify(sessionData),
+export default function TeacherDashboard() {
+  const router = useRouter();
+  const { isReady, isAuthenticated, user } = useAuth();
+  const [activeSessions, setActiveSessions] = useState<SessionStatus[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [myClass, setMyClass] = useState<MyClassInfo | null>(null);
+  const [recentScripts, setRecentScripts] = useState<AnswerScript[]>([]);
+  const [loadingScripts, setLoadingScripts] = useState(true);
+
+  // Section picker modal state
+  const [showSectionPicker, setShowSectionPicker] = useState(false);
+  const [sections, setSections] = useState<UniqueSection[]>([]);
+  const [loadingSections, setLoadingSections] = useState(false);
+
+  // Authorization check
+  useEffect(() => {
+    if (isReady && !isAuthenticated) {
+      router.replace("/signin");
+    } else if (isReady && isAuthenticated && user?.role !== "teacher") {
+      router.replace("/student/dashboard");
+    }
+  }, [isReady, isAuthenticated, user, router]);
+
+  // Fetch active sessions
+  const fetchSessions = useCallback(async () => {
+    try {
+      setLoadingSessions(true);
+      const [waiting, active] = await Promise.all([
+        listSessions("WAITING"),
+        listSessions("ACTIVE"),
+      ]);
+      setActiveSessions([...active, ...waiting]);
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      fetchSessions();
+      const interval = setInterval(fetchSessions, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isReady, isAuthenticated, fetchSessions]);
+
+  // Fetch class-teacher info
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      getMyClass()
+        .then(setMyClass)
+        .catch(() => setMyClass(null));
+    }
+  }, [isReady, isAuthenticated]);
+
+  // Fetch recent script submissions
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return;
+    setLoadingScripts(true);
+    getScripts()
+      .then((scripts) => {
+        const sorted = [...scripts].sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        setRecentScripts(sorted.slice(0, 6));
+      })
+      .catch(() => setRecentScripts([]))
+      .finally(() => setLoadingScripts(false));
+  }, [isReady, isAuthenticated]);
+
+  // Open section picker: fetch teaching assignments and deduplicate by section
+  const handleOpenSectionPicker = async () => {
+    setShowSectionPicker(true);
+    setLoadingSections(true);
+    try {
+      const assignments = await getMyTeachingAssignments();
+      // Deduplicate by section id
+      const sectionMap = new Map<number, UniqueSection>();
+      for (const a of assignments) {
+        if (!sectionMap.has(a.section)) {
+          sectionMap.set(a.section, {
+            id: a.section,
+            section_name: a.section_name,
+            class_name: a.class_name,
+            stream: a.stream,
+            academic_year: a.academic_year,
+          });
+        }
+      }
+      setSections(Array.from(sectionMap.values()));
+    } catch (err) {
+      console.error("Failed to fetch sections:", err);
+      setSections([]);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+
+  const [joiningSessionId, setJoiningSessionId] = useState<string | null>(null);
+
+  // Rejoin existing active session
+  const handleRejoinSession = async (session: SessionStatus) => {
+    if (joiningSessionId) return;
+    setJoiningSessionId(session.id);
+    try {
+      const data = await rejoinSession(session.id);
+      const tutoringUser = {
+        id: user!.id,
+        email: user!.email,
+        full_name: `${user!.first_name} ${user!.last_name}`,
+        role: user!.role.toUpperCase() as "TEACHER" | "STUDENT",
+        created_at: user!.date_joined,
+      };
+      sessionStorage.setItem("tutoring_teacher_session", JSON.stringify(data));
+      sessionStorage.setItem(
+        "tutoring_teacher_user",
+        JSON.stringify(tutoringUser),
+      );
+      router.push("/teacher/dashboard/session");
+    } catch (err) {
+      console.error("Failed to rejoin session:", err);
+      setJoiningSessionId(null);
+    }
+  };
+
+  // Create session for selected section
+  const handleCreateSession = async (sectionId: number) => {
+    if (creatingSession) return;
+    setCreatingSession(true);
+    try {
+      const session = await createSession(sectionId);
+      const tutoringUser = {
+        id: user!.id,
+        email: user!.email,
+        full_name: `${user!.first_name} ${user!.last_name}`,
+        role: user!.role.toUpperCase() as "TEACHER" | "STUDENT",
+        created_at: user!.date_joined,
+      };
+      sessionStorage.setItem(
+        "tutoring_teacher_session",
+        JSON.stringify(session),
+      );
+      sessionStorage.setItem(
+        "tutoring_teacher_user",
+        JSON.stringify(tutoringUser),
+      );
+      setShowSectionPicker(false);
+      router.push("/teacher/dashboard/session");
+    } catch (err) {
+      console.error("Failed to create session:", err);
+      setCreatingSession(false);
+    }
+  };
+
+  // Loading state
+  if (!isReady || !user || user.role !== "teacher") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
     );
-    localStorage.setItem(STORAGE_KEY_TEACHER_USER, JSON.stringify(user));
   }
-}
-
-function loadTeacherSession(): {
-  sessionData: SessionCreateResponse | null;
-  user: TutoringUser | null;
-} {
-  if (typeof window === "undefined") {
-    return { sessionData: null, user: null };
-  }
-  try {
-    const sessionStr = localStorage.getItem(STORAGE_KEY_TEACHER_SESSION);
-    const userStr = localStorage.getItem(STORAGE_KEY_TEACHER_USER);
-    return {
-      sessionData: sessionStr ? JSON.parse(sessionStr) : null,
-      user: userStr ? JSON.parse(userStr) : null,
-    };
-  } catch {
-    return { sessionData: null, user: null };
-  }
-}
-
-function clearTeacherSession() {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY_TEACHER_SESSION);
-    localStorage.removeItem(STORAGE_KEY_TEACHER_USER);
-  }
-}
-
-// Main page component
-export default function TeacherDashboardPage() {
-  const [user, setUser] = useState<TutoringUser | null>(null);
-  const [sessionData, setSessionData] = useState<SessionCreateResponse | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(true);
-
-  // Restore session from localStorage on mount
-  useEffect(() => {
-    const { sessionData: savedSession, user: savedUser } = loadTeacherSession();
-    if (savedSession && savedUser) {
-      setSessionData(savedSession);
-      setUser(savedUser);
-    }
-    setIsRestoring(false);
-  }, []);
-
-  // Save session to localStorage when it changes
-  useEffect(() => {
-    if (sessionData && user) {
-      saveTeacherSession(sessionData, user);
-    }
-  }, [sessionData, user]);
-
-  const handleUserChange = useCallback((selectedUser: TutoringUser | null) => {
-    setUser(selectedUser);
-    // Reset session state when user changes (but don't clear storage yet)
-    setSessionData(null);
-    setError(null);
-  }, []);
-
-  const handleCreateSession = async () => {
-    if (!user) {
-      setError("Please select a teacher user first");
-      return;
-    }
-
-    if (user.role !== "TEACHER") {
-      setError("Only teachers can create tutoring sessions");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response: SessionCreateResponse = await createSession();
-      console.log("[TeacherDashboard] Session created:", response);
-      console.log(
-        "[TeacherDashboard] LiveKit WS URL:",
-        response.livekit_ws_url,
-      );
-      console.log(
-        "[TeacherDashboard] Token:",
-        response.token ? "present" : "null",
-      );
-      setSessionData(response);
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(getErrorMessage(apiError));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEndSession = async () => {
-    if (!sessionData?.session_id) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Pass the teacher_id from session creation to ensure authorization
-      await endSession(sessionData.session_id, sessionData.teacher_id);
-      // Session ended - WebSocket will receive the event
-    } catch (err) {
-      const apiError = err as ApiError;
-      setError(getErrorMessage(apiError));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleNewSession = () => {
-    clearTeacherSession();
-    setSessionData(null);
-    setError(null);
-  };
-
-  // Event handlers for WebSocket events
-  const handleParticipantJoined = useCallback((event: ParticipantEvent) => {
-    console.log("Participant joined:", event);
-    // Could add toast notification here
-  }, []);
-
-  const handleParticipantLeft = useCallback((event: ParticipantEvent) => {
-    console.log("Participant left:", event);
-    // Could add toast notification here
-  }, []);
-
-  const handleStatusChanged = useCallback((event: StatusChangeEvent) => {
-    console.log("Status changed:", event);
-    // Could add toast notification here
-  }, []);
-
-  const handleSessionEnded = useCallback((event: SessionEndedEvent) => {
-    console.log("Session ended:", event);
-    // Clear session storage when session ends
-    clearTeacherSession();
-    // Could add toast notification here
-  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Teacher Dashboard
-              </h1>
-              <p className="text-gray-500 mt-1">
-                Create and manage tutoring sessions (Real-time)
-              </p>
-            </div>
-            <UserSelector
-              filterRole="TEACHER"
-              onUserChange={handleUserChange}
-            />
-          </div>
-        </div>
+    <div className="min-h-screen">
+      {/* ── Section Picker Modal ───────────────────────────────────────── */}
+      {showSectionPicker && !loadingSections && (
+        <SectionPickerModal
+          sections={sections}
+          onSelect={handleCreateSession}
+          onClose={() => {
+            setShowSectionPicker(false);
+            setCreatingSession(false);
+          }}
+          isCreating={creatingSession}
+        />
+      )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <p className="text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Loading while restoring session */}
-        {isRestoring ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading session...</p>
-          </div>
-        ) : /* Main Content */
-        !user ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Select a Teacher
-            </h2>
-            <p className="text-gray-500">
-              Choose a teacher account from the dropdown above to get started.
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+        <div className="flex items-center justify-between px-8 py-4">
+          <div>
+            <h1 className="text-2xl font-bold text-primary-dark">
+              Classroom Monitoring
+            </h1>
+            <p className="text-sm text-primary">
+              {loadingSessions
+                ? "Loading sessions..."
+                : `Monitoring ${activeSessions.length} active session${activeSessions.length !== 1 ? "s" : ""} in real-time`}
             </p>
           </div>
-        ) : !sessionData ? (
-          /* Create Session View */
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">
-              Start a New Tutoring Session
-            </h2>
-            <p className="text-gray-500 mb-6">
-              Create a new session and share the link with your student.
-            </p>
+
+          <div className="flex items-center gap-4">
             <button
-              onClick={handleCreateSession}
-              disabled={isLoading}
-              className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+              onClick={handleOpenSectionPicker}
+              disabled={creatingSession || loadingSections}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Creating Session...
-                </span>
+              {creatingSession || loadingSections ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                "Start New Tutoring Session"
+                <Plus className="w-4 h-4" />
               )}
+              {creatingSession
+                ? "Creating..."
+                : loadingSections
+                  ? "Loading..."
+                  : "New Session"}
             </button>
           </div>
-        ) : (
-          /* Session View with WebSocket */
-          <SessionProvider
-            sessionId={sessionData.session_id}
-            userId={user.id}
-            onParticipantJoined={handleParticipantJoined}
-            onParticipantLeft={handleParticipantLeft}
-            onStatusChanged={handleStatusChanged}
-            onSessionEnded={handleSessionEnded}
-          >
-            <SessionView
-              sessionData={sessionData}
-              user={user}
-              onEndSession={handleEndSession}
-              onNewSession={handleNewSession}
-              isLoading={isLoading}
-            />
-          </SessionProvider>
+        </div>
+      </header>
+
+      {/* ── Content ──────────────────────────────────────────────────────── */}
+      <main className="px-8 py-6 max-w-6xl">
+        {/* My Class card */}
+        {myClass && (
+          <div className="mb-8">
+            <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-0.5">
+                      <h2 className="text-lg font-semibold text-primary-dark">
+                        Class {myClass.class_name}
+                        {myClass.stream && ` - ${myClass.stream}`}, Section{" "}
+                        {myClass.name}
+                      </h2>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
+                        <GraduationCap className="w-3 h-3" />
+                        Class Teacher
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted">
+                      {myClass.academic_year} &middot; Capacity:{" "}
+                      {myClass.capacity}
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  href="/teacher/students"
+                  className="flex items-center gap-3 bg-background hover:bg-primary/5 rounded-xl px-5 py-3 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-primary-dark leading-tight">
+                      {myClass.student_count}
+                    </p>
+                    <p className="text-xs text-muted">Students</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted group-hover:text-primary ml-2 transition-colors" />
+                </Link>
+              </div>
+            </div>
+          </div>
         )}
-      </div>
+
+        {/* Active Sessions */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-primary-dark mb-4">
+            Active Sessions
+          </h2>
+
+          {loadingSessions ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            </div>
+          ) : activeSessions.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
+              <Video className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
+                No active sessions
+              </p>
+              <p className="text-xs text-muted mb-4">
+                Start a new session to begin live tutoring
+              </p>
+              <button
+                onClick={handleOpenSectionPicker}
+                disabled={creatingSession}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" />
+                New Session
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {activeSessions.map((session) => (
+                <div
+                  key={session.id}
+                  onClick={() => handleRejoinSession(session)}
+                  className="bg-white rounded-2xl border border-secondary/30 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-5">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-primary-dark truncate">
+                        {session.class_name && session.section_name
+                          ? `Class ${session.class_name} - Section ${session.section_name}`
+                          : "Tutoring Session"}
+                      </h3>
+                      <p className="text-xs text-muted mt-0.5 font-mono truncate">
+                        {session.room_id}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-2.5 py-1 rounded-full shrink-0 ml-3 ${
+                        session.status === "ACTIVE"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-amber-50 text-amber-600"
+                      }`}
+                    >
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span
+                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                            session.status === "ACTIVE"
+                              ? "bg-red-400"
+                              : "bg-amber-400"
+                          }`}
+                        />
+                        <span
+                          className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                            session.status === "ACTIVE"
+                              ? "bg-red-500"
+                              : "bg-amber-500"
+                          }`}
+                        />
+                      </span>
+                      {session.status === "ACTIVE" ? "LIVE" : "WAITING"}
+                    </span>
+                  </div>
+
+                  {/* Session Info */}
+                  <div className="space-y-3 mb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs text-muted">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>
+                          {session.participant_count}{" "}
+                          {session.participant_count === 1
+                            ? "student"
+                            : "students"}{" "}
+                          connected
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>
+                          Started {formatSessionTime(session.created_at)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Teacher card */}
+                    <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: avatarColor(session.teacher_name),
+                        }}
+                      >
+                        {initials(session.teacher_name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-primary-dark truncate">
+                          {session.teacher_name}
+                        </p>
+                        <p className="text-[10px] text-muted">Teacher</p>
+                      </div>
+                    </div>
+
+                    {/* Participant summary */}
+                    {session.participant_count > 0 ? (
+                      <div className="flex items-center gap-2.5 bg-background/60 rounded-lg px-3 py-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <p className="text-xs font-medium text-primary-dark">
+                          {session.participant_count}{" "}
+                          {session.participant_count === 1
+                            ? "student"
+                            : "students"}{" "}
+                          in session
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2.5 border border-dashed border-secondary/40 rounded-lg px-3 py-2">
+                        <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center">
+                          <Users className="w-3.5 h-3.5 text-secondary" />
+                        </div>
+                        <p className="text-xs text-secondary italic">
+                          Waiting for students to join...
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-end pt-3 border-t border-secondary/20">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:text-primary-dark transition-colors">
+                      {joiningSessionId === session.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          JOINING...
+                        </>
+                      ) : (
+                        <>
+                          GO TO SESSION
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Script Submissions */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-primary-dark">
+              Recent Submissions
+            </h2>
+            <Link
+              href="/evaluation"
+              className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
+            >
+              View All
+            </Link>
+          </div>
+
+          {loadingScripts ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            </div>
+          ) : recentScripts.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
+              <FileText className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
+                No submissions yet
+              </p>
+              <p className="text-xs text-muted">
+                Scripts submitted by students or uploaded by you will appear
+                here
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-background/50 border-b border-secondary/20 text-xs font-semibold text-muted uppercase tracking-wide">
+                <span className="col-span-3">Student</span>
+                <span className="col-span-3">Form / Rubric</span>
+                <span className="col-span-2">Status</span>
+                <span className="col-span-2">Score</span>
+                <span className="col-span-2">Submitted</span>
+              </div>
+
+              {recentScripts.map((script) => {
+                const studentName =
+                  script.student_full_name ||
+                  script.student_name ||
+                  "Unknown Student";
+                const formTitle =
+                  script.submission_form_title ||
+                  script.rubric_set_title ||
+                  "Manual Upload";
+
+                return (
+                  <Link
+                    key={script.id}
+                    href={`/evaluation?script=${script.id}`}
+                    className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-secondary/10 last:border-b-0 items-center hover:bg-background/30 transition-colors"
+                  >
+                    <div className="col-span-3 flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+                        style={{ backgroundColor: avatarColor(studentName) }}
+                      >
+                        {initials(studentName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary-dark truncate">
+                          {studentName}
+                        </p>
+                        {script.student_roll_number && (
+                          <p className="text-[10px] text-muted">
+                            {script.student_roll_number}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-span-3 min-w-0">
+                      <p className="text-sm text-primary-dark truncate">
+                        {formTitle}
+                      </p>
+                      {script.page_count != null && (
+                        <p className="text-[10px] text-muted">
+                          {script.page_count} page
+                          {script.page_count !== 1 ? "s" : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="col-span-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                          script.status === "evaluated"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : script.status === "pending"
+                              ? "bg-amber-50 text-amber-700"
+                              : script.status === "processing"
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {script.status === "evaluated" && (
+                          <CheckCircle className="w-3 h-3" />
+                        )}
+                        {script.status === "pending" && (
+                          <Hourglass className="w-3 h-3" />
+                        )}
+                        {script.status === "processing" && (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        )}
+                        {script.status === "error" && (
+                          <AlertCircle className="w-3 h-3" />
+                        )}
+                        {script.status.charAt(0).toUpperCase() +
+                          script.status.slice(1)}
+                      </span>
+                    </div>
+
+                    <div className="col-span-2">
+                      {script.status === "evaluated" &&
+                      script.percentage != null ? (
+                        <div>
+                          <p
+                            className={`text-sm font-bold ${
+                              script.percentage >= 80
+                                ? "text-emerald-600"
+                                : script.percentage >= 60
+                                  ? "text-primary"
+                                  : script.percentage >= 40
+                                    ? "text-amber-600"
+                                    : "text-red-600"
+                            }`}
+                          >
+                            {script.percentage.toFixed(1)}%
+                          </p>
+                          {script.total_score != null && (
+                            <p className="text-[10px] text-muted">
+                              {script.total_score.toFixed(1)} marks
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted">--</span>
+                      )}
+                    </div>
+
+                    <div className="col-span-2 flex items-center justify-between">
+                      <span className="text-xs text-muted">
+                        {formatSessionTime(script.created_at)}
+                      </span>
+                      {script.status === "evaluated" && (
+                        <Eye className="w-4 h-4 text-primary" />
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
