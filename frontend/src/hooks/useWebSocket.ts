@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
+import { createWebSocketTicket } from "@/api/auth";
 
 export type WebSocketMessage = {
   type:
@@ -52,12 +53,14 @@ export function useWebSocket(config: WebSocketConfig) {
   // Queue for messages sent before connection is established
   const messageQueueRef = useRef<WebSocketMessage[]>([]);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     try {
       // WebSocket endpoint format: ws://<host>/ws/whiteboard/{sessionId}/
-      const wsHost = process.env.NEXT_PUBLIC_WS_HOST || "localhost:8000";
+      const wsHost =
+        process.env.NEXT_PUBLIC_WS_HOST || `${window.location.hostname}:8000`;
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${wsHost}/ws/whiteboard/${sessionId}/`;
+      const wsTicket = await createWebSocketTicket();
+      const wsUrl = `${wsProtocol}//${wsHost}/ws/whiteboard/${sessionId}/?ws_ticket=${encodeURIComponent(wsTicket)}`;
 
       console.log(`[WebSocket] Connecting to ${wsUrl} as ${role}...`);
       setConnectionState("connecting");
@@ -124,7 +127,7 @@ export function useWebSocket(config: WebSocketConfig) {
         if (event.code !== 1000) {
           console.log("[WebSocket] Attempting to reconnect in 3 seconds...");
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
+            void connect();
           }, 3000);
         }
       };
@@ -199,7 +202,7 @@ export function useWebSocket(config: WebSocketConfig) {
       return;
     }
 
-    connect();
+    void connect();
 
     // Cleanup on unmount
     return () => {

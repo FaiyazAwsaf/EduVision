@@ -42,20 +42,22 @@ export interface RefreshResponse {
   payload: string; // new access token
 }
 
+export interface WebSocketTicketResponse {
+  message: string;
+  payload: {
+    ticket: string;
+    expires_in: number;
+  };
+}
+
 // ─── Token storage helpers ───────────────────────────────────────────────────
 
 const ACCESS_TOKEN_KEY = "eduvision_access_token";
-const REFRESH_TOKEN_KEY = "eduvision_refresh_token";
 const USER_DATA_KEY = "eduvision_user";
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
   return sessionStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
-export function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function getUserData(): User | null {
@@ -76,7 +78,6 @@ export function setTokens(access: string, user: User): void {
 
 export function clearTokens(): void {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   sessionStorage.removeItem(USER_DATA_KEY);
 }
 
@@ -168,6 +169,22 @@ export async function changePassword(
 export function authHeaders(): Record<string, string> {
   const token = getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function createWebSocketTicket(): Promise<string> {
+  const res = await authenticatedFetch(`${API_BASE_URL}/auth/ws-ticket/`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const message = await parseApiError(res, "Failed to create WebSocket ticket");
+    throw new Error(message);
+  }
+
+  const data: WebSocketTicketResponse = await res.json();
+  return data.payload.ticket;
 }
 
 // ─── Authenticated fetch with auto-refresh ───────────────────────────────────
