@@ -1,5 +1,7 @@
 from django.shortcuts import render
 from django.db import transaction
+from django.db.models.deletion import Collector
+from django.contrib.admin.models import LogEntry
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -231,12 +233,16 @@ class AdminUserDetailView(APIView):
         if not user:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = AdminUserUpdateSerializer(data=request.data)
+        serializer = AdminUserUpdateSerializer(data=request.data, context={'user_id': user_id})
         serializer.is_valid(raise_exception=True)
 
+        changed_fields = []
         for field, value in serializer.validated_data.items():
             setattr(user, field, value)
-        user.save()
+            changed_fields.append(field)
+
+        if changed_fields:
+            user.save(update_fields=changed_fields)
 
         return Response({"message": "User updated", "payload": UserSerializer(user).data})
 
@@ -251,9 +257,16 @@ class AdminUserDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.is_active = False
-        user.save()
-        return Response({"message": "User deactivated"})
+        # django_admin_log has an integer user_id FK that is incompatible
+        # with our UUID primary key — skip that cascade step explicitly.
+        collector = Collector(using='default')
+        collector.collect([user], keep_parents=False)
+        collector.fast_deletes = [
+            qs for qs in collector.fast_deletes
+            if qs.model is not LogEntry
+        ]
+        collector.delete()
+        return Response({"message": "User deleted"}, status=status.HTTP_200_OK)
 
 
 class AdminResetPasswordView(APIView):
