@@ -121,6 +121,12 @@ def build_context_aware_prompt(
     if request.notes:
         prompt_parts.append(f"\nAdditional Context: {request.notes}")
     
+    # Add curriculum context if a curriculum topic is linked
+    curriculum_section = _build_curriculum_context(request)
+    if curriculum_section:
+        prompt_parts.append("\n" + curriculum_section)
+        logger.info("Including curriculum context in prompt")
+
     # Add learning context if provided (Phase 4: Manual inputs)
     if learning_context:
         context_section = _build_learning_context_section(learning_context)
@@ -304,3 +310,46 @@ Create a comprehensive topic explanation suitable for classroom use:
     }
     
     return instructions.get(content_type, "").strip()
+
+
+def _build_curriculum_context(request: ContentRequest) -> str:
+    """
+    Build prompt section from a linked curriculum topic.
+
+    When a content request is linked to a CourseTopic, we enrich the prompt
+    with course objectives and course outcomes so the AI aligns its output
+    with the curriculum scope.
+    """
+    # The ORM attribute is set on the domain object when loaded via repository
+    curriculum_topic_id = getattr(request, "curriculum_topic_id", None)
+    if not curriculum_topic_id:
+        return ""
+
+    try:
+        from apps.curriculum.models import CourseTopic
+
+        topic = (
+            CourseTopic.objects.select_related("course_outline")
+            .get(pk=curriculum_topic_id)
+        )
+    except CourseTopic.DoesNotExist:
+        return ""
+
+    parts = ["\n=== Curriculum Alignment ==="]
+    parts.append(f"Course: {topic.course_outline.title}")
+
+    objectives = topic.course_outline.course_objectives
+    if objectives:
+        parts.append("Course Objectives:")
+        for idx, obj in enumerate(objectives, 1):
+            parts.append(f"  {idx}. {obj}")
+
+    if topic.course_outcomes:
+        parts.append(f"Target Course Outcomes: {', '.join(topic.course_outcomes)}")
+
+    parts.append(
+        "Ensure the generated content is scoped to this course's curriculum "
+        "and aligns with the objectives and outcomes listed above."
+    )
+
+    return "\n".join(parts)

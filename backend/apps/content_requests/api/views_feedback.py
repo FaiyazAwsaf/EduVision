@@ -146,11 +146,8 @@ class FeedbackView(APIView):
             
             if not feedback:
                 return Response(
-                    {
-                        'error': 'Feedback not found',
-                        'message': 'No feedback has been submitted for this content yet'
-                    },
-                    status=status.HTTP_404_NOT_FOUND
+                    {'feedback': None},
+                    status=status.HTTP_200_OK
                 )
             
             serializer = FeedbackSerializer(feedback)

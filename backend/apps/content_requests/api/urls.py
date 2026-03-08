@@ -34,6 +34,7 @@ from .views import (
     GeneratedContentView,
     RegenerateContentView,
     SharedContentListView,
+    CurriculumMaterialsListView,
     download_generated_content_view
 )
 from .views_feedback import FeedbackView
@@ -56,6 +57,13 @@ urlpatterns = [
         SharedContentListView.as_view(),
         name='shared-content-list'
     ),
+
+    # Curriculum-grouped generated content for students
+    path(
+        'shared/curriculum/',
+        CurriculumMaterialsListView.as_view(),
+        name='curriculum-materials-list'
+    ),
     
     # Retrieve content request details
     path(
@@ -64,18 +72,18 @@ urlpatterns = [
         name='content-request-detail'
     ),
     
+    # Download formatted content (PDF/Worksheet) — must be before content/ to avoid being swallowed
+    path(
+        '<str:request_id>/content/download/',
+        download_generated_content_view,
+        name='download-content'
+    ),
+
     # Retrieve generated content (Phase 2)
     path(
         '<str:request_id>/content/',
         GeneratedContentView.as_view(),
         name='generated-content'
-    ),
-    
-    # Download formatted content (PDF/Worksheet)
-    path(
-        '<str:request_id>/content/download/',
-        download_generated_content_view,
-        name='download-content'
     ),
     
     # Regenerate content from an existing request

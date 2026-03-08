@@ -49,6 +49,7 @@ def api_root(request):
             'rubrics': '/api/rubrics/',
             'whiteboard': '/api/whiteboard/',
             'school': '/api/school/',
+            'curriculum': '/api/curriculum/',
             'admin': '/admin/',
         }
     })
@@ -96,6 +97,9 @@ urlpatterns = [
 
     # school (classes, sections, teachers, students)
     path('api/school/', include('apps.students.urls', namespace='students')),
+
+    # curriculum management
+    path('api/curriculum/', include('apps.curriculum.api.urls', namespace='curriculum')),
 ]
 
 # Serve media files in development

@@ -165,6 +165,16 @@ class ContentRequestModel(models.Model):
         blank=True,
         help_text=_('Human-readable error message when request fails')
     )
+
+    # Optional link to a curriculum topic (for syllabus-aligned generation)
+    curriculum_topic = models.ForeignKey(
+        'curriculum.CourseTopic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='content_requests',
+        help_text=_('Curriculum topic this content is generated for')
+    )
     
     class Meta:
         db_table = 'content_requests'

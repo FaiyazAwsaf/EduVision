@@ -182,7 +182,34 @@ def process_content_request(self, request_id: str):
                     'request_id': request_id,
                     'error': 'Failed to update status to COMPLETED'
                 }
-            
+
+            # Auto-create curriculum TopicMaterial if linked to a topic
+            try:
+                from .models import ContentRequestModel
+                req_model = ContentRequestModel.objects.select_related(
+                    'curriculum_topic'
+                ).get(pk=request_uuid)
+                if req_model.curriculum_topic_id:
+                    from apps.curriculum.models import TopicMaterial, MaterialType
+                    TopicMaterial.objects.update_or_create(
+                        content_request=req_model,
+                        defaults={
+                            'topic': req_model.curriculum_topic,
+                            'uploaded_by': req_model.created_by,
+                            'title': f"{req_model.topic} ({req_model.content_type})",
+                            'description': f"AI-generated {req_model.content_type} content",
+                            'material_type': MaterialType.GENERATED,
+                        },
+                    )
+                    logger.info(
+                        f"[Task] Auto-created TopicMaterial for topic "
+                        f"{req_model.curriculum_topic_id}"
+                    )
+            except Exception:
+                logger.exception(
+                    f"[Task] Failed to auto-create TopicMaterial for {request_id}"
+                )
+
             logger.info(f"[Task] Request {request_id} processing completed successfully")
             
             return {

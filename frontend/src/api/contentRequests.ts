@@ -335,15 +335,12 @@ export async function getFeedback(contentId: string): Promise<Feedback | null> {
     },
   );
 
-  if (response.status === 404) {
-    return null; // No feedback exists yet
-  }
-
   if (!response.ok) {
     throw new Error("Failed to check feedback status");
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.feedback ?? data;
 }
 
 // ============================================================================
@@ -784,6 +781,52 @@ export async function listSharedContent(
 
   if (!response.ok) {
     throw new Error("Failed to fetch shared content");
+  }
+
+  return response.json();
+}
+
+// ─── Curriculum-Grouped Materials (for students) ───────────────────────────
+
+export interface CurriculumMaterialItem {
+  id: string;
+  topic: string;
+  content_type: string;
+  subject: string | null;
+  difficulty: string | null;
+  style: string;
+  teacher_name: string | null;
+  curriculum_topic_title: string;
+  week_number: number | null;
+  created_at: string;
+}
+
+export interface CurriculumCourseGroup {
+  course_id: string;
+  course_title: string;
+  course_code: string;
+  materials: CurriculumMaterialItem[];
+}
+
+export interface CurriculumMaterialsResponse {
+  courses: CurriculumCourseGroup[];
+}
+
+/**
+ * List generated content linked to curriculum topics, grouped by course.
+ * Only for students enrolled in the corresponding sections.
+ */
+export async function listCurriculumMaterials(): Promise<CurriculumMaterialsResponse> {
+  const response = await authenticatedFetch(
+    `${API_ENDPOINTS.CONTENT_REQUESTS}shared/curriculum/`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch curriculum materials");
   }
 
   return response.json();

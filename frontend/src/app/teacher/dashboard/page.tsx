@@ -32,6 +32,7 @@ import {
   type TeachingAssignment,
 } from "@/api/school";
 import { getScripts, type AnswerScript } from "@/api/evaluation";
+import NotificationBell from "@/components/curriculum/NotificationBell";
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -370,6 +371,7 @@ export default function TeacherDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <button
               onClick={handleOpenSectionPicker}
               disabled={creatingSession || loadingSections}
