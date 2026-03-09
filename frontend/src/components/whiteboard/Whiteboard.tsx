@@ -38,6 +38,8 @@ export type WhiteboardProps = {
   userId: string;
   role: "teacher" | "student";
   initialState?: WhiteboardState | null;
+  initialPageStates?: WhiteboardState[];
+  pageCount?: number;
   onExitSession?: () => Promise<void> | void;
   members?: Member[];
   ownerId?: string;
@@ -84,6 +86,8 @@ export default function Whiteboard({
   userId,
   role,
   initialState,
+  initialPageStates = [],
+  pageCount = 1,
   onExitSession,
   members = [],
   ownerId = "",
@@ -98,6 +102,7 @@ export default function Whiteboard({
   ]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const pagesContainerRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<PageData[]>([]);
   const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -118,6 +123,11 @@ export default function Whiteboard({
   } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const isCreatingPageRef = useRef(false);
+
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
 
   const selectionBounds = useMemo(
     () => selectionData?.bounds ?? null,
@@ -137,38 +147,67 @@ export default function Whiteboard({
   }, [latexObjects]);
 
   // ============================================================
-  // Load initial state from backend
+  // Load initial state(s) from backend
   // ============================================================
   useEffect(() => {
-    if (hasLoadedInitialState || !initialState || !isCanvasReady || !canvasRef.current) return;
-
-    console.log("[Whiteboard] Loading initial state from backend:", initialState);
+    if (hasLoadedInitialState || !isCanvasReady || !canvasRef.current) return;
 
     const loadInitialState = async () => {
       try {
-      const canvasHandle = canvasRef.current;
-      if (!canvasHandle) return;
+        const canvasHandle = canvasRef.current;
+        if (!canvasHandle) return;
 
-      // Load canvas state
-      const snapshot =
-        typeof initialState.snapshot_json === "string"
-          ? JSON.parse(initialState.snapshot_json)
-          : initialState.snapshot_json;
+        const seedStates = initialPageStates.length > 0
+          ? initialPageStates
+          : initialState
+            ? [initialState]
+            : [];
 
-      if (snapshot && typeof snapshot === "object") {
-        await canvasHandle.loadFromJSON(snapshot);
-        setPages([
-          {
-            id: "page-1",
-            canvasState: snapshot,
-            latexObjects: initialState.latex_objects || [],
-          },
-        ]);
-        setLatexObjects(initialState.latex_objects || []);
-        console.log("[Whiteboard] Initial state restored successfully");
-      }
+        const highestSeedPage = seedStates.reduce((max, s) => {
+          const page = Number(s.page || 1);
+          return page > max ? page : max;
+        }, 1);
 
-      setHasLoadedInitialState(true);
+        const resolvedPageCount = Math.max(pageCount, highestSeedPage, 1);
+        const seededPages: PageData[] = Array.from({ length: resolvedPageCount }, (_, idx) => ({
+          id: `page-${idx + 1}`,
+          canvasState: null,
+          latexObjects: [],
+        }));
+
+        for (const state of seedStates) {
+          const targetPage = Math.max(Number(state.page || 1), 1);
+          const targetIndex = targetPage - 1;
+          if (!seededPages[targetIndex]) continue;
+
+          const snapshot =
+            typeof state.snapshot_json === "string"
+              ? JSON.parse(state.snapshot_json)
+              : state.snapshot_json;
+
+          seededPages[targetIndex] = {
+            ...seededPages[targetIndex],
+            canvasState: snapshot && typeof snapshot === "object" ? snapshot : null,
+            latexObjects: state.latex_objects || [],
+          };
+        }
+
+        setPages(seededPages);
+        setCurrentPageIndex(0);
+        setLatexObjects(seededPages[0]?.latexObjects || []);
+
+        if (seededPages[0]?.canvasState) {
+          await canvasHandle.loadFromJSON(seededPages[0].canvasState);
+        } else {
+          canvasHandle.clearCanvas();
+        }
+
+        console.log("[Whiteboard] Initial page states restored", {
+          pageCount: seededPages.length,
+          seededPages: seedStates.length,
+        });
+
+        setHasLoadedInitialState(true);
       } catch (error) {
         console.error("[Whiteboard] Error loading initial state:", error);
         setHasLoadedInitialState(true);
@@ -176,7 +215,7 @@ export default function Whiteboard({
     };
 
     void loadInitialState();
-  }, [initialState, hasLoadedInitialState, isCanvasReady]);
+  }, [initialState, initialPageStates, pageCount, hasLoadedInitialState, isCanvasReady]);
 
   // ============================================================
   // Periodic state saving to backend
@@ -189,11 +228,19 @@ export default function Whiteboard({
       const currentCanvasState = canvasRef.current.exportToJSON();
       if (!currentCanvasState) return;
 
+      const currentPage = currentPageIndex + 1;
       const stateToSave = {
+        page: currentPage,
         snapshot_json: currentCanvasState,
         latex_objects: latexObjectsRef.current,
         description: `Auto-saved at ${new Date().toLocaleTimeString()}`,
       };
+
+      const hasCanvasObjects = Array.isArray(currentCanvasState?.objects) && currentCanvasState.objects.length > 0;
+      const hasLatexObjects = (latexObjectsRef.current?.length || 0) > 0;
+      if (!hasCanvasObjects && !hasLatexObjects) {
+        return;
+      }
 
       const stateKey = JSON.stringify(stateToSave);
 
@@ -211,6 +258,7 @@ export default function Whiteboard({
         stateToSave.snapshot_json,
         stateToSave.latex_objects,
         stateToSave.description,
+        stateToSave.page,
       )
         .then(() => {
           console.log("[Whiteboard] State saved successfully");
@@ -221,7 +269,7 @@ export default function Whiteboard({
     }, 30000); // Save every 30 seconds
 
     return () => clearInterval(saveIntervalId);
-  }, [sessionId]);
+  }, [sessionId, currentPageIndex]);
 
   const updateHistoryAvailability = useCallback(() => {
     const { undo, redo } = historyRef.current;
@@ -268,6 +316,9 @@ export default function Whiteboard({
 
       switch (message.type) {
         case "canvas_event":
+          if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
+            break;
+          }
           // handle remote drawing events
           if (message.data?.pathData) {
             console.log(
@@ -284,6 +335,9 @@ export default function Whiteboard({
           break;
 
         case "clear_canvas":
+          if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
+            break;
+          }
           // remote clear event
           console.log("[Whiteboard] Remote clear canvas");
           canvasRef.current?.clearCanvas();
@@ -317,6 +371,9 @@ export default function Whiteboard({
           break;
 
         case "latex_added":
+          if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
+            break;
+          }
           if (message.data?.latexObject) {
             setLatexObjects((prev) => [
               ...prev,
@@ -330,7 +387,7 @@ export default function Whiteboard({
           console.warn("[Whiteboard] Unknown message type:", message.type);
       }
     },
-    [role],
+    [role, currentPageIndex],
   );
 
   /**
@@ -385,19 +442,32 @@ export default function Whiteboard({
       setCurrentPageIndex(pageIndex);
       setLatexObjects(page.latexObjects);
 
-      // load canvas state
-      if (page.canvasState) {
-        canvasRef.current?.loadFromJSON(page.canvasState);
-      } else {
-        canvasRef.current?.clearCanvas();
-      }
-
       console.log(`[Whiteboard] Loaded page ${pageIndex + 1}/${pages.length}`);
     },
     [currentPageIndex, pages, saveCurrentPage],
   );
 
-  // Track if page creation has been triggered at this scroll position to prevent duplicates
+  // Restore the active page canvas after page switch/remount.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const activePage = pagesRef.current[currentPageIndex];
+    if (!activePage) return;
+
+    const restoreActivePage = async () => {
+      if (activePage.canvasState) {
+        await canvas.loadFromJSON(activePage.canvasState);
+      } else {
+        canvas.clearCanvas();
+      }
+      setLatexObjects(activePage.latexObjects || []);
+    };
+
+    void restoreActivePage();
+  }, [currentPageIndex]);
+
+  // Track page count for which new-page creation already happened at the bottom.
   const pageCreationThresholdRef = useRef<number>(-1);
 
   /**
@@ -416,11 +486,7 @@ export default function Whiteboard({
       console.log("[Whiteboard] Scroll event fired:", { scrollTop, scrollHeight, clientHeight });
       const pageHeight = clientHeight;
       
-      // Calculate how close to bottom we are (0 = top, 1 = bottom)
-      // If scrollHeight <= clientHeight (no scroll needed), consider it as being at bottom
-      const scrollProgress = scrollHeight > clientHeight 
-        ? (scrollTop + clientHeight) / scrollHeight 
-        : 1.0;  // At max scroll when content fits in viewport
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 80;
 
       // Load page based on scroll position
       const visiblePageIndex = Math.floor(scrollTop / pageHeight);
@@ -435,31 +501,41 @@ export default function Whiteboard({
         loadPage(visiblePageIndex);
       }
 
-      // Only create new page when scrolled to 95% and there's room for more
-      // AND only once per threshold (prevent multiple creations)
+      // Add exactly one page when user reaches bottom of the last page.
       if (
-        scrollProgress > 0.95 &&
+        isNearBottom &&
+        visiblePageIndex >= pages.length - 1 &&
         pages.length < 100 &&
-        pageCreationThresholdRef.current < scrollProgress
+        pageCreationThresholdRef.current !== pages.length &&
+        !isCreatingPageRef.current
       ) {
-        pageCreationThresholdRef.current = scrollProgress;
-        const newPageId = `page-${Date.now()}`;
-        setPages((prev) => {
-          console.log("[Whiteboard] ✓ Auto-created new page", prev.length + 1);
-          return [
-            ...prev,
-            { id: newPageId, canvasState: null, latexObjects: [] },
-          ];
-        });
+        isCreatingPageRef.current = true;
+        pageCreationThresholdRef.current = pages.length;
+        const newPageNumber = pages.length + 1;
+
+        saveCurrentPage();
+        setPages((prev) => [
+          ...prev,
+          {
+            id: `page-${newPageNumber}`,
+            canvasState: null,
+            latexObjects: [],
+          },
+        ]);
+
+        setTimeout(() => {
+          setCurrentPageIndex(newPageNumber - 1);
+          container.scrollTo({ top: (newPageNumber - 1) * pageHeight, behavior: "smooth" });
+          isCreatingPageRef.current = false;
+        }, 0);
       }
 
-      // Reset threshold when scrolling back up (below 90%)
-      if (scrollProgress < 0.9) {
+      if (!isNearBottom) {
         pageCreationThresholdRef.current = -1;
       }
 
       console.log("[Whiteboard] Scroll progress:", {
-        scrollProgress: scrollProgress.toFixed(2),
+        isNearBottom,
         visiblePageIndex,
         pagesLength: pages.length,
       });
@@ -559,6 +635,7 @@ export default function Whiteboard({
           currentCanvasState,
           latexObjectsRef.current,
           `Saved on exit at ${new Date().toLocaleTimeString()}`,
+          currentPageIndex + 1,
         );
       }
 
@@ -568,7 +645,7 @@ export default function Whiteboard({
     } finally {
       setIsExiting(false);
     }
-  }, [isExiting, onExitSession, sessionId]);
+  }, [isExiting, onExitSession, sessionId, currentPageIndex]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -666,7 +743,7 @@ export default function Whiteboard({
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: newLatexObject },
+              data: { latexObject: newLatexObject, page: currentPageIndex + 1 },
             });
           }
 
@@ -686,7 +763,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     },
-    [websocket],
+    [websocket, currentPageIndex],
   );
 
   const handleSelectionReady = useCallback(
@@ -759,11 +836,11 @@ export default function Whiteboard({
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: originalLatexObject },
+              data: { latexObject: originalLatexObject, page: currentPageIndex + 1 },
             });
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: solutionLatexObject },
+              data: { latexObject: solutionLatexObject, page: currentPageIndex + 1 },
             });
           }
 
@@ -785,7 +862,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     })();
-  }, [selectionData, websocket]);
+  }, [selectionData, websocket, currentPageIndex]);
 
   /**
    * handle local drawing events
@@ -808,13 +885,13 @@ export default function Whiteboard({
 
       websocket.sendMessage({
         type: "canvas_event",
-        data: { pathData },
+        data: { pathData, page: currentPageIndex + 1 },
       });
 
       console.log("[Whiteboard] Broadcasted path to peers");
       captureHistory();
     },
-    [websocket, canDraw, captureHistory],
+    [websocket, canDraw, captureHistory, currentPageIndex],
   );
 
   /**
@@ -855,11 +932,11 @@ export default function Whiteboard({
 
     websocket.sendMessage({
       type: "clear_canvas",
-      data: {},
+      data: { page: currentPageIndex + 1 },
     });
 
     console.log("[Whiteboard] Cleared canvas");
-  }, [role, selectionBounds, websocket]);
+  }, [role, selectionBounds, websocket, currentPageIndex]);
 
   const handleLatexObjectClick = useCallback(
     (id: string) => {

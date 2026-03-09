@@ -636,6 +636,8 @@ function WhiteboardContent() {
           userId={user.id}
           role={user.role}
           initialState={session.latest_state}
+          initialPageStates={session.page_states || []}
+          pageCount={session.page_count || 1}
           onExitSession={handleExitSession}
           members={session.members}
           ownerId={session.owner.id}
