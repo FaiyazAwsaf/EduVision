@@ -36,7 +36,8 @@ export default function ScriptUploadForm({
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
-  const [selectedStudentUserId, setSelectedStudentUserId] = useState<string>("");
+  const [selectedStudentUserId, setSelectedStudentUserId] =
+    useState<string>("");
   const [loadingSections, setLoadingSections] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
@@ -57,7 +58,9 @@ export default function ScriptUploadForm({
 
   // Load classes on mount
   useEffect(() => {
-    getClasses().then(setClasses).catch(() => {});
+    getClasses()
+      .then(setClasses)
+      .catch(() => {});
   }, []);
 
   // Load sections when class changes

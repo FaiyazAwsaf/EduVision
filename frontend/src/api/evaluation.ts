@@ -155,7 +155,7 @@ async function evaluationFetch<T>(
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
     const text = await response.text();
-    return (text ? (text as unknown as T) : (undefined as T));
+    return text ? (text as unknown as T) : (undefined as T);
   }
 
   const bodyText = await response.text();
@@ -199,7 +199,7 @@ async function authenticatedEvaluationFetch<T>(
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
     const text = await response.text();
-    return (text ? (text as unknown as T) : (undefined as T));
+    return text ? (text as unknown as T) : (undefined as T);
   }
 
   const bodyText = await response.text();

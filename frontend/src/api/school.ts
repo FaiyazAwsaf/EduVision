@@ -181,7 +181,9 @@ export async function getMyClass(): Promise<MyClassInfo> {
 }
 
 /** List all students in the logged-in teacher's assigned section. */
-export async function getMyStudents(search?: string): Promise<StudentProfile[]> {
+export async function getMyStudents(
+  search?: string,
+): Promise<StudentProfile[]> {
   const params = search ? `?search=${encodeURIComponent(search)}` : "";
   return schoolFetch<StudentProfile[]>(`/my-students/${params}`);
 }
