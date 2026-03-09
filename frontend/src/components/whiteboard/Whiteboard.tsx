@@ -101,7 +101,7 @@ export default function Whiteboard({
     { id: "page-1", canvasState: null, latexObjects: [] },
   ]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const pagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const pagesRef = useRef<PageData[]>([]);
   const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
@@ -123,7 +123,6 @@ export default function Whiteboard({
   } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const isCreatingPageRef = useRef(false);
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -427,128 +426,85 @@ export default function Whiteboard({
   }, [currentPageIndex, latexObjects]);
 
   /**
-   * load a specific page
+   * navigate to previous page
    */
-  const loadPage = useCallback(
-    (pageIndex: number) => {
-      if (pageIndex === currentPageIndex) return;
-      if (pageIndex < 0 || pageIndex >= pages.length) return;
+  const handlePreviousPage = useCallback(async () => {
+    if (currentPageIndex === 0 || isTransitioning) return;
 
-      // save current page
-      saveCurrentPage();
+    setIsTransitioning(true);
+    saveCurrentPage();
 
-      // load new page
-      const page = pages[pageIndex];
-      setCurrentPageIndex(pageIndex);
-      setLatexObjects(page.latexObjects);
+    const targetPageIndex = currentPageIndex - 1;
+    setCurrentPageIndex(targetPageIndex);
 
-      console.log(`[Whiteboard] Loaded page ${pageIndex + 1}/${pages.length}`);
-    },
-    [currentPageIndex, pages, saveCurrentPage],
-  );
-
-  // Restore the active page canvas after page switch/remount.
-  useEffect(() => {
+    // Load previous page canvas
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const activePage = pagesRef.current[currentPageIndex];
-    if (!activePage) return;
-
-    const restoreActivePage = async () => {
-      if (activePage.canvasState) {
-        await canvas.loadFromJSON(activePage.canvasState);
+    const targetPage = pagesRef.current[targetPageIndex];
+    
+    if (canvas && targetPage) {
+      if (targetPage.canvasState) {
+        await canvas.loadFromJSON(targetPage.canvasState);
       } else {
         canvas.clearCanvas();
       }
-      setLatexObjects(activePage.latexObjects || []);
-    };
-
-    void restoreActivePage();
-  }, [currentPageIndex]);
-
-  // Track page count for which new-page creation already happened at the bottom.
-  const pageCreationThresholdRef = useRef<number>(-1);
-
-  /**
-   * handle scroll to load pages and create new ones when needed
-   * stricter logic: only create new page when scrolled close to bottom (~95%)
-   */
-  useEffect(() => {
-    const container = pagesContainerRef.current;
-    if (!container) {
-      console.log("[Whiteboard] Pages container ref not available");
-      return;
+      setLatexObjects(targetPage.latexObjects || []);
     }
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      console.log("[Whiteboard] Scroll event fired:", { scrollTop, scrollHeight, clientHeight });
-      const pageHeight = clientHeight;
-      
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 80;
-
-      // Load page based on scroll position
-      const visiblePageIndex = Math.floor(scrollTop / pageHeight);
-      if (
-        visiblePageIndex !== currentPageIndex &&
-        visiblePageIndex >= 0 &&
-        visiblePageIndex < pages.length
-      ) {
-        console.log(
-          `[Whiteboard] ✓ Scrolled to page ${visiblePageIndex + 1}/${pages.length}`
-        );
-        loadPage(visiblePageIndex);
-      }
-
-      // Add exactly one page when user reaches bottom of the last page.
-      if (
-        isNearBottom &&
-        visiblePageIndex >= pages.length - 1 &&
-        pages.length < 100 &&
-        pageCreationThresholdRef.current !== pages.length &&
-        !isCreatingPageRef.current
-      ) {
-        isCreatingPageRef.current = true;
-        pageCreationThresholdRef.current = pages.length;
-        const newPageNumber = pages.length + 1;
-
-        saveCurrentPage();
-        setPages((prev) => [
-          ...prev,
-          {
-            id: `page-${newPageNumber}`,
-            canvasState: null,
-            latexObjects: [],
-          },
-        ]);
-
-        setTimeout(() => {
-          setCurrentPageIndex(newPageNumber - 1);
-          container.scrollTo({ top: (newPageNumber - 1) * pageHeight, behavior: "smooth" });
-          isCreatingPageRef.current = false;
-        }, 0);
-      }
-
-      if (!isNearBottom) {
-        pageCreationThresholdRef.current = -1;
-      }
-
-      console.log("[Whiteboard] Scroll progress:", {
-        isNearBottom,
-        visiblePageIndex,
-        pagesLength: pages.length,
-      });
-    };
-
-    container.addEventListener("scroll", handleScroll);
-    console.log("[Whiteboard] Scroll event listener attached to pages container");
+    console.log(`[Whiteboard] Navigated to page ${targetPageIndex + 1}/${pages.length}`);
     
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      console.log("[Whiteboard] Scroll event listener removed");
-    };
-  }, [currentPageIndex, pages.length, loadPage]);
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [currentPageIndex, pages.length, saveCurrentPage, isTransitioning]);
+
+  /**
+   * navigate to next page (create if needed)
+   */
+  const handleNextPage = useCallback(async () => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    saveCurrentPage();
+
+    // Create new page if on last page
+    if (currentPageIndex === pages.length - 1 && pages.length < 100) {
+      const newPageNumber = pages.length + 1;
+      const newPage: PageData = {
+        id: `page-${newPageNumber}`,
+        canvasState: null,
+        latexObjects: [],
+      };
+
+      setPages((prev) => [...prev, newPage]);
+      setCurrentPageIndex(newPageNumber - 1);
+      setLatexObjects([]);
+
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.clearCanvas();
+      }
+
+      console.log(`[Whiteboard] Created and navigated to new page ${newPageNumber}`);
+    } else if (currentPageIndex < pages.length - 1) {
+      // Navigate to existing next page
+      const targetPageIndex = currentPageIndex + 1;
+      setCurrentPageIndex(targetPageIndex);
+
+      const canvas = canvasRef.current;
+      const targetPage = pagesRef.current[targetPageIndex];
+      
+      if (canvas && targetPage) {
+        if (targetPage.canvasState) {
+          await canvas.loadFromJSON(targetPage.canvasState);
+        } else {
+          canvas.clearCanvas();
+        }
+        setLatexObjects(targetPage.latexObjects || []);
+      }
+
+      console.log(`[Whiteboard] Navigated to page ${targetPageIndex + 1}/${pages.length}`);
+    }
+    
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [currentPageIndex, pages.length, saveCurrentPage, isTransitioning]);
 
   /**
    * update current page when latex objects change
@@ -1037,62 +993,100 @@ export default function Whiteboard({
         isConnected={websocket.isConnected}
       />
 
-      {/* pages container - scrollable */}
-      <div
-        ref={pagesContainerRef}
-        className="flex-1 h-screen overflow-y-auto scroll-smooth"
-        style={{ 
-          scrollBehavior: "smooth", 
-          touchAction: "auto"
-        }}
-      >
-        {/* pages */}
-        {pages.map((page, index) => (
-          <div
-            key={page.id}
-            className="w-full relative bg-white"
-            style={{ 
-              height: "100vh",
-              position: "relative",
-              flexShrink: 0
+      {/* current page - single page display with transitions */}
+      <div className="flex-1 h-screen relative overflow-hidden">
+        <div
+          className={`w-full h-full bg-white relative transition-opacity duration-300 ${
+            isTransitioning ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <WhiteboardCanvas
+            ref={canvasRef}
+            isDrawingEnabled={canDraw}
+            penColor={penColor}
+            strokeWidth={strokeWidth}
+            eraserWidth={eraserWidth}
+            tool={currentTool}
+            onPathCreated={handlePathCreated}
+            onSelectionReady={handleSelectionReady}
+            onCanvasReady={() => {
+              setIsCanvasReady(true);
+              historyRef.current.undo = [];
+              historyRef.current.redo = [];
+              lastSnapshotRef.current = "";
+              captureHistory([]);
             }}
-          >
-            {index === currentPageIndex && (
-              <>
-                <WhiteboardCanvas
-                  ref={canvasRef}
-                  isDrawingEnabled={canDraw}
-                  penColor={penColor}
-                  strokeWidth={strokeWidth}
-                  eraserWidth={eraserWidth}
-                  tool={currentTool}
-                  onPathCreated={handlePathCreated}
-                  onSelectionReady={handleSelectionReady}
-                  onCanvasReady={() => {
-                    setIsCanvasReady(true);
-                    historyRef.current.undo = [];
-                    historyRef.current.redo = [];
-                    lastSnapshotRef.current = "";
-                    captureHistory([]);
-                  }}
-                />
+          />
 
-                {/* latex overlay for current page */}
-                <div style={{ pointerEvents: 'auto' }}>
-                  <LatexRenderer
-                    objects={latexObjects}
-                    onObjectClick={handleLatexObjectClick}
-                  />
-                </div>
-
-                {/* page number indicator */}
-                <div className="fixed top-20 right-2.5 text-gray-600 text-sm z-[900] font-medium">
-                  {index + 1}/{pages.length}
-                </div>
-              </>
-            )}
+          {/* latex overlay for current page */}
+          <div style={{ pointerEvents: 'auto' }}>
+            <LatexRenderer
+              objects={latexObjects}
+              onObjectClick={handleLatexObjectClick}
+            />
           </div>
-        ))}
+
+          {/* page number indicator */}
+          <div className="fixed top-20 right-2.5 text-gray-600 text-sm z-[900] font-medium">
+            {currentPageIndex + 1}/{pages.length}
+          </div>
+        </div>
+
+        {/* Left navigation arrow - only show if not on first page */}
+        {currentPageIndex > 0 && (
+          <button
+            onClick={handlePreviousPage}
+            disabled={isTransitioning}
+            className="fixed left-20 top-1/2 -translate-y-1/2 z-[950] 
+                     bg-black/10 hover:bg-black/20 text-gray-700 
+                     rounded-full p-2 transition-all duration-200
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     backdrop-blur-sm"
+            aria-label="Previous page"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+        )}
+
+        {/* Right navigation arrow - always visible */}
+        <button
+          onClick={handleNextPage}
+          disabled={isTransitioning || pages.length >= 100}
+          className="fixed right-4 top-1/2 -translate-y-1/2 z-[950] 
+                   bg-black/10 hover:bg-black/20 text-gray-700 
+                   rounded-full p-2 transition-all duration-200
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   backdrop-blur-sm"
+          aria-label={currentPageIndex === pages.length - 1 ? "Add new page" : "Next page"}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* converting indicator - positioned near selection */}
