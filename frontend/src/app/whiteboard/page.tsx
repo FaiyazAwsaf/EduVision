@@ -281,8 +281,9 @@ function WhiteboardContent() {
             </div>
           </header>
           <main className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-lg text-primary-dark font-semibold">Initializing whiteboard...</div>
+            <div className="text-center flex flex-col items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-dark" />
+              <div className="text-lg text-primary-dark font-semibold mt-4">Initializing whiteboard...</div>
               <div className="text-sm text-muted mt-2">Authenticating and loading sessions</div>
             </div>
           </main>
@@ -677,7 +678,10 @@ export default function WhiteboardPage() {
               </div>
             </header>
             <main className="flex-1 flex items-center justify-center">
-              <div className="text-primary-dark">Loading...</div>
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-dark" />
+                <div className="text-primary-dark mt-4">Loading...</div>
+              </div>
             </main>
           </div>
         </div>
