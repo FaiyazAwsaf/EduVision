@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
-import LatexRenderer, { LatexObject } from "./LatexRenderer";
+import { LatexObject } from "./LatexRenderer";
 import { convertHandwritingToLatex, evaluateHandwrittenEquation } from "@/api/geminiService";
 import { saveState, WhiteboardState } from "@/api/whiteboardService";
 import Toolbar, { Tool } from "./Toolbar";
@@ -75,6 +75,24 @@ function isLatexIntersecting(
     obj.top > bounds.top + bounds.height ||
     obj.top + obj.height < bounds.top
   );
+}
+
+function normalizeLatexPayload(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates = [obj.latex, obj.katex, obj.expression, obj.original_latex, obj.solution_latex];
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -373,13 +391,20 @@ export default function Whiteboard({
           if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
             break;
           }
-          if (message.data && 'latex' in message.data && typeof message.data.latex === 'string') {
+          {
+            const payload = message.data;
+            const latex = normalizeLatexPayload(message.data?.latex);
+            if (!latex || !payload) {
+              break;
+            }
             // Add remote LaTeX directly to canvas
             void canvasRef.current?.addLatexAsImage(
-              message.data.latex as string,
-              (message.data.left as number) || 0,
-              (message.data.top as number) || 0,
-              (message.data.fontSize as number) || 24
+              latex,
+              (payload.left as number) || 0,
+              (payload.top as number) || 0,
+              (payload.fontSize as number) || 24,
+              (payload.width as number) || undefined,
+              (payload.height as number) || undefined,
             );
             console.log("[Whiteboard] Remote LaTeX object added");
           }
@@ -678,8 +703,9 @@ export default function Whiteboard({
       try {
         // call gemini
         const result = await convertHandwritingToLatex(imageData, "math");
+        const normalizedLatex = normalizeLatexPayload(result.latex);
 
-        if (result.success && result.latex) {
+        if (result.success && normalizedLatex) {
           // clear the hand-drawn content in the selected region
           canvasRef.current?.clearRegion(bounds);
 
@@ -688,22 +714,26 @@ export default function Whiteboard({
 
           // Add LaTeX directly to canvas as selectable image
           await canvasRef.current?.addLatexAsImage(
-            result.latex,
+            normalizedLatex,
             bounds.left,
             bounds.top,
-            fontSize
+            fontSize,
+            bounds.width,
+            bounds.height,
           );
 
           // broadcast to other users
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { 
-                latex: result.latex,
+              data: {
+                latex: normalizedLatex,
                 left: bounds.left,
                 top: bounds.top,
                 fontSize: fontSize,
-                page: currentPageIndex + 1 
+                width: bounds.width,
+                height: bounds.height,
+                page: currentPageIndex + 1,
               },
             });
           }
@@ -712,7 +742,7 @@ export default function Whiteboard({
 
           console.log(
             "[Whiteboard] LaTeX conversion successful:",
-            result.latex,
+            normalizedLatex,
           );
         } else {
           console.error("[Whiteboard] LaTeX conversion failed:", result.error);
@@ -758,50 +788,38 @@ export default function Whiteboard({
       try {
         // Call evaluate endpoint
         const result = await evaluateHandwrittenEquation(imageData);
+        const originalLatex = normalizeLatexPayload(result.original_latex);
+        const solutionLatex = normalizeLatexPayload(result.solution_latex);
 
-        if (result.success && result.original_latex && result.solution_latex) {
+        if (result.success && solutionLatex) {
           // Clear the hand-drawn content in the selected region
           canvasRef.current?.clearRegion(bounds);
 
           // Calculate font size
           const fontSize = Math.min(Math.max(bounds.height * 0.6, 16), 48);
 
-          // Add original equation to canvas
+          // Add only the evaluated solution at the selected area
           await canvasRef.current?.addLatexAsImage(
-            result.original_latex,
+            solutionLatex,
             bounds.left,
             bounds.top,
-            fontSize
-          );
-
-          // Add solution to the right with spacing
-          await canvasRef.current?.addLatexAsImage(
-            result.solution_latex,
-            bounds.left + bounds.width + 30,
-            bounds.top,
-            fontSize
+            fontSize,
+            bounds.width,
+            bounds.height,
           );
 
           // Broadcast to other users
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { 
-                latex: result.original_latex,
+              data: {
+                latex: solutionLatex,
                 left: bounds.left,
                 top: bounds.top,
                 fontSize: fontSize,
-                page: currentPageIndex + 1 
-              },
-            });
-            websocket.sendMessage({
-              type: "latex_added",
-              data: { 
-                latex: result.solution_latex,
-                left: bounds.left + bounds.width + 30,
-                top: bounds.top,
-                fontSize: fontSize,
-                page: currentPageIndex + 1 
+                width: bounds.width,
+                height: bounds.height,
+                page: currentPageIndex + 1,
               },
             });
           }
@@ -810,9 +828,7 @@ export default function Whiteboard({
 
           console.log(
             "[Whiteboard] Equation evaluation successful:",
-            result.original_latex,
-            "=",
-            result.solution_latex,
+            solutionLatex,
           );
         } else {
           console.error("[Whiteboard] Equation evaluation failed:", result.error);
@@ -833,6 +849,7 @@ export default function Whiteboard({
   const handlePathCreated = useCallback(
     (path: CanvasPath) => {
       if (isApplyingHistoryRef.current) return;
+      if (currentTool === "select") return;
       const pathData = path.toObject();
 
       if (!websocket.isConnected) {
@@ -853,7 +870,7 @@ export default function Whiteboard({
       console.log("[Whiteboard] Broadcasted path to peers");
       captureHistory();
     },
-    [websocket, canDraw, captureHistory, currentPageIndex],
+    [websocket, canDraw, captureHistory, currentPageIndex, currentTool],
   );
 
   /**
@@ -1020,6 +1037,7 @@ export default function Whiteboard({
             tool={currentTool}
             onPathCreated={handlePathCreated}
             onSelectionReady={handleSelectionReady}
+            onObjectModified={captureHistory}
             onCanvasReady={() => {
               setIsCanvasReady(true);
               historyRef.current.undo = [];

@@ -45,6 +45,7 @@ export type WhiteboardCanvasProps = {
   onCanvasReady?: (canvas: fabric.Canvas) => void;
   onPathCreated?: (path: fabric.Path) => void;
   onSelectionReady?: (imageData: string, bounds: { left: number; top: number; width: number; height: number }) => void;
+  onObjectModified?: () => void;
 };
 
 /**
@@ -66,7 +67,14 @@ export type WhiteboardCanvasHandle = {
   setDrawingMode: (enabled: boolean) => void;
   setBrushColor: (color: string) => void;
   setBrushWidth: (width: number) => void;
-  addLatexAsImage: (latex: string, left: number, top: number, fontSize: number) => Promise<void>;
+  addLatexAsImage: (
+    latex: string,
+    left: number,
+    top: number,
+    fontSize: number,
+    targetWidth?: number,
+    targetHeight?: number,
+  ) => Promise<void>;
 };
 
 /**
@@ -186,6 +194,7 @@ const WhiteboardCanvas = forwardRef<
     onCanvasReady,
     onPathCreated,
     onSelectionReady,
+    onObjectModified,
   } = props;
 
   // ============================================================
@@ -199,12 +208,14 @@ const WhiteboardCanvas = forwardRef<
   // store callback in ref to avoid canvas recreation when callback changes
   const onPathCreatedRef = useRef(onPathCreated);
   const onSelectionReadyRef = useRef(onSelectionReady);
+  const onObjectModifiedRef = useRef(onObjectModified);
 
   // keep the ref in sync with the prop
   useEffect(() => {
     onPathCreatedRef.current = onPathCreated;
     onSelectionReadyRef.current = onSelectionReady;
-  }, [onPathCreated, onSelectionReady]);
+    onObjectModifiedRef.current = onObjectModified;
+  }, [onPathCreated, onSelectionReady, onObjectModified]);
 
   // ============================================================
   // canvas initialization
@@ -293,6 +304,20 @@ const WhiteboardCanvas = forwardRef<
           obj,
         );
       }
+    });
+
+    // listen for object:modified events (when objects are moved, scaled, rotated)
+    canvas.on("object:modified", () => {
+      if (isRemoteUpdateRef.current) return;
+      console.log("[Canvas] object:modified event fired");
+      onObjectModifiedRef.current?.();
+    });
+
+    // listen for object:removed events (when objects are deleted)
+    canvas.on("object:removed", () => {
+      if (isRemoteUpdateRef.current) return;
+      console.log("[Canvas] object:removed event fired");
+      onObjectModifiedRef.current?.();
     });
 
     console.log("[Canvas] canvas initialized successfully");
@@ -798,7 +823,14 @@ const WhiteboardCanvas = forwardRef<
       }
     },
 
-    addLatexAsImage: async (latex: string, left: number, top: number, fontSize: number) => {
+    addLatexAsImage: async (
+      latex: string,
+      left: number,
+      top: number,
+      fontSize: number,
+      targetWidth?: number,
+      targetHeight?: number,
+    ) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -809,13 +841,18 @@ const WhiteboardCanvas = forwardRef<
 
         // Create temporary container for rendering
         const tempContainer = document.createElement('div');
-        tempContainer.style.position = 'absolute';
-        tempContainer.style.left = '-9999px';
+        tempContainer.style.position = 'fixed';
+        tempContainer.style.left = '-10000px';
         tempContainer.style.top = '0px';
+        tempContainer.style.opacity = '1';
+        tempContainer.style.pointerEvents = 'none';
+        tempContainer.style.display = 'inline-block';
+        tempContainer.style.width = 'fit-content';
+        tempContainer.style.whiteSpace = 'nowrap';
         tempContainer.style.fontSize = `${fontSize}px`;
         tempContainer.style.color = '#006A71';
         tempContainer.style.backgroundColor = 'transparent';
-        tempContainer.style.padding = '8px';
+        tempContainer.style.padding = '2px';
         document.body.appendChild(tempContainer);
 
         // Render LaTeX
@@ -828,12 +865,25 @@ const WhiteboardCanvas = forwardRef<
         // Wait for fonts to load
         await document.fonts.ready;
 
-        // Capture as image using html2canvas
-        const capturedCanvas = await html2canvas(tempContainer, {
-          backgroundColor: null,
-          scale: 2, // Higher resolution
+        const rect = tempContainer.getBoundingClientRect();
+        const captureWidth = Math.max(1, Math.ceil(rect.width));
+        const captureHeight = Math.max(1, Math.ceil(rect.height));
+
+        const captureOptions = {
+          background: 'rgba(0,0,0,0)',
+          scale: 2,
           logging: false,
-        });
+          width: captureWidth,
+          height: captureHeight,
+          x: 0,
+          y: 0,
+        } as any;
+
+        // Capture as image using html2canvas
+        const capturedCanvas = await html2canvas(tempContainer, captureOptions);
+        if (!capturedCanvas.width || !capturedCanvas.height) {
+          throw new Error('LaTeX capture returned empty canvas');
+        }
 
         // Clean up temp container
         document.body.removeChild(tempContainer);
@@ -845,10 +895,26 @@ const WhiteboardCanvas = forwardRef<
         const img = await fabric.FabricImage.fromURL(dataURL, {
           crossOrigin: 'anonymous',
         });
+
+        const originalWidth = img.width ?? captureWidth;
+        const originalHeight = img.height ?? captureHeight;
+        const desiredHeight = targetHeight && targetHeight > 0 ? targetHeight : originalHeight;
+        const desiredWidth = targetWidth && targetWidth > 0 ? targetWidth : originalWidth;
+
+        // Match-by-size: prioritize matching handwritten height.
+        const heightScale = desiredHeight / Math.max(originalHeight, 1);
+        const safeScale = Number.isFinite(heightScale) && heightScale > 0 ? heightScale : 1;
+
+        const finalWidth = originalWidth * safeScale;
+        const finalHeight = originalHeight * safeScale;
+        const adjustedLeft = left + (desiredWidth - finalWidth) / 2;
+        const adjustedTop = top + (desiredHeight - finalHeight) / 2;
         
         img.set({
-          left: left,
-          top: top,
+          left: adjustedLeft,
+          top: adjustedTop,
+          scaleX: safeScale,
+          scaleY: safeScale,
           selectable: true,
           hasControls: true,
           hasBorders: true,
@@ -860,6 +926,24 @@ const WhiteboardCanvas = forwardRef<
         console.log('[Canvas] Added LaTeX as image');
       } catch (error) {
         console.error('[Canvas] Error adding LaTeX as image:', error);
+
+        // Fallback: at least place readable text so user never loses conversion output.
+        try {
+          const fallback = new fabric.Textbox(latex, {
+            left,
+            top,
+            fontSize: Math.max(14, Math.floor(fontSize * 0.8)),
+            fill: '#006A71',
+            editable: false,
+            selectable: true,
+            width: 320,
+          });
+          canvas.add(fallback);
+          canvas.renderAll();
+          console.warn('[Canvas] Fallback text added for LaTeX render');
+        } catch (fallbackError) {
+          console.error('[Canvas] Fallback render failed:', fallbackError);
+        }
       }
     },
   }));
