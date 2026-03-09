@@ -37,9 +37,13 @@ function WhiteboardContent() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteSessionId, setInviteSessionId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<WhiteboardSession | null>(null);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [preInviteStudentIds, setPreInviteStudentIds] = useState<string[]>([]);
   const [isInviting, setIsInviting] = useState(false);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
   const canCreateSession = user?.role === "teacher";
 
   useEffect(() => {
@@ -57,6 +61,9 @@ function WhiteboardContent() {
         if (sessionId) {
           console.log("[Whiteboard] Loading session from URL:", sessionId);
           const loadedSession = await getSession(sessionId);
+          console.log("[Whiteboard Page] Loaded session for user:", currentUser.username, "role:", currentUser.role);
+          console.log("[Whiteboard Page] Session data:", loadedSession);
+          console.log("[Whiteboard Page] Latest state:", loadedSession.latest_state);
           setSession(loadedSession);
           setShowPicker(false);
           setIsLoading(false);
@@ -67,6 +74,17 @@ function WhiteboardContent() {
         console.log("[Whiteboard] Loading user sessions...");
         const userSessions = await getUserSessions();
         setSessions(userSessions);
+
+        // Load students early so teachers can pre-invite while creating a session.
+        if (currentUser.role === "teacher") {
+          try {
+            const fetchedStudents = await getMyStudents();
+            setStudents(fetchedStudents);
+          } catch (studentErr) {
+            console.warn("[Whiteboard] Failed to preload students for pre-invite:", studentErr);
+          }
+        }
+
         setIsLoading(false);
       } catch (err) {
         const errorMessage =
@@ -93,6 +111,9 @@ function WhiteboardContent() {
   const handleSelectSession = async (selectedSession: WhiteboardSession) => {
     try {
       const loadedSession = await getSession(selectedSession.id);
+      console.log("[Whiteboard Page] Loaded session for user:", user?.username, "role:", user?.role);
+      console.log("[Whiteboard Page] Session data:", loadedSession);
+      console.log("[Whiteboard Page] Latest state:", loadedSession.latest_state);
       setSession(loadedSession);
       setShowPicker(false);
       window.history.replaceState(null, "", `?session=${selectedSession.id}`);
@@ -115,8 +136,19 @@ function WhiteboardContent() {
         newSessionName.trim() ||
         `Whiteboard - ${new Date().toLocaleString()}`;
       const newSession = await createSession(name);
+
+      if (preInviteStudentIds.length > 0) {
+        try {
+          await inviteStudentsToSession(newSession.id, preInviteStudentIds);
+        } catch (inviteErr) {
+          console.error("[Whiteboard] Session created but pre-invite failed:", inviteErr);
+          setError("Session created, but inviting selected students failed.");
+        }
+      }
+
       setSession(newSession);
       setShowPicker(false);
+      setPreInviteStudentIds([]);
       window.history.replaceState(null, "", `?session=${newSession.id}`);
     } catch (err) {
       const errorMessage =
@@ -168,6 +200,14 @@ function WhiteboardContent() {
     );
   };
 
+  const togglePreInviteSelection = (studentId: string) => {
+    setPreInviteStudentIds((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId],
+    );
+  };
+
   const handleConfirmInvite = async () => {
     if (!inviteSessionId) return;
     if (selectedStudentIds.length === 0) {
@@ -193,26 +233,33 @@ function WhiteboardContent() {
     }
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
+  const handleDeleteSession = (targetSession: WhiteboardSession) => {
     if (!canCreateSession) {
       setError("Only teachers can delete sessions.");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Delete this session permanently? This cannot be undone.",
-    );
-    if (!confirmed) return;
+    setSessionToDelete(targetSession);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
 
     try {
-      await deleteSession(sessionId);
+      setIsDeletingSession(true);
+      await deleteSession(sessionToDelete.id);
       const updatedSessions = await getUserSessions();
       setSessions(updatedSessions);
+      setShowDeleteModal(false);
+      setSessionToDelete(null);
       setError(null);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to delete session";
       setError(errorMessage);
+    } finally {
+      setIsDeletingSession(false);
     }
   };
 
@@ -325,6 +372,71 @@ function WhiteboardContent() {
                 >
                   {isCreatingSession ? "Creating..." : "Create New"}
                 </button>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "12px",
+                  border: "1px solid #405d5d",
+                  borderRadius: "6px",
+                  backgroundColor: "#1f1f1f",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                    fontSize: "13px",
+                    color: "#cfcfcf",
+                  }}
+                >
+                  <span>Invite students before creating</span>
+                  <span style={{ color: "#48A6A7", fontWeight: 600 }}>
+                    Selected: {preInviteStudentIds.length}
+                  </span>
+                </div>
+
+                {students.length === 0 ? (
+                  <div style={{ fontSize: "12px", color: "#888" }}>
+                    No students available to pre-invite.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                      display: "grid",
+                      gap: "6px",
+                    }}
+                  >
+                    {students.map((student) => (
+                      <label
+                        key={student.user_id}
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          alignItems: "center",
+                          fontSize: "13px",
+                          color: "#ddd",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={preInviteStudentIds.includes(student.user_id)}
+                          onChange={() => togglePreInviteSelection(student.user_id)}
+                          disabled={isCreatingSession}
+                        />
+                        <span>
+                          {student.username} ({student.email})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -444,7 +556,7 @@ function WhiteboardContent() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              void handleDeleteSession(sess.id);
+                              handleDeleteSession(sess);
                             }}
                             style={{
                               padding: "6px 10px",
@@ -494,6 +606,20 @@ function WhiteboardContent() {
           }}
           isInviting={isInviting}
         />
+
+        <DeleteSessionModal
+          open={showDeleteModal}
+          sessionName={sessionToDelete?.name ?? ""}
+          onClose={() => {
+            if (isDeletingSession) return;
+            setShowDeleteModal(false);
+            setSessionToDelete(null);
+          }}
+          onConfirm={() => {
+            void handleConfirmDeleteSession();
+          }}
+          isDeleting={isDeletingSession}
+        />
       </div>
     );
   }
@@ -507,6 +633,8 @@ function WhiteboardContent() {
           role={user.role}
           initialState={session.latest_state}
           onExitSession={handleExitSession}
+          members={session.members}
+          ownerId={session.owner.id}
         />
       </div>
     );
@@ -550,6 +678,94 @@ export default function WhiteboardPage() {
     >
       <WhiteboardContent />
     </Suspense>
+  );
+}
+
+function DeleteSessionModal({
+  open,
+  sessionName,
+  onClose,
+  onConfirm,
+  isDeleting,
+}: {
+  open: boolean;
+  sessionName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        zIndex: 2100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "460px",
+          backgroundColor: "#1f1f1f",
+          border: "1px solid #5e2b2b",
+          borderRadius: "10px",
+          padding: "20px",
+          color: "#fff",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: "12px", color: "#ff9a9a" }}>
+          Delete Session
+        </h3>
+        <p style={{ margin: "0 0 8px 0", color: "#e7e7e7" }}>
+          Are you sure you want to delete <strong>{sessionName}</strong>?
+        </p>
+        <p style={{ margin: "0 0 16px 0", fontSize: "13px", color: "#9aa0a6" }}>
+          This action is permanent and cannot be undone.
+        </p>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button
+            onClick={onClose}
+            disabled={isDeleting}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "6px",
+              border: "1px solid #666",
+              backgroundColor: "transparent",
+              color: "#ddd",
+              cursor: isDeleting ? "not-allowed" : "pointer",
+              opacity: isDeleting ? 0.7 : 1,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "6px",
+              border: "none",
+              backgroundColor: "#ff6b6b",
+              color: "#fff",
+              cursor: isDeleting ? "not-allowed" : "pointer",
+              opacity: isDeleting ? 0.7 : 1,
+            }}
+          >
+            {isDeleting ? "Deleting..." : "Delete Session"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

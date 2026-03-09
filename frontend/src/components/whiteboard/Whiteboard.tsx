@@ -17,6 +17,7 @@ import { convertHandwritingToLatex, evaluateHandwrittenEquation } from "@/api/ge
 import { saveState, WhiteboardState } from "@/api/whiteboardService";
 import Toolbar, { Tool } from "./Toolbar";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
+import MembersList, { Member } from "./MembersList";
 import * as fabric from "fabric";
 
 /**
@@ -38,6 +39,8 @@ export type WhiteboardProps = {
   role: "teacher" | "student";
   initialState?: WhiteboardState | null;
   onExitSession?: () => Promise<void> | void;
+  members?: Member[];
+  ownerId?: string;
 };
 
 /**
@@ -82,6 +85,8 @@ export default function Whiteboard({
   role,
   initialState,
   onExitSession,
+  members = [],
+  ownerId = "",
 }: WhiteboardProps) {
   // ============================================================
   // state management
@@ -286,12 +291,20 @@ export default function Whiteboard({
 
         case "lock_state":
           // update drawing lock state for students
+          console.log(
+            "[Whiteboard] Received lock_state message:",
+            message.data?.isLocked,
+            "Role:",
+            role,
+          );
           if (role === "student") {
             setIsDrawingLocked(Boolean(message.data?.isLocked));
             console.log(
-              "[Whiteboard] Drawing lock state:",
+              "[Whiteboard] Student - Drawing lock state updated to:",
               message.data?.isLocked,
             );
+          } else {
+            console.log("[Whiteboard] Teacher - Ignoring lock_state (teacher can always draw)");
           }
           break;
 
@@ -480,6 +493,16 @@ export default function Whiteboard({
   // ============================================================
 
   const canDraw = role === "teacher" || !isDrawingLocked;
+
+  // Debug logging for drawing permission changes
+  useEffect(() => {
+    console.log("[Whiteboard] canDraw updated:", {
+      canDraw,
+      role,
+      isDrawingLocked,
+      reason: role === "teacher" ? "teacher (always allowed)" : isDrawingLocked ? "locked" : "unlocked"
+    });
+  }, [canDraw, role, isDrawingLocked]);
 
   useEffect(() => {
     if (currentTool !== "select") {
@@ -879,14 +902,18 @@ export default function Whiteboard({
     setIsDrawingLocked((prevLocked) => {
       const newLockState = !prevLocked;
 
+      console.log("[Whiteboard] Teacher toggling lock to:", newLockState);
+
       if (websocket.isConnected) {
         websocket.sendMessage({
           type: "lock_state",
           data: { isLocked: newLockState },
         });
+        console.log("[Whiteboard] Lock state broadcasted via WebSocket");
+      } else {
+        console.warn("[Whiteboard] Cannot broadcast lock state - WebSocket not connected");
       }
 
-      console.log("[Whiteboard] Drawing lock:", newLockState);
       return newLockState;
     });
   }, [role, websocket]);
@@ -921,30 +948,17 @@ export default function Whiteboard({
           onClear={handleClear}
           onExport={handleExport}
           onToggleLock={role === "teacher" ? handleToggleLock : undefined}
+          onSaveExit={() => void handleSaveAndExit()}
+          isExiting={isExiting}
         />
       </div>
 
-      <button
-        onClick={() => void handleSaveAndExit()}
-        disabled={isExiting}
-        style={{
-          position: "fixed",
-          top: "20px",
-          right: "20px",
-          zIndex: 1200,
-          padding: "10px 20px",
-          backgroundColor: "#ff6b6b",
-          color: "#fff",
-          border: "none",
-          borderRadius: "6px",
-          cursor: isExiting ? "not-allowed" : "pointer",
-          fontSize: "14px",
-          fontWeight: "600",
-          opacity: isExiting ? 0.7 : 1,
-        }}
-      >
-        {isExiting ? "Saving..." : "Save & Exit"}
-      </button>
+      {/* Members List */}
+      <MembersList
+        members={members}
+        ownerId={ownerId}
+        isConnected={websocket.isConnected}
+      />
 
       {/* pages container - scrollable */}
       <div
@@ -1031,13 +1045,6 @@ export default function Whiteboard({
           </span>
         </div>
       )}
-
-      {/* session info */}
-      <div className="fixed top-2.5 right-2.5 bg-slate-700 bg-opacity-90 text-slate-100 px-3 py-2 rounded text-xs z-[900] flex flex-col gap-1">
-        <div>Session: {sessionId}</div>
-        <div>Role: {role}</div>
-        <div>Status: {websocket.connectionState}</div>
-      </div>
     </div>
   );
 }

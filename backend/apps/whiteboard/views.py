@@ -311,7 +311,12 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
             )
         
         serializer = WhiteboardSessionDetailSerializer(session)
-        return Response(serializer.data)
+        response_data = serializer.data
+        print(f"[Whiteboard API] Session {pk} retrieved by {user.username} (role: {user.role})")
+        print(f"[Whiteboard API] Latest state present: {response_data.get('latest_state') is not None}")
+        if response_data.get('latest_state'):
+            print(f"[Whiteboard API] Latest state version: {response_data['latest_state'].get('version')}")
+        return Response(response_data)
 
     @action(detail=True, methods=["post"], url_path="invite")
     def invite_student(self, request, pk=None):

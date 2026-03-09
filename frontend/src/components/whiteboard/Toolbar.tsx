@@ -33,6 +33,8 @@ export type ToolbarProps = {
   onClear: () => void;
   onExport: () => void;
   onToggleLock?: () => void;
+  onSaveExit?: () => void;
+  isExiting?: boolean;
 };
 
 const COLORS = [
@@ -73,6 +75,8 @@ export default function Toolbar(props: ToolbarProps) {
     onClear,
     onExport,
     onToggleLock,
+    onSaveExit,
+    isExiting = false,
   } = props;
 
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -323,6 +327,25 @@ export default function Toolbar(props: ToolbarProps) {
             }`}
           >
             {isDrawingLocked ? "🔒 Locked" : "🔓 Unlocked"}
+          </button>
+        </>
+      )}
+
+      {/* session actions */}
+      {onSaveExit && (
+        <>
+          <div className="h-px bg-[#9ACBD0] my-1" />
+          <button
+            type="button"
+            onClick={onSaveExit}
+            disabled={isExiting}
+            className={`px-3 py-2 rounded text-sm text-white font-semibold transition-colors ${
+              isExiting
+                ? "bg-[#ff9a9a] cursor-not-allowed"
+                : "bg-[#ff6b6b] hover:bg-[#ff5252]"
+            }`}
+          >
+            {isExiting ? "Saving..." : "Save & Exit"}
           </button>
         </>
       )}
