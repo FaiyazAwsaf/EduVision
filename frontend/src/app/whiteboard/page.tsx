@@ -272,15 +272,15 @@ function WhiteboardContent() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#1a1a1a",
-          color: "#fff",
+          backgroundColor: "#f2efe7",
+          color: "#006a71",
           fontSize: "18px",
           flexDirection: "column",
           gap: "16px",
         }}
       >
         <div>Initializing whiteboard...</div>
-        <div style={{ fontSize: "14px", color: "#888" }}>
+        <div style={{ fontSize: "14px", color: "#6b7280" }}>
           Authenticating and loading sessions
         </div>
       </div>
@@ -293,8 +293,8 @@ function WhiteboardContent() {
         style={{
           width: "100vw",
           height: "100vh",
-          backgroundColor: "#1a1a1a",
-          color: "#fff",
+          backgroundColor: "#f2efe7",
+          color: "#006a71",
           overflow: "auto",
           padding: "40px 20px",
         }}
@@ -304,7 +304,7 @@ function WhiteboardContent() {
             <h1 style={{ fontSize: "2.5em", margin: "0 0 8px 0" }}>
               Whiteboard
             </h1>
-            <p style={{ fontSize: "14px", color: "#888", margin: 0 }}>
+            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
               Welcome, {user?.username}
             </p>
           </div>
@@ -312,12 +312,12 @@ function WhiteboardContent() {
           {error && (
             <div
               style={{
-                backgroundColor: "#2a1515",
-                border: "1px solid #ff6b6b",
+                backgroundColor: "#fef2f2",
+                border: "1px solid #fecaca",
                 borderRadius: "8px",
                 padding: "16px",
                 marginBottom: "30px",
-                color: "#ff6b6b",
+                color: "#dc2626",
                 fontSize: "14px",
               }}
             >
@@ -328,11 +328,12 @@ function WhiteboardContent() {
           {canCreateSession && (
             <div
               style={{
-                backgroundColor: "#252525",
-                border: "1px solid #405d5d",
+                backgroundColor: "#ffffff",
+                border: "1px solid #9acbd0",
                 borderRadius: "8px",
                 padding: "24px",
                 marginBottom: "40px",
+                boxShadow: "0 4px 12px rgba(0, 106, 113, 0.08)",
               }}
             >
               <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "1.2em" }}>
@@ -348,10 +349,10 @@ function WhiteboardContent() {
                   style={{
                     flex: 1,
                     padding: "10px 14px",
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #405d5d",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #9acbd0",
                     borderRadius: "6px",
-                    color: "#fff",
+                    color: "#006a71",
                     fontSize: "14px",
                   }}
                 />
@@ -378,9 +379,9 @@ function WhiteboardContent() {
                 style={{
                   marginTop: "16px",
                   padding: "12px",
-                  border: "1px solid #405d5d",
+                  border: "1px solid #9acbd0",
                   borderRadius: "6px",
-                  backgroundColor: "#1f1f1f",
+                  backgroundColor: "#f8fbfb",
                 }}
               >
                 <div
@@ -390,7 +391,7 @@ function WhiteboardContent() {
                     alignItems: "center",
                     marginBottom: "8px",
                     fontSize: "13px",
-                    color: "#cfcfcf",
+                    color: "#006a71",
                   }}
                 >
                   <span>Invite students before creating</span>
@@ -400,7 +401,7 @@ function WhiteboardContent() {
                 </div>
 
                 {students.length === 0 ? (
-                  <div style={{ fontSize: "12px", color: "#888" }}>
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
                     No students available to pre-invite.
                   </div>
                 ) : (
@@ -420,7 +421,7 @@ function WhiteboardContent() {
                           gap: "8px",
                           alignItems: "center",
                           fontSize: "13px",
-                          color: "#ddd",
+                          color: "#006a71",
                           cursor: "pointer",
                         }}
                       >
@@ -448,12 +449,12 @@ function WhiteboardContent() {
             {sessions.length === 0 ? (
               <div
                 style={{
-                  backgroundColor: "#252525",
-                  border: "1px solid #405d5d",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #9acbd0",
                   borderRadius: "8px",
                   padding: "40px",
                   textAlign: "center",
-                  color: "#888",
+                  color: "#6b7280",
                 }}
               >
                 {canCreateSession
@@ -473,20 +474,21 @@ function WhiteboardContent() {
                     key={sess.id}
                     onClick={() => handleSelectSession(sess)}
                     style={{
-                      backgroundColor: "#252525",
-                      border: "1px solid #405d5d",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #9acbd0",
                       borderRadius: "8px",
                       padding: "20px",
                       cursor: "pointer",
                       transition: "all 0.3s ease",
+                      boxShadow: "0 3px 10px rgba(0, 106, 113, 0.06)",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#2a2a2a";
+                      e.currentTarget.style.backgroundColor = "#f8fbfb";
                       e.currentTarget.style.borderColor = "#48A6A7";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "#252525";
-                      e.currentTarget.style.borderColor = "#405d5d";
+                      e.currentTarget.style.backgroundColor = "#ffffff";
+                      e.currentTarget.style.borderColor = "#9acbd0";
                     }}
                   >
                     <h3
@@ -502,7 +504,7 @@ function WhiteboardContent() {
                       style={{
                         margin: "0 0 12px 0",
                         fontSize: "12px",
-                        color: "#888",
+                        color: "#6b7280",
                       }}
                     >
                       Owner: {sess.owner.username}
@@ -512,7 +514,7 @@ function WhiteboardContent() {
                         display: "flex",
                         justifyContent: "space-between",
                         fontSize: "12px",
-                        color: "#666",
+                        color: "#6b7280",
                       }}
                     >
                       <span>Members: {sess.members?.length || 0}</span>
@@ -525,7 +527,7 @@ function WhiteboardContent() {
                       style={{
                         marginTop: "12px",
                         paddingTop: "12px",
-                        borderTop: "1px solid #404040",
+                        borderTop: "1px solid #d1e5e8",
                       }}
                     >
                       {canCreateSession && sess.owner.id === user?.id && (
@@ -648,8 +650,8 @@ function WhiteboardContent() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#1a1a1a",
-        color: "#fff",
+        backgroundColor: "#f2efe7",
+        color: "#006a71",
       }}
     >
       Initializing...
@@ -668,8 +670,8 @@ export default function WhiteboardPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#1a1a1a",
-            color: "#fff",
+            backgroundColor: "#f2efe7",
+            color: "#006a71",
           }}
         >
           Loading...
