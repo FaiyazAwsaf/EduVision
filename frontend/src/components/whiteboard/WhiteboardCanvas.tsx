@@ -803,70 +803,48 @@ const WhiteboardCanvas = forwardRef<
       if (!canvas) return;
 
       try {
-        // Dynamically import katex
+        // Dynamically import dependencies
         const katex = (await import('katex')).default;
-
-        // Render LaTeX as HTML to get the output
-        const htmlOutput = katex.renderToString(latex, {
-          throwOnError: false,
-          displayMode: true,
-          output: 'html',
-        });
+        const html2canvas = (await import('html2canvas')).default;
 
         // Create temporary container for rendering
         const tempContainer = document.createElement('div');
         tempContainer.style.position = 'absolute';
         tempContainer.style.left = '-9999px';
+        tempContainer.style.top = '0px';
         tempContainer.style.fontSize = `${fontSize}px`;
         tempContainer.style.color = '#006A71';
         tempContainer.style.backgroundColor = 'transparent';
-        tempContainer.style.padding = '4px';
-        tempContainer.innerHTML = htmlOutput;
+        tempContainer.style.padding = '8px';
         document.body.appendChild(tempContainer);
+
+        // Render LaTeX
+        katex.render(latex, tempContainer, {
+          throwOnError: false,
+          displayMode: true,
+          output: 'html',
+        });
 
         // Wait for fonts to load
         await document.fonts.ready;
 
-        // Get dimensions
-        const rect = tempContainer.getBoundingClientRect();
-        
-        // Create a canvas to draw the LaTeX
-        const tempCanvas = document.createElement('canvas');
-        const scale = 2; // Higher resolution
-        tempCanvas.width = rect.width * scale;
-        tempCanvas.height = rect.height * scale;
-        
-        const ctx = tempCanvas.getContext('2d');
-        if (!ctx) {
-          document.body.removeChild(tempContainer);
-          return;
-        }
-
-        ctx.scale(scale, scale);
-        
-        // Create SVG foreignObject to embed HTML
-        const svgData = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">
-            <foreignObject width="100%" height="100%">
-              <div xmlns="http://www.w3.org/1999/xhtml" style="font-size: ${fontSize}px; color: #006A71;">
-                ${htmlOutput}
-              </div>
-            </foreignObject>
-          </svg>
-        `;
-
-        const blob = new Blob([svgData], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
+        // Capture as image using html2canvas
+        const capturedCanvas = await html2canvas(tempContainer, {
+          backgroundColor: null,
+          scale: 2, // Higher resolution
+          logging: false,
+        });
 
         // Clean up temp container
         document.body.removeChild(tempContainer);
 
-        // Create fabric image from SVG
-        const img = await fabric.FabricImage.fromURL(url, {
+        // Convert to data URL
+        const dataURL = capturedCanvas.toDataURL('image/png');
+
+        // Create fabric image
+        const img = await fabric.FabricImage.fromURL(dataURL, {
           crossOrigin: 'anonymous',
         });
-        
-        URL.revokeObjectURL(url);
         
         img.set({
           left: left,
