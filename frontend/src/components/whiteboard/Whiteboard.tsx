@@ -373,11 +373,14 @@ export default function Whiteboard({
           if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
             break;
           }
-          if (message.data?.latexObject) {
-            setLatexObjects((prev) => [
-              ...prev,
-              message.data!.latexObject as LatexObject,
-            ]);
+          if (message.data && 'latex' in message.data && typeof message.data.latex === 'string') {
+            // Add remote LaTeX directly to canvas
+            void canvasRef.current?.addLatexAsImage(
+              message.data.latex as string,
+              (message.data.left as number) || 0,
+              (message.data.top as number) || 0,
+              (message.data.fontSize as number) || 24
+            );
             console.log("[Whiteboard] Remote LaTeX object added");
           }
           break;
@@ -680,30 +683,32 @@ export default function Whiteboard({
           // clear the hand-drawn content in the selected region
           canvasRef.current?.clearRegion(bounds);
 
-          // create new Latex object positioned at the selection
-          const newLatexObject: LatexObject = {
-            id: `latex-${Date.now()}`,
-            latex: result.latex,
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
-          };
+          // Calculate font size based on bounds
+          const fontSize = Math.min(Math.max(bounds.height * 0.6, 16), 48);
 
-          // add to state
-          const nextLatex = [...latexObjectsRef.current, newLatexObject];
-          setLatexObjects(nextLatex);
+          // Add LaTeX directly to canvas as selectable image
+          await canvasRef.current?.addLatexAsImage(
+            result.latex,
+            bounds.left,
+            bounds.top,
+            fontSize
+          );
 
           // broadcast to other users
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: newLatexObject, page: currentPageIndex + 1 },
+              data: { 
+                latex: result.latex,
+                left: bounds.left,
+                top: bounds.top,
+                fontSize: fontSize,
+                page: currentPageIndex + 1 
+              },
             });
           }
 
-          captureHistory(nextLatex);
+          captureHistory();
 
           console.log(
             "[Whiteboard] LaTeX conversion successful:",
@@ -719,7 +724,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     },
-    [websocket, currentPageIndex],
+    [websocket, currentPageIndex, captureHistory],
   );
 
   const handleSelectionReady = useCallback(
@@ -758,49 +763,50 @@ export default function Whiteboard({
           // Clear the hand-drawn content in the selected region
           canvasRef.current?.clearRegion(bounds);
 
-          // Create original equation object on the left
-          const originalLatexObject: LatexObject = {
-            id: `latex-${Date.now()}`,
-            latex: result.original_latex,
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
-          };
+          // Calculate font size
+          const fontSize = Math.min(Math.max(bounds.height * 0.6, 16), 48);
 
-          // Create solution object to the right with some spacing
-          const solutionLatexObject: LatexObject = {
-            id: `latex-${Date.now() + 1}`,
-            latex: result.solution_latex,
-            left: bounds.left + bounds.width + 30, // 30px spacing from original
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
-          };
+          // Add original equation to canvas
+          await canvasRef.current?.addLatexAsImage(
+            result.original_latex,
+            bounds.left,
+            bounds.top,
+            fontSize
+          );
 
-          // Add both to state
-          const nextLatex = [
-            ...latexObjectsRef.current,
-            originalLatexObject,
-            solutionLatexObject,
-          ];
-          setLatexObjects(nextLatex);
+          // Add solution to the right with spacing
+          await canvasRef.current?.addLatexAsImage(
+            result.solution_latex,
+            bounds.left + bounds.width + 30,
+            bounds.top,
+            fontSize
+          );
 
           // Broadcast to other users
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: originalLatexObject, page: currentPageIndex + 1 },
+              data: { 
+                latex: result.original_latex,
+                left: bounds.left,
+                top: bounds.top,
+                fontSize: fontSize,
+                page: currentPageIndex + 1 
+              },
             });
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: solutionLatexObject, page: currentPageIndex + 1 },
+              data: { 
+                latex: result.solution_latex,
+                left: bounds.left + bounds.width + 30,
+                top: bounds.top,
+                fontSize: fontSize,
+                page: currentPageIndex + 1 
+              },
             });
           }
 
-          captureHistory(nextLatex);
+          captureHistory();
 
           console.log(
             "[Whiteboard] Equation evaluation successful:",
@@ -818,7 +824,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     })();
-  }, [selectionData, websocket, currentPageIndex]);
+  }, [selectionData, websocket, currentPageIndex, captureHistory]);
 
   /**
    * handle local drawing events
@@ -1022,14 +1028,6 @@ export default function Whiteboard({
               captureHistory([]);
             }}
           />
-
-          {/* latex overlay for current page */}
-          <div style={{ pointerEvents: 'auto' }}>
-            <LatexRenderer
-              objects={latexObjects}
-              onObjectClick={handleLatexObjectClick}
-            />
-          </div>
 
           {/* page number indicator */}
           <div className="fixed top-20 right-2.5 text-gray-600 text-sm z-[900] font-medium">

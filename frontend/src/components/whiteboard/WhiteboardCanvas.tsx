@@ -66,6 +66,7 @@ export type WhiteboardCanvasHandle = {
   setDrawingMode: (enabled: boolean) => void;
   setBrushColor: (color: string) => void;
   setBrushWidth: (width: number) => void;
+  addLatexAsImage: (latex: string, left: number, top: number, fontSize: number) => Promise<void>;
 };
 
 /**
@@ -794,6 +795,93 @@ const WhiteboardCanvas = forwardRef<
     setBrushWidth: (width: number) => {
       if (canvasRef.current && canvasRef.current.freeDrawingBrush) {
         canvasRef.current.freeDrawingBrush.width = width;
+      }
+    },
+
+    addLatexAsImage: async (latex: string, left: number, top: number, fontSize: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      try {
+        // Dynamically import katex
+        const katex = (await import('katex')).default;
+
+        // Render LaTeX as HTML to get the output
+        const htmlOutput = katex.renderToString(latex, {
+          throwOnError: false,
+          displayMode: true,
+          output: 'html',
+        });
+
+        // Create temporary container for rendering
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.fontSize = `${fontSize}px`;
+        tempContainer.style.color = '#006A71';
+        tempContainer.style.backgroundColor = 'transparent';
+        tempContainer.style.padding = '4px';
+        tempContainer.innerHTML = htmlOutput;
+        document.body.appendChild(tempContainer);
+
+        // Wait for fonts to load
+        await document.fonts.ready;
+
+        // Get dimensions
+        const rect = tempContainer.getBoundingClientRect();
+        
+        // Create a canvas to draw the LaTeX
+        const tempCanvas = document.createElement('canvas');
+        const scale = 2; // Higher resolution
+        tempCanvas.width = rect.width * scale;
+        tempCanvas.height = rect.height * scale;
+        
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) {
+          document.body.removeChild(tempContainer);
+          return;
+        }
+
+        ctx.scale(scale, scale);
+        
+        // Create SVG foreignObject to embed HTML
+        const svgData = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">
+            <foreignObject width="100%" height="100%">
+              <div xmlns="http://www.w3.org/1999/xhtml" style="font-size: ${fontSize}px; color: #006A71;">
+                ${htmlOutput}
+              </div>
+            </foreignObject>
+          </svg>
+        `;
+
+        const blob = new Blob([svgData], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+
+        // Clean up temp container
+        document.body.removeChild(tempContainer);
+
+        // Create fabric image from SVG
+        const img = await fabric.FabricImage.fromURL(url, {
+          crossOrigin: 'anonymous',
+        });
+        
+        URL.revokeObjectURL(url);
+        
+        img.set({
+          left: left,
+          top: top,
+          selectable: true,
+          hasControls: true,
+          hasBorders: true,
+          lockScalingFlip: true,
+        });
+
+        canvas.add(img);
+        canvas.renderAll();
+        console.log('[Canvas] Added LaTeX as image');
+      } catch (error) {
+        console.error('[Canvas] Error adding LaTeX as image:', error);
       }
     },
   }));
