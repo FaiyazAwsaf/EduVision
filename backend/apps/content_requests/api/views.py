@@ -66,41 +66,64 @@ def _user_can_view_request(user, model_instance) -> bool:
     Access is granted when the user:
       1. is the creator of the request, OR
       2. is a student whose class (and optionally section) is the target of the request
-         and the request is COMPLETED teacher content.
+         and the request is COMPLETED teacher content, OR
+      3. is a student enrolled in a section whose course outline contains the
+         curriculum topic linked to this request.
     """
     # Owner always has access
     if model_instance.created_by_id and model_instance.created_by_id == user.id:
         return True
 
     # Shared-content visibility for students
-    if (
-        getattr(user, 'role', None) == 'student'
-        and model_instance.role == 'teacher'
-        and model_instance.status == 'COMPLETED'
-        and model_instance.target_class_id is not None
-    ):
-        from apps.students.models import StudentProfile
-        try:
-            profile = StudentProfile.objects.select_related(
-                'section', 'section__class_ref'
-            ).get(user=user)
-        except StudentProfile.DoesNotExist:
-            return False
-
-        if not profile.section or not profile.section.class_ref:
-            return False
-
-        if profile.section.class_ref_id != model_instance.target_class_id:
-            return False
-
-        # Section-specific content: only that section can see it
+    if getattr(user, 'role', None) == 'student':
+        # Path A: target_class-based sharing
         if (
-            model_instance.target_section_id is not None
-            and model_instance.target_section_id != profile.section_id
+            model_instance.role == 'teacher'
+            and model_instance.status == 'COMPLETED'
+            and model_instance.target_class_id is not None
         ):
-            return False
+            from apps.students.models import StudentProfile
+            try:
+                profile = StudentProfile.objects.select_related(
+                    'section', 'section__class_ref'
+                ).get(user=user)
+            except StudentProfile.DoesNotExist:
+                return False
 
-        return True
+            if not profile.section or not profile.section.class_ref:
+                return False
+
+            if profile.section.class_ref_id != model_instance.target_class_id:
+                return False
+
+            # Section-specific content: only that section can see it
+            if (
+                model_instance.target_section_id is not None
+                and model_instance.target_section_id != profile.section_id
+            ):
+                return False
+
+            return True
+
+        # Path B: curriculum-topic-based sharing
+        if (
+            model_instance.status == 'COMPLETED'
+            and model_instance.curriculum_topic_id is not None
+        ):
+            from apps.students.models import StudentProfile
+            try:
+                profile = StudentProfile.objects.select_related('section').get(user=user)
+            except StudentProfile.DoesNotExist:
+                return False
+            if not profile.section:
+                return False
+            # Check if the topic's outline belongs to a teaching assignment
+            # that targets the student's section
+            from apps.curriculum.models import CourseTopic
+            return CourseTopic.objects.filter(
+                pk=model_instance.curriculum_topic_id,
+                course_outline__teaching_assignment__section=profile.section,
+            ).exists()
 
     return False
 
@@ -788,5 +811,104 @@ class SharedContentListView(APIView):
                 'total': total,
                 'count': len(serializer.data),
             },
+            status=status.HTTP_200_OK,
+        )
+
+
+class CurriculumMaterialsListView(APIView):
+    """
+    GET /api/content-requests/shared/curriculum/
+
+    Returns completed content requests that are linked to curriculum topics
+    belonging to course outlines assigned to the student's section.
+    Results are grouped by course outline title.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if getattr(request.user, 'role', None) != 'student':
+            return Response(
+                {'error': 'Only students can view curriculum materials'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from apps.students.models import StudentProfile
+        try:
+            profile = StudentProfile.objects.select_related('section').get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response({'courses': []}, status=status.HTTP_200_OK)
+
+        if not profile.section:
+            return Response({'courses': []}, status=status.HTTP_200_OK)
+
+        # Find all course outlines assigned to this student's section
+        from apps.curriculum.models import CourseOutline
+        outline_ids = list(
+            CourseOutline.objects.filter(
+                teaching_assignment__section=profile.section,
+                parsing_status='COMPLETED',
+            ).values_list('id', flat=True)
+        )
+
+        if not outline_ids:
+            return Response({'courses': []}, status=status.HTTP_200_OK)
+
+        # Get all completed content requests linked to topics in those outlines
+        qs = (
+            ContentRequestModel.objects
+            .filter(
+                status='COMPLETED',
+                curriculum_topic__isnull=False,
+                curriculum_topic__course_outline_id__in=outline_ids,
+            )
+            .select_related(
+                'created_by',
+                'curriculum_topic',
+                'curriculum_topic__course_outline',
+                'curriculum_topic__week',
+            )
+            .order_by(
+                'curriculum_topic__course_outline__title',
+                'curriculum_topic__week__week_number',
+                '-created_at',
+            )
+        )
+
+        # Group by course outline
+        from collections import OrderedDict
+        courses: OrderedDict = OrderedDict()
+        for cr in qs:
+            outline = cr.curriculum_topic.course_outline
+            outline_id = str(outline.id)
+            if outline_id not in courses:
+                courses[outline_id] = {
+                    'course_id': outline_id,
+                    'course_title': outline.title,
+                    'course_code': outline.course_code,
+                    'materials': [],
+                }
+
+            teacher = cr.created_by
+            teacher_name = None
+            if teacher:
+                name = f"{teacher.first_name} {teacher.last_name}".strip()
+                teacher_name = name or teacher.username
+
+            week = cr.curriculum_topic.week
+            courses[outline_id]['materials'].append({
+                'id': str(cr.id),
+                'topic': cr.topic,
+                'content_type': cr.content_type,
+                'subject': cr.subject or None,
+                'difficulty': cr.difficulty or None,
+                'style': cr.style,
+                'teacher_name': teacher_name,
+                'curriculum_topic_title': cr.curriculum_topic.title,
+                'week_number': week.week_number if week else None,
+                'created_at': cr.created_at.isoformat(),
+            })
+
+        return Response(
+            {'courses': list(courses.values())},
             status=status.HTTP_200_OK,
         )

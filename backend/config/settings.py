@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "apps.rubrics.apps.RubricsConfig",
     "apps.students.apps.StudentsConfig",
     "apps.whiteboard.apps.WhiteboardConfig",
+    "apps.curriculum.apps.CurriculumConfig",
     "apps.analytics.apps.AnalyticsConfig",
 ]
 

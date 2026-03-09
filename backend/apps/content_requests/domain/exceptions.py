@@ -28,3 +28,14 @@ class ValidationError(DomainException):
         self.field = field
         self.message = message
         super().__init__(f"Validation error for {field}: {message}")
+
+
+class OffTopicError(DomainException):
+    """Raised when AI detects the topic is not related to education."""
+
+    def __init__(self, topic: str):
+        self.topic = topic
+        super().__init__(
+            f"The topic '{topic[:80]}' is not related to academics or education. "
+            "Please enter a study-related topic."
+        )

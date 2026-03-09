@@ -23,6 +23,7 @@ from .services.content_formatter import get_content_formatter, ContentFormatterE
 from .persistence.repository import GeneratedContentRepository
 from .persistence.learning_context_repository import LearningContextRepository
 from .domain.enums import RequestStatus
+from .domain.exceptions import OffTopicError
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,26 @@ def process_content_request(self, request_id: str):
             logger.info(f"[Task] Generating content for request {request_id}")
             generated = ai_provider.generate_content(request, learning_context=learning_context)
             
+            # Check if AI flagged the topic as off-topic
+            if generated.content_text.strip().startswith('[OFF_TOPIC]'):
+                logger.warning(f"[Task] AI flagged request {request_id} as off-topic: {request.topic[:80]}")
+                off_topic_msg = (
+                    'The topic you entered is not related to academics or education. '
+                    'Please enter a study-related topic.'
+                )
+                # Store error message on the model so the frontend can read it
+                from .models import ContentRequestModel
+                ContentRequestModel.objects.filter(id=request_uuid).update(
+                    status=RequestStatus.FAILED.value,
+                    error_message=off_topic_msg,
+                )
+                return {
+                    'success': False,
+                    'request_id': request_id,
+                    'error': off_topic_msg,
+                    'error_code': 'OFF_TOPIC',
+                }
+            
             logger.info(
                 f"[Task] Content generated successfully "
                 f"({len(generated.content_text)} chars)"
@@ -161,7 +182,34 @@ def process_content_request(self, request_id: str):
                     'request_id': request_id,
                     'error': 'Failed to update status to COMPLETED'
                 }
-            
+
+            # Auto-create curriculum TopicMaterial if linked to a topic
+            try:
+                from .models import ContentRequestModel
+                req_model = ContentRequestModel.objects.select_related(
+                    'curriculum_topic'
+                ).get(pk=request_uuid)
+                if req_model.curriculum_topic_id:
+                    from apps.curriculum.models import TopicMaterial, MaterialType
+                    TopicMaterial.objects.update_or_create(
+                        content_request=req_model,
+                        defaults={
+                            'topic': req_model.curriculum_topic,
+                            'uploaded_by': req_model.created_by,
+                            'title': f"{req_model.topic} ({req_model.content_type})",
+                            'description': f"AI-generated {req_model.content_type} content",
+                            'material_type': MaterialType.GENERATED,
+                        },
+                    )
+                    logger.info(
+                        f"[Task] Auto-created TopicMaterial for topic "
+                        f"{req_model.curriculum_topic_id}"
+                    )
+            except Exception:
+                logger.exception(
+                    f"[Task] Failed to auto-create TopicMaterial for {request_id}"
+                )
+
             logger.info(f"[Task] Request {request_id} processing completed successfully")
             
             return {
