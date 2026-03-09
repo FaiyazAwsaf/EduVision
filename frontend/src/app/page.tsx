@@ -30,7 +30,9 @@ export default function Home() {
             <div className="w-10 h-10 bg-primary-dark rounded-xl flex items-center justify-center shadow-md">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-primary-dark">EduVision</span>
+            <span className="text-xl font-bold text-primary-dark">
+              EduVision
+            </span>
           </div>
           <Link
             href="/signin"
@@ -215,9 +217,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary" />
-            <span className="text-sm text-primary font-medium">
-              EduVision
-            </span>
+            <span className="text-sm text-primary font-medium">EduVision</span>
           </div>
           <p className="text-xs text-secondary">
             &copy; {new Date().getFullYear()} EduVision AI Platform
