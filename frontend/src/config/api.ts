@@ -32,6 +32,34 @@ export const API_ENDPOINTS = {
   // Phase 5: Study Plan endpoints
   STUDY_PLANS: `${API_BASE_URL}/study-plans/`,
   STUDY_PLAN_ITEMS: `${API_BASE_URL}/study-plan-items/`,
+
+  // Curriculum
+  CURRICULUM_OUTLINES: `${API_BASE_URL}/curriculum/outlines/`,
+  CURRICULUM_OUTLINES_LIST: `${API_BASE_URL}/curriculum/outlines/list/`,
+  CURRICULUM_OUTLINE_DETAIL: (id: string) =>
+    `${API_BASE_URL}/curriculum/outlines/${id}/`,
+  CURRICULUM_OUTLINE_REPARSE: (id: string) =>
+    `${API_BASE_URL}/curriculum/outlines/${id}/reparse/`,
+  CURRICULUM_DIFFICULTY_REPORT: (id: string) =>
+    `${API_BASE_URL}/curriculum/outlines/${id}/difficulty-report/`,
+  CURRICULUM_TOPIC_MATERIALS_UPLOAD: (topicId: string) =>
+    `${API_BASE_URL}/curriculum/topics/${topicId}/materials/`,
+  CURRICULUM_MATERIAL_DELETE: (materialId: string) =>
+    `${API_BASE_URL}/curriculum/materials/${materialId}/`,
+  CURRICULUM_NOTIFICATIONS: `${API_BASE_URL}/curriculum/notifications/`,
+  CURRICULUM_NOTIFICATIONS_MARK_READ: `${API_BASE_URL}/curriculum/notifications/mark-read/`,
+  CURRICULUM_MY_COURSES: `${API_BASE_URL}/curriculum/my-courses/`,
+  CURRICULUM_COURSE_TOPICS: (outlineId: string) =>
+    `${API_BASE_URL}/curriculum/my-courses/${outlineId}/topics/`,
+  CURRICULUM_COURSE_SUMMARY: (outlineId: string) =>
+    `${API_BASE_URL}/curriculum/my-courses/${outlineId}/summary/`,
+  CURRICULUM_TOPIC_PROGRESS: (topicId: string) =>
+    `${API_BASE_URL}/curriculum/topics/${topicId}/progress/`,
+  CURRICULUM_TOPIC_FLAG: (topicId: string) =>
+    `${API_BASE_URL}/curriculum/topics/${topicId}/flag-difficulty/`,
+  CURRICULUM_TOPIC_MATERIALS_LIST: (topicId: string) =>
+    `${API_BASE_URL}/curriculum/topics/${topicId}/materials/list/`,
+  CURRICULUM_TOPIC_SEARCH: `${API_BASE_URL}/curriculum/topics/search/`,
 } as const;
 
 // Polling configuration

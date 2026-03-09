@@ -52,6 +52,7 @@ export interface CreateContentRequestPayload {
   subject?: string;
   target_class_id?: string;
   target_section_id?: string;
+  curriculum_topic_id?: string;
 }
 
 // Content request response from API
@@ -67,6 +68,7 @@ export interface ContentRequest {
   role?: string;
   subject?: string;
   created_by_id?: string;
+  error_message?: string;
   created_at: string;
   updated_at: string;
 }
