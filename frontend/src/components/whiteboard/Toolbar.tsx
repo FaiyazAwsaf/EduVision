@@ -35,6 +35,11 @@ export type ToolbarProps = {
   onToggleLock?: () => void;
   onSaveExit?: () => void;
   isExiting?: boolean;
+  currentPageIndex?: number;
+  totalPages?: number;
+  onPreviousPage?: () => void;
+  onNextPage?: () => void;
+  isTransitioning?: boolean;
 };
 
 const COLORS = [
@@ -77,6 +82,11 @@ export default function Toolbar(props: ToolbarProps) {
     onToggleLock,
     onSaveExit,
     isExiting = false,
+    currentPageIndex = 0,
+    totalPages = 1,
+    onPreviousPage,
+    onNextPage,
+    isTransitioning = false,
   } = props;
 
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -108,6 +118,90 @@ export default function Toolbar(props: ToolbarProps) {
       </div>
 
       <div className="h-px bg-[#9ACBD0] my-1" />
+
+      {/* Page Navigation */}
+      {onPreviousPage && onNextPage && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[#006A71] text-xs font-bold uppercase text-center">
+              Page {currentPageIndex + 1} / {totalPages}
+            </span>
+            <div className="flex gap-2 justify-center">
+              <button
+                type="button"
+                onClick={onPreviousPage}
+                disabled={currentPageIndex === 0 || isTransitioning}
+                className="bg-black/10 hover:bg-black/20 text-gray-700 
+                         rounded-full p-2 transition-all duration-200
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         backdrop-blur-sm"
+                aria-label="Previous page"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={onNextPage}
+                disabled={isTransitioning || totalPages >= 100}
+                className="bg-black/10 hover:bg-black/20 text-gray-700 
+                         rounded-full p-2 transition-all duration-200
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         backdrop-blur-sm"
+                aria-label={currentPageIndex === totalPages - 1 ? "Add new page" : "Next page"}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="h-px bg-[#9ACBD0] my-1" />
+        </>
+      )}
+
+      {/* Save & Exit */}
+      {onSaveExit && (
+        <>
+          <button
+            type="button"
+            onClick={onSaveExit}
+            disabled={isExiting}
+            className={`px-3 py-2 rounded text-sm text-white font-semibold transition-colors ${
+              isExiting
+                ? "bg-[#ff9a9a] cursor-not-allowed"
+                : "bg-[#ff6b6b] hover:bg-[#ff5252]"
+            }`}
+          >
+            {isExiting ? "Saving..." : "Save & Exit"}
+          </button>
+          <div className="h-px bg-[#9ACBD0] my-1" />
+        </>
+      )}
 
       {/* Drawing Tools */}
       {canDraw && (
@@ -327,25 +421,6 @@ export default function Toolbar(props: ToolbarProps) {
             }`}
           >
             {isDrawingLocked ? "🔒 Locked" : "🔓 Unlocked"}
-          </button>
-        </>
-      )}
-
-      {/* session actions */}
-      {onSaveExit && (
-        <>
-          <div className="h-px bg-[#9ACBD0] my-1" />
-          <button
-            type="button"
-            onClick={onSaveExit}
-            disabled={isExiting}
-            className={`px-3 py-2 rounded text-sm text-white font-semibold transition-colors ${
-              isExiting
-                ? "bg-[#ff9a9a] cursor-not-allowed"
-                : "bg-[#ff6b6b] hover:bg-[#ff5252]"
-            }`}
-          >
-            {isExiting ? "Saving..." : "Save & Exit"}
           </button>
         </>
       )}

@@ -983,6 +983,11 @@ export default function Whiteboard({
           onToggleLock={role === "teacher" ? handleToggleLock : undefined}
           onSaveExit={() => void handleSaveAndExit()}
           isExiting={isExiting}
+          currentPageIndex={currentPageIndex}
+          totalPages={pages.length}
+          onPreviousPage={handlePreviousPage}
+          onNextPage={handleNextPage}
+          isTransitioning={isTransitioning}
         />
       </div>
 
@@ -1031,62 +1036,6 @@ export default function Whiteboard({
             {currentPageIndex + 1}/{pages.length}
           </div>
         </div>
-
-        {/* Left navigation arrow - only show if not on first page */}
-        {currentPageIndex > 0 && (
-          <button
-            onClick={handlePreviousPage}
-            disabled={isTransitioning}
-            className="fixed left-20 top-1/2 -translate-y-1/2 z-[950] 
-                     bg-black/10 hover:bg-black/20 text-gray-700 
-                     rounded-full p-2 transition-all duration-200
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     backdrop-blur-sm"
-            aria-label="Previous page"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-          </button>
-        )}
-
-        {/* Right navigation arrow - always visible */}
-        <button
-          onClick={handleNextPage}
-          disabled={isTransitioning || pages.length >= 100}
-          className="fixed right-4 top-1/2 -translate-y-1/2 z-[950] 
-                   bg-black/10 hover:bg-black/20 text-gray-700 
-                   rounded-full p-2 transition-all duration-200
-                   disabled:opacity-50 disabled:cursor-not-allowed
-                   backdrop-blur-sm"
-          aria-label={currentPageIndex === pages.length - 1 ? "Add new page" : "Next page"}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
       </div>
 
       {/* converting indicator - positioned near selection */}
