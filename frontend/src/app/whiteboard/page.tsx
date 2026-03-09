@@ -10,6 +10,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import Whiteboard from "@/components/whiteboard/Whiteboard";
+import Sidebar from "@/components/shared/Sidebar";
 import {
   getCurrentUser,
   getSession,
@@ -289,25 +290,20 @@ function WhiteboardContent() {
 
   if (showPicker && !session) {
     return (
-      <div
-        style={{
-          width: "100vw",
-          height: "100vh",
-          backgroundColor: "#f2efe7",
-          color: "#006a71",
-          overflow: "auto",
-          padding: "40px 20px",
-        }}
-      >
-        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-          <div style={{ marginBottom: "40px" }}>
-            <h1 style={{ fontSize: "2.5em", margin: "0 0 8px 0" }}>
-              Whiteboard
-            </h1>
-            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
-              Welcome, {user?.username}
-            </p>
-          </div>
+      <div className="min-h-screen bg-background">
+        <Sidebar role={user?.role === "student" ? "student" : "teacher"} />
+        <div className="ml-60 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+            <div className="px-8 py-4">
+              <h1 className="text-2xl font-bold text-primary-dark">Whiteboard</h1>
+              <p className="text-sm text-primary">
+                Create or open collaborative whiteboard sessions
+              </p>
+            </div>
+          </header>
+
+          <main className="flex-1 px-8 py-8">
+            <div style={{ maxWidth: "980px" }}>
 
           {error && (
             <div
@@ -590,38 +586,40 @@ function WhiteboardContent() {
               </div>
             )}
           </div>
+            </div>
+
+            <InviteStudentsModal
+              open={showInviteModal}
+              students={students}
+              selectedStudentIds={selectedStudentIds}
+              onToggle={toggleStudentSelection}
+              onClose={() => {
+                setShowInviteModal(false);
+                setInviteSessionId(null);
+                setSelectedStudentIds([]);
+                setError(null);
+              }}
+              onConfirm={() => {
+                void handleConfirmInvite();
+              }}
+              isInviting={isInviting}
+            />
+
+            <DeleteSessionModal
+              open={showDeleteModal}
+              sessionName={sessionToDelete?.name ?? ""}
+              onClose={() => {
+                if (isDeletingSession) return;
+                setShowDeleteModal(false);
+                setSessionToDelete(null);
+              }}
+              onConfirm={() => {
+                void handleConfirmDeleteSession();
+              }}
+              isDeleting={isDeletingSession}
+            />
+          </main>
         </div>
-
-        <InviteStudentsModal
-          open={showInviteModal}
-          students={students}
-          selectedStudentIds={selectedStudentIds}
-          onToggle={toggleStudentSelection}
-          onClose={() => {
-            setShowInviteModal(false);
-            setInviteSessionId(null);
-            setSelectedStudentIds([]);
-            setError(null);
-          }}
-          onConfirm={() => {
-            void handleConfirmInvite();
-          }}
-          isInviting={isInviting}
-        />
-
-        <DeleteSessionModal
-          open={showDeleteModal}
-          sessionName={sessionToDelete?.name ?? ""}
-          onClose={() => {
-            if (isDeletingSession) return;
-            setShowDeleteModal(false);
-            setSessionToDelete(null);
-          }}
-          onConfirm={() => {
-            void handleConfirmDeleteSession();
-          }}
-          isDeleting={isDeletingSession}
-        />
       </div>
     );
   }
