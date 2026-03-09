@@ -11,6 +11,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import Whiteboard from "@/components/whiteboard/Whiteboard";
 import Sidebar from "@/components/shared/Sidebar";
+import { getUserData } from "@/api/auth";
 import {
   getCurrentUser,
   getSession,
@@ -46,6 +47,8 @@ function WhiteboardContent() {
   const [isInviting, setIsInviting] = useState(false);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
   const canCreateSession = user?.role === "teacher";
+  const cachedRole = getUserData()?.role;
+  const shellRole: "teacher" | "student" | "admin" = user?.role ?? cachedRole ?? "teacher";
 
   useEffect(() => {
     const initializeWhiteboard = async () => {
@@ -266,23 +269,23 @@ function WhiteboardContent() {
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          width: "100vw",
-          height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#f2efe7",
-          color: "#006a71",
-          fontSize: "18px",
-          flexDirection: "column",
-          gap: "16px",
-        }}
-      >
-        <div>Initializing whiteboard...</div>
-        <div style={{ fontSize: "14px", color: "#6b7280" }}>
-          Authenticating and loading sessions
+      <div className="min-h-screen bg-background">
+        <Sidebar role={shellRole} />
+        <div className="ml-60 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+            <div className="px-8 py-4">
+              <h1 className="text-2xl font-bold text-primary-dark">Whiteboard</h1>
+              <p className="text-sm text-primary">
+                Create or open collaborative whiteboard sessions
+              </p>
+            </div>
+          </header>
+          <main className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-lg text-primary-dark font-semibold">Initializing whiteboard...</div>
+              <div className="text-sm text-muted mt-2">Authenticating and loading sessions</div>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -658,21 +661,25 @@ function WhiteboardContent() {
 }
 
 export default function WhiteboardPage() {
+  const cachedRole = getUserData()?.role;
+  const fallbackRole: "teacher" | "student" | "admin" = cachedRole ?? "teacher";
+
   return (
     <Suspense
       fallback={
-        <div
-          style={{
-            width: "100vw",
-            height: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#f2efe7",
-            color: "#006a71",
-          }}
-        >
-          Loading...
+        <div className="min-h-screen bg-background">
+          <Sidebar role={fallbackRole} />
+          <div className="ml-60 flex flex-col min-h-screen">
+            <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+              <div className="px-8 py-4">
+                <h1 className="text-2xl font-bold text-primary-dark">Whiteboard</h1>
+                <p className="text-sm text-primary">Create or open collaborative whiteboard sessions</p>
+              </div>
+            </header>
+            <main className="flex-1 flex items-center justify-center">
+              <div className="text-primary-dark">Loading...</div>
+            </main>
+          </div>
         </div>
       }
     >
