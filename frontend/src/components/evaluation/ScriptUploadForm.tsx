@@ -1,12 +1,20 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useScriptUpload } from "@/hooks/useScriptUpload";
 import {
   getRubricSets,
   uploadScript,
   type RubricSetListItem,
 } from "@/api/evaluation";
+import {
+  getClasses,
+  getSections,
+  getStudents,
+  type SchoolClass,
+  type SchoolSection,
+  type StudentProfile,
+} from "@/api/school";
 
 interface ScriptUploadFormProps {
   rubricSets: RubricSetListItem[];
@@ -19,11 +27,18 @@ export default function ScriptUploadForm({
 }: ScriptUploadFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedRubricSet, setSelectedRubricSet] = useState<string>("");
-  const [studentName, setStudentName] = useState<string>("");
-  const [studentId, setStudentId] = useState<string>("");
-  const [rollNumber, setRollNumber] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+
+  // Cascading student selection state
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [sections, setSections] = useState<SchoolSection[]>([]);
+  const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>("");
+  const [selectedSectionId, setSelectedSectionId] = useState<string>("");
+  const [selectedStudentUserId, setSelectedStudentUserId] = useState<string>("");
+  const [loadingSections, setLoadingSections] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   const {
     files,
@@ -40,6 +55,41 @@ export default function ScriptUploadForm({
     maxFiles,
   } = useScriptUpload({ maxFiles: 10 });
 
+  // Load classes on mount
+  useEffect(() => {
+    getClasses().then(setClasses).catch(() => {});
+  }, []);
+
+  // Load sections when class changes
+  useEffect(() => {
+    setSections([]);
+    setSelectedSectionId("");
+    setStudents([]);
+    setSelectedStudentUserId("");
+    if (!selectedClassId) return;
+    setLoadingSections(true);
+    getSections(Number(selectedClassId))
+      .then(setSections)
+      .catch(() => {})
+      .finally(() => setLoadingSections(false));
+  }, [selectedClassId]);
+
+  // Load students when section changes
+  useEffect(() => {
+    setStudents([]);
+    setSelectedStudentUserId("");
+    if (!selectedSectionId) return;
+    setLoadingStudents(true);
+    getStudents({ section: Number(selectedSectionId) })
+      .then(setStudents)
+      .catch(() => {})
+      .finally(() => setLoadingStudents(false));
+  }, [selectedSectionId]);
+
+  const selectedStudent = students.find(
+    (s) => s.user_id === selectedStudentUserId,
+  );
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const uploadErrors = addFiles(e.target.files);
@@ -53,6 +103,11 @@ export default function ScriptUploadForm({
     e.preventDefault();
     setErrors([]);
 
+    if (!selectedStudentUserId) {
+      setErrors(["Please select a student"]);
+      return;
+    }
+
     if (files.length === 0) {
       setErrors(["Please upload at least one page"]);
       return;
@@ -63,16 +118,14 @@ export default function ScriptUploadForm({
     try {
       const script = await uploadScript({
         rubric_set: selectedRubricSet || undefined,
-        student_name: studentName || undefined,
-        student_id: studentId || undefined,
-        roll_number: rollNumber || undefined,
+        student_user_id: selectedStudentUserId,
         pages: files,
       });
 
       clearFiles();
-      setStudentName("");
-      setStudentId("");
-      setRollNumber("");
+      setSelectedClassId("");
+      setSelectedSectionId("");
+      setSelectedStudentUserId("");
       onUploadComplete(script.id);
     } catch (error) {
       setErrors([
@@ -99,7 +152,7 @@ export default function ScriptUploadForm({
           id="rubricSet"
           value={selectedRubricSet}
           onChange={(e) => setSelectedRubricSet(e.target.value)}
-          className="w-full px-4 py-3  border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
+          className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
         >
           <option value="">Select a rubric set...</option>
           {rubricSets
@@ -114,59 +167,119 @@ export default function ScriptUploadForm({
         </select>
       </div>
 
-      {/* Student Information */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label
-            htmlFor="rollNumber"
-            className="block text-sm font-medium text-secondary mb-2"
-          >
-            Roll Number
-          </label>
-          <input
-            type="text"
-            id="rollNumber"
-            value={rollNumber}
-            onChange={(e) => setRollNumber(e.target.value)}
-            placeholder="e.g. 9A-001"
-            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-          <p className="text-xs text-secondary mt-1">
-            Auto-links to student profile
-          </p>
+      {/* Student Selection — Cascading: Class → Section → Student */}
+      <div>
+        <h3 className="text-sm font-medium text-secondary mb-3">
+          Select Student *
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Step 1: Class */}
+          <div>
+            <label
+              htmlFor="classSelect"
+              className="block text-xs font-medium text-secondary mb-1"
+            >
+              Class
+            </label>
+            <select
+              id="classSelect"
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">Select class...</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  Class {cls.name}
+                  {cls.stream ? ` (${cls.stream})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Step 2: Section (appears after class is selected) */}
+          <div>
+            <label
+              htmlFor="sectionSelect"
+              className="block text-xs font-medium text-secondary mb-1"
+            >
+              Section
+            </label>
+            <select
+              id="sectionSelect"
+              value={selectedSectionId}
+              onChange={(e) => setSelectedSectionId(e.target.value)}
+              disabled={!selectedClassId || loadingSections}
+              className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {!selectedClassId
+                  ? "Select a class first"
+                  : loadingSections
+                    ? "Loading sections..."
+                    : "Select section..."}
+              </option>
+              {sections.map((sec) => (
+                <option key={sec.id} value={sec.id}>
+                  Section {sec.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Step 3: Student (appears after section is selected) */}
+          <div>
+            <label
+              htmlFor="studentSelect"
+              className="block text-xs font-medium text-secondary mb-1"
+            >
+              Student
+            </label>
+            <select
+              id="studentSelect"
+              value={selectedStudentUserId}
+              onChange={(e) => setSelectedStudentUserId(e.target.value)}
+              disabled={!selectedSectionId || loadingStudents}
+              className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {!selectedSectionId
+                  ? "Select a section first"
+                  : loadingStudents
+                    ? "Loading students..."
+                    : students.length === 0
+                      ? "No students in this section"
+                      : "Select student..."}
+              </option>
+              {students.map((student) => (
+                <option key={student.user_id} value={student.user_id}>
+                  {student.first_name} {student.last_name} (@{student.username})
+                  {student.roll_number ? ` — Roll: ${student.roll_number}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div>
-          <label
-            htmlFor="studentName"
-            className="block text-sm font-medium text-secondary mb-2"
-          >
-            Student Name (Optional)
-          </label>
-          <input
-            type="text"
-            id="studentName"
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
-            placeholder="Enter student name"
-            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="studentId"
-            className="block text-sm font-medium text-secondary mb-2"
-          >
-            Student ID (Optional)
-          </label>
-          <input
-            type="text"
-            id="studentId"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            placeholder="Enter student ID"
-            className="w-full px-4 py-3 border border-[#334155] rounded-lg text-white placeholder-primary focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
+
+        {/* Selected student info card */}
+        {selectedStudent && (
+          <div className="mt-3 p-3 bg-emerald-900/20 border border-emerald-700/40 rounded-lg flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white font-semibold text-sm">
+              {selectedStudent.first_name?.charAt(0)}
+              {selectedStudent.last_name?.charAt(0)}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">
+                {selectedStudent.first_name} {selectedStudent.last_name}
+              </p>
+              <p className="text-xs text-secondary">
+                @{selectedStudent.username}
+                {selectedStudent.roll_number &&
+                  ` • Roll: ${selectedStudent.roll_number}`}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* File Upload Area */}
@@ -292,7 +405,7 @@ export default function ScriptUploadForm({
         </button>
         <button
           type="submit"
-          disabled={isUploading || files.length === 0}
+          disabled={isUploading || files.length === 0 || !selectedStudentUserId}
           className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           {isUploading ? (
