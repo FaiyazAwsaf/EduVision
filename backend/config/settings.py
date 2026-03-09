@@ -106,6 +106,26 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+# Cache Configuration (Django cache API)
+# Used by websocket ticket auth and any cache.get/cache.set usage.
+# Prefer Redis when available so tickets work across workers/instances.
+REDIS_URL = os.environ.get("REDIS_URL", "")
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "eduvision-default-cache",
+        }
+    }
+
 # Channel Layers Configuration (Django Channels)
 # Set USE_REDIS_CHANNELS=true in Docker/production to use Redis for cross-worker WebSocket support.
 # Local dev defaults to in-memory (sufficient for single-process runserver).

@@ -149,7 +149,7 @@ class WebSocketTicketView(APIView):
         cache_key = f"ws_ticket:{ticket}"
         cache.set(cache_key, str(request.user.id), timeout=WS_TICKET_TTL_SECONDS)
 
-        return Response(
+        response = Response(
             {
                 "message": "WebSocket ticket created",
                 "payload": {
@@ -159,6 +159,8 @@ class WebSocketTicketView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+        return response
 
 class LogoutView(APIView):
     def post(self, request):
