@@ -206,6 +206,22 @@ export async function leaveSession(sessionId: string): Promise<void> {
 }
 
 /**
+ * Teacher rejoins their existing active session to get a fresh token
+ */
+export async function rejoinSession(
+  sessionId: string,
+): Promise<SessionCreateResponse> {
+  const response = await authenticatedFetch(
+    `${TUTORING_API_URL}/sessions/${sessionId}/rejoin/`,
+    {
+      method: "POST",
+      headers: getContentHeaders(),
+    },
+  );
+  return handleResponse<SessionCreateResponse>(response);
+}
+
+/**
  * Get session status
  */
 export async function getSessionStatus(

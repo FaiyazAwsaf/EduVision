@@ -90,69 +90,66 @@ function configureBrush(
 
   switch (tool) {
     case "pencil": {
-      // ✏️ Pencil Tool: soft graphite look
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth;
-      (brush as any).opacity = 0.7;
+      brush.width = strokeWidth * 0.7;
+      (brush as any).opacity = 0.35;
       console.log(
-        `[Canvas] tool: pencil, color: ${penColor}, width: ${strokeWidth}, opacity: 0.7`,
+        `[Canvas] tool: pencil, color: ${penColor}, width: ${strokeWidth * 0.7}, opacity: 0.35`,
       );
       break;
     }
 
     case "fountain": {
-      // 🖋 Fountain Pen Tool: calligraphic with pressure simulation
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth * 1.5;
-      (brush as any).opacity = 1;
-      // Enable decimate for smoother strokes
+      brush.width = strokeWidth * 1.6;
+      (brush as any).opacity = 1.0;
       if ("decimate" in brush) {
-        (brush as any).decimate = 0.4;
+        (brush as any).decimate = 0.3;
       }
       console.log(
-        `[Canvas] tool: fountain, color: ${penColor}, width: ${strokeWidth * 1.5}, opacity: 1, decimate: 0.4`,
+        `[Canvas] tool: fountain, color: ${penColor}, width: ${strokeWidth * 1.6}, opacity: 1.0`,
       );
       break;
     }
 
     case "marker": {
-      // 🟨 Marker / Highlighter Tool: translucent overlay
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth * 2;
-      (brush as any).opacity = 0.3;
+      brush.width = strokeWidth * 2.0;
+      (brush as any).opacity = 0.45;
       console.log(
-        `[Canvas] tool: marker, color: ${penColor}, width: ${strokeWidth * 2}, opacity: 0.3`,
+        `[Canvas] tool: marker, color: ${penColor}, width: ${strokeWidth * 2.0}, opacity: 0.45`,
       );
       break;
     }
 
     case "pen": {
-      // 🖊 Pen Tool: regular drawing with full opacity
       canvas.isDrawingMode = true;
       canvas.selection = false;
       brush.color = penColor;
-      brush.width = strokeWidth;
-      (brush as any).opacity = 1;
+      brush.width = strokeWidth * 1.3;
+      (brush as any).opacity = 1.0;
+      if ("decimate" in brush) {
+        (brush as any).decimate = 0.5;
+      }
+      if ("shadowBlur" in brush) {
+        (brush as any).shadowBlur = 1.5;
+      }
       console.log(
-        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth}, opacity: 1`,
+        `[Canvas] tool: pen, color: ${penColor}, width: ${strokeWidth * 1.3}, opacity: 1.0`,
       );
       break;
     }
 
     case "eraser": {
-      // 🧹 Eraser Tool: white brush simulation
-      canvas.isDrawingMode = true;
+      canvas.isDrawingMode = false;
       canvas.selection = false;
-      brush.color = "#ffffff";
-      brush.width = eraserWidth;
-      (brush as any).opacity = 1;
-      console.log(`[Canvas] tool: eraser, width: ${eraserWidth}`);
+      console.log("[Canvas] tool: eraser (click to delete)");
       break;
     }
 
@@ -196,6 +193,7 @@ const WhiteboardCanvas = forwardRef<
 
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const htmlCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRemoteUpdateRef = useRef(false);
   // store callback in ref to avoid canvas recreation when callback changes
   const onPathCreatedRef = useRef(onPathCreated);
@@ -216,13 +214,26 @@ const WhiteboardCanvas = forwardRef<
    * sets up canvas dimensions, brush, and event listeners
    */
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !htmlCanvasRef.current) return;
 
     console.log("[Canvas] initializing fabric.js canvas...");
 
-    const canvas = new fabric.Canvas("whiteboard-canvas", {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
+    // Use container dimensions if available, otherwise fallback to viewport
+    let canvasWidth = containerRef.current.clientWidth;
+    let canvasHeight = containerRef.current.clientHeight;
+    
+    // Fallback to window dimensions if container dimensions are not yet available
+    if (canvasWidth === 0 || canvasHeight === 0) {
+      canvasWidth = window.innerWidth;
+      canvasHeight = window.innerHeight;
+      console.log("[Canvas] using window dimensions as fallback:", canvasWidth, "x", canvasHeight);
+    }
+
+    console.log("[Canvas] initializing with dimensions:", canvasWidth, "x", canvasHeight);
+
+    const canvas = new fabric.Canvas(htmlCanvasRef.current, {
+      width: canvasWidth,
+      height: canvasHeight,
       backgroundColor: "#ffffff",
       isDrawingMode: isDrawingEnabled,
       selection: false,
@@ -240,6 +251,27 @@ const WhiteboardCanvas = forwardRef<
 
     // notify parent component
     onCanvasReady?.(canvas);
+
+    // Add ResizeObserver to handle container resizing
+    const resizeObserver = new ResizeObserver(() => {
+      if (containerRef.current && canvasRef.current) {
+        const newWidth = containerRef.current.clientWidth;
+        const newHeight = containerRef.current.clientHeight;
+        if (newWidth > 0 && newHeight > 0) {
+          const currentWidth = canvasRef.current.getWidth();
+          const currentHeight = canvasRef.current.getHeight();
+          
+          // Only resize if dimensions actually changed
+          if (newWidth !== currentWidth || newHeight !== currentHeight) {
+            canvasRef.current.setDimensions({ width: newWidth, height: newHeight });
+            canvasRef.current.renderAll();
+            console.log(`[Canvas] resized from ${currentWidth}x${currentHeight} to ${newWidth}x${newHeight}`);
+          }
+        }
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
 
     // listen for path:created events (when user finishes drawing a stroke)
     canvas.on("path:created", (event) => {
@@ -267,6 +299,7 @@ const WhiteboardCanvas = forwardRef<
     // cleanup
     return () => {
       console.log("[Canvas] disposing canvas");
+      resizeObserver.disconnect();
       canvas.dispose();
       canvasRef.current = null;
     };
@@ -340,7 +373,7 @@ const WhiteboardCanvas = forwardRef<
    */
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || tool !== "select") {
+    if (!canvas || !tool || tool !== "select") {
       return;
     }
 
@@ -418,7 +451,7 @@ const WhiteboardCanvas = forwardRef<
     };
 
     const handleMouseDown = (event: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-      if (tool !== "select") return;
+      if (!tool || tool !== "select") return;
 
       isDrawingLasso = true;
       lassoPoints.length = 0;
@@ -517,36 +550,23 @@ const WhiteboardCanvas = forwardRef<
         // Get bounding box of selected objects
         const bounds = activeSelection.getBoundingRect();
         
-        // Extract image from selection bounds
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = bounds.width;
-        tempCanvas.height = bounds.height;
-        const tempCtx = tempCanvas.getContext("2d");
-
-        if (tempCtx) {
-          const mainCanvasElement = canvas.getElement();
-          tempCtx.drawImage(
-            mainCanvasElement,
-            bounds.left,
-            bounds.top,
-            bounds.width,
-            bounds.height,
-            0,
-            0,
-            bounds.width,
-            bounds.height
-          );
-
-          const imageData = tempCanvas.toDataURL("image/png");
-          
-          // Call selection ready callback
-          onSelectionReadyRef.current?.(imageData, {
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-          });
-        }
+        // Use Fabric.js's built-in toDataURL with cropping
+        const imageData = canvas.toDataURL({
+          format: "png",
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+          multiplier: 1,
+        });
+        
+        // Call selection ready callback
+        onSelectionReadyRef.current?.(imageData, {
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+        });
         
         canvas.renderAll();
         console.log(
@@ -572,6 +592,49 @@ const WhiteboardCanvas = forwardRef<
       if (tempPath) {
         canvas.remove(tempPath);
       }
+    };
+  }, [tool]);
+
+  /**
+   * handle eraser tool
+   * allows clicking on objects to delete them
+   */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || tool !== "eraser") {
+      return;
+    }
+
+    const handleEraserMouseDown = (
+      event: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+    ) => {
+      // Get the pointer position in scene coordinates
+      const pointer = event.scenePoint;
+      
+      // Find the topmost object at the click position
+      let clickedObject: fabric.FabricObject | null = null;
+      const objects = canvas.getObjects();
+      
+      // Iterate from top to bottom (reverse order) to find topmost object
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        if (obj.containsPoint(pointer)) {
+          clickedObject = obj;
+          break;
+        }
+      }
+
+      if (clickedObject) {
+        canvas.remove(clickedObject);
+        canvas.renderAll();
+        console.log("[Canvas] Object erased");
+      }
+    };
+
+    canvas.on("mouse:down", handleEraserMouseDown);
+
+    return () => {
+      canvas.off("mouse:down", handleEraserMouseDown);
     };
   }, [tool]);
 
@@ -648,21 +711,34 @@ const WhiteboardCanvas = forwardRef<
     },
 
     loadFromJSON: async (state: CanvasState) => {
-      if (canvasRef.current) {
-        isRemoteUpdateRef.current = true;
-        try {
-          await canvasRef.current.loadFromJSON({
-            version: fabric.version,
-            objects: state.objects,
-          });
-          canvasRef.current.backgroundColor = "#ffffff";
-          canvasRef.current.renderAll();
-          console.log("[Canvas] loaded canvas state from json");
-        } catch (error) {
-          console.error("[Canvas] error loading from json:", error);
-        } finally {
-          isRemoteUpdateRef.current = false;
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        console.warn("[Canvas] loadFromJSON skipped - canvas ref is null");
+        return;
+      }
+
+      // Guard against malformed persisted state.
+      const safeObjects = Array.isArray(state?.objects) ? state.objects : [];
+
+      isRemoteUpdateRef.current = true;
+      try {
+        await canvas.loadFromJSON({
+          version: fabric.version,
+          objects: safeObjects,
+        });
+
+        // Bail out if canvas was disposed/replaced while async load was running.
+        if (canvasRef.current !== canvas) {
+          return;
         }
+
+        canvas.backgroundColor = "#ffffff";
+        canvas.renderAll();
+        console.log("[Canvas] loaded canvas state from json");
+      } catch (error) {
+        console.error("[Canvas] error loading from json:", error);
+      } finally {
+        isRemoteUpdateRef.current = false;
       }
     },
 
@@ -727,8 +803,8 @@ const WhiteboardCanvas = forwardRef<
   // ============================================================
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
-      <canvas id="whiteboard-canvas" />
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden" style={{ pointerEvents: 'auto', touchAction: 'none' }}>
+      <canvas ref={htmlCanvasRef} id="whiteboard-canvas" />
     </div>
   );
 });

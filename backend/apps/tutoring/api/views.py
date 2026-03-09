@@ -275,6 +275,20 @@ class SessionJoinView(APIView):
 
         logger.info(f"Student {user.id} joined session {session.id}")
 
+        # Record SESSION_JOINED learning event (non-blocking)
+        try:
+            from apps.intelligence.services.event_service import EventService
+            topic = session.section.name if session.section else None
+            EventService().record_event(
+                event_type='session_joined',
+                user_id=user.id,
+                topic=topic,
+                session_id=session.id,
+                metadata={'session_id': str(session.id)},
+            )
+        except Exception:
+            pass
+
         # Broadcast WebSocket events
         try:
             if previous_status != session.status:
@@ -309,6 +323,83 @@ class SessionJoinView(APIView):
                 'section_name': session.section.name if session.section else '',
                 'class_name': session.section.class_ref.name if session.section else '',
                 'participant_count': session.participant_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ─── Session Rejoin (teacher) ──────────────────────────────────────────────────
+
+class SessionRejoinView(APIView):
+    """
+    POST /api/tutoring/sessions/{session_id}/rejoin/
+
+    Teacher rejoins their own active session and gets a fresh LiveKit token.
+    """
+
+    def post(self, request, session_id):
+        user = _get_user(request)
+        if not user:
+            return _auth_error()
+
+        if user.role != 'teacher':
+            return Response(
+                {'error': 'Forbidden', 'detail': 'Only teachers can rejoin sessions', 'code': 'teacher_required'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            session = TutoringSession.objects.select_related(
+                'teacher', 'section', 'section__class_ref'
+            ).get(id=session_id)
+        except TutoringSession.DoesNotExist:
+            return Response(
+                {'error': 'Not found', 'detail': 'Session not found', 'code': 'session_not_found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if session.teacher_id != user.id:
+            return Response(
+                {'error': 'Forbidden', 'detail': 'You are not the teacher of this session', 'code': 'teacher_required'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if session.is_ended:
+            return Response(
+                {'error': 'Session ended', 'detail': 'This session has already ended', 'code': 'session_ended'},
+                status=status.HTTP_410_GONE,
+            )
+
+        try:
+            token = generate_livekit_token(
+                room_id=session.room_id,
+                user_id=str(user.id),
+                user_name=f"{user.first_name} {user.last_name}",
+                role='TEACHER',
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate LiveKit token: {e}")
+            return Response(
+                {'error': 'Token generation failed', 'detail': str(e), 'code': 'token_generation_failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        session.livekit_token_teacher = token
+        session.save(update_fields=['livekit_token_teacher'])
+
+        logger.info(f"Teacher {user.id} rejoined session {session.id}")
+
+        return Response(
+            {
+                'session_id': str(session.id),
+                'room_id': session.room_id,
+                'token': token,
+                'status': session.status,
+                'livekit_ws_url': get_livekit_ws_url(),
+                'teacher_id': str(user.id),
+                'section_id': session.section_id,
+                'section_name': session.section.name if session.section else '',
+                'class_name': session.section.class_ref.name if session.section else '',
             },
             status=status.HTTP_200_OK,
         )

@@ -6,6 +6,7 @@ from django.urls import path
 from apps.tutoring.api.views import (
     SessionCreateView,
     SessionJoinView,
+    SessionRejoinView,
     SessionStatusView,
     SessionEndView,
     SessionListView,
@@ -22,6 +23,7 @@ urlpatterns = [
     path('sessions/join/', SessionJoinView.as_view(), name='session-join'),
     path('sessions/available/', AvailableSessionsView.as_view(), name='session-available'),
     path('sessions/<uuid:session_id>/status/', SessionStatusView.as_view(), name='session-status'),
+    path('sessions/<uuid:session_id>/rejoin/', SessionRejoinView.as_view(), name='session-rejoin'),
     path('sessions/<uuid:session_id>/end/', SessionEndView.as_view(), name='session-end'),
     path('sessions/<uuid:session_id>/leave/', LeaveSessionView.as_view(), name='session-leave'),
 ]

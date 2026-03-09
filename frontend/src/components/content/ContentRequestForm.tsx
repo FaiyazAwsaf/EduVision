@@ -827,7 +827,7 @@ export default function ContentRequestForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="flex-1 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">

@@ -61,6 +61,10 @@ class RuleBasedPaceEvaluator(PaceEvaluator):
             fallback_value=0.5,  # Moderate pace as fallback
         )
     
+    def estimate(self, *args, **kwargs) -> EstimatorResult[float]:
+        """Satisfy BaseEstimator contract — delegates to evaluate()."""
+        return self.evaluate(*args, **kwargs)
+
     def evaluate(
         self,
         user_id: UUID,

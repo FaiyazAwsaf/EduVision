@@ -164,7 +164,7 @@ export default function MultiQuestionTester({
             <div
               className={`text-2xl font-semibold ${getScoreColor(overallScore.percentage)}`}
             >
-              {overallScore.percentage.toFixed(1)}%
+              {overallScore.percentage.toFixed(2)}%
             </div>
           </div>
         </div>
@@ -198,7 +198,7 @@ export default function MultiQuestionTester({
                       <span
                         className={`text-sm font-semibold ${getScoreColor(percentage)}`}
                       >
-                        ({percentage.toFixed(1)}%)
+                        ({percentage.toFixed(2)}%)
                       </span>
                     </div>
                   </div>

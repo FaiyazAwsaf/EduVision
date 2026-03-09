@@ -55,3 +55,15 @@ textarea::placeholder {
 select option {
   color: #006a71;
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000;
+  }
+
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+}

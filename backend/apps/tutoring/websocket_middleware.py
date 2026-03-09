@@ -15,6 +15,7 @@ from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,10 @@ class TokenAuthMiddleware(BaseMiddleware):
     """
     Custom middleware for WebSocket authentication.
     
-    Extracts user_id from query string and attaches user to scope.
+    Extracts one-time ws_ticket from query string and attaches user to scope.
     
     Query string format:
-        ws://host/path/?user_id=<uuid>
+        ws://host/path/?ws_ticket=<ticket>
     
     Usage in consumer:
         user = self.scope['user']
@@ -38,8 +39,23 @@ class TokenAuthMiddleware(BaseMiddleware):
         # Parse query string
         query_string = scope.get('query_string', b'').decode('utf-8')
         query_params = parse_qs(query_string)
+
+        # Preferred auth: one-time websocket ticket
+        ws_ticket_list = query_params.get('ws_ticket', [])
+        ws_ticket = ws_ticket_list[0] if ws_ticket_list else None
+        if ws_ticket:
+            user_id = await self.consume_ticket(ws_ticket)
+            if user_id:
+                scope['user'] = await self.get_user(user_id)
+                if getattr(scope['user'], 'is_authenticated', False):
+                    logger.debug(f"WebSocket authenticated via ticket for user {scope['user'].id}")
+                    return await super().__call__(scope, receive, send)
+
+            scope['user'] = AnonymousUser()
+            logger.warning("WebSocket auth failed: invalid/expired ws_ticket")
+            return await super().__call__(scope, receive, send)
         
-        # Extract user_id
+        # Legacy fallback: user_id query parameter
         user_id_list = query_params.get('user_id', [])
         user_id = user_id_list[0] if user_id_list else None
         
@@ -56,6 +72,15 @@ class TokenAuthMiddleware(BaseMiddleware):
             logger.debug("WebSocket connection without user_id")
         
         return await super().__call__(scope, receive, send)
+
+    @database_sync_to_async
+    def consume_ticket(self, ticket):
+        cache_key = f"ws_ticket:{ticket}"
+        user_id = cache.get(cache_key)
+        if user_id:
+            # One-time ticket: delete immediately after successful read.
+            cache.delete(cache_key)
+        return user_id
     
     @database_sync_to_async
     def get_user(self, user_id):
@@ -78,18 +103,3 @@ class TokenAuthMiddleware(BaseMiddleware):
         except Exception as e:
             logger.error(f"WebSocket auth error: {str(e)}")
             return AnonymousUser()
-
-
-class AnonymousUser:
-    """
-    Placeholder for unauthenticated users.
-    
-    Mimics Django's AnonymousUser interface for compatibility.
-    """
-    
-    id = None
-    is_anonymous = True
-    is_authenticated = False
-    
-    def __str__(self):
-        return "AnonymousUser"
