@@ -181,7 +181,19 @@ class ContentRequestListCreateView(APIView):
             # Get the model instance from repository using the domain entity's ID
             model_instance = ContentRequestModel.objects.get(id=content_request.id)
             response_serializer = ContentRequestResponseSerializer(model_instance)
-            
+
+            # Record CONTENT_GENERATED learning event (non-blocking)
+            try:
+                from apps.intelligence.services.event_service import EventService
+                EventService().record_event(
+                    event_type='content_generated',
+                    user_id=request.user.id,
+                    topic=content_request.topic,
+                    metadata={'content_request_id': str(content_request.id)},
+                )
+            except Exception:
+                pass
+
             logger.info(f"Created content request {content_request.id}")
             return Response(
                 response_serializer.data,
@@ -484,9 +496,21 @@ class GeneratedContentView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
+            # Record CONTENT_VIEWED learning event (non-blocking)
+            try:
+                from apps.intelligence.services.event_service import EventService
+                EventService().record_event(
+                    event_type='content_viewed',
+                    user_id=request.user.id,
+                    topic=model_instance.topic,
+                    metadata={'content_request_id': str(uuid_obj)},
+                )
+            except Exception:
+                pass
+
             # Get format parameter (default to text for API response)
             output_format = request.query_params.get('format', 'text').lower()
-            
+
             logger.info(f"Processing content request with format={output_format}")
             
             # If requesting raw JSON

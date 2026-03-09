@@ -21,6 +21,8 @@ from rest_framework.routers import DefaultRouter
 from apps.content_requests.api.views_study_plan import StudyPlanViewSet, StudyPlanItemViewSet
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
+from django.urls import re_path
 
 
 # Health check endpoint for Docker/Kubernetes
@@ -100,8 +102,11 @@ urlpatterns = [
 
     # curriculum management
     path('api/curriculum/', include('apps.curriculum.api.urls', namespace='curriculum')),
+    # analytics
+    path('api/analytics/', include('apps.analytics.urls', namespace='analytics')),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve media files (always, since no nginx is configured)
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
