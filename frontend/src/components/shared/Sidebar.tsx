@@ -26,7 +26,6 @@ import {
   Layers,
   UserCog,
   ShieldCheck,
-  Brain,
   PenTool,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -91,7 +90,6 @@ const studentNavItems: NavEntry[] = [
   { label: "Practice", href: "/student/practice", icon: BookOpen },
   { label: "Scripts", href: "/student/scripts", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
-  { label: "My Insights", href: "/student/insights", icon: Brain },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
 
