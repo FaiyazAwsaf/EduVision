@@ -482,7 +482,7 @@ export default function TeacherIntelligencePage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                       <tr>
-                        <th className="text-left px-5 py-3">User ID</th>
+                        <th className="text-left px-5 py-3">Student</th>
                         <th className="text-left px-4 py-3">Pace</th>
                         <th className="text-left px-4 py-3">Health</th>
                         <th className="text-left px-4 py-3">Consistency</th>
@@ -495,8 +495,8 @@ export default function TeacherIntelligencePage() {
                           key={ins.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="px-5 py-3 font-mono text-xs text-gray-500 truncate max-w-[140px]">
-                            {ins.user_id.slice(0, 8)}…
+                          <td className="px-5 py-3 text-sm font-medium text-gray-700 truncate max-w-[180px]">
+                            {ins.user_display_name}
                           </td>
                           <td className="px-4 py-3">
                             <span

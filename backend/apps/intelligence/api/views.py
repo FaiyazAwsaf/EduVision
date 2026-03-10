@@ -175,13 +175,26 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Filter insights by user_id."""
-        queryset = super().get_queryset()
-        
+        """Filter insights to students only, returning only the latest per student."""
+        from django.contrib.auth import get_user_model
+        from django.db.models import OuterRef, Subquery
+        User = get_user_model()
+        student_ids = User.objects.filter(role='student').values_list('id', flat=True)
+
+        # Subquery: latest computed_at per user_id
+        latest = LearnerInsight.objects.filter(
+            user_id=OuterRef('user_id')
+        ).order_by('-computed_at').values('id')[:1]
+
+        queryset = LearnerInsight.objects.filter(
+            user_id__in=student_ids,
+            id__in=Subquery(latest),
+        )
+
         user_id = self.request.query_params.get('user_id')
         if user_id:
             queryset = queryset.filter(user_id=user_id)
-        
+
         return queryset.order_by('-computed_at')
     
     def get_serializer_class(self):
@@ -276,12 +289,14 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
         Returns a summary of how many succeeded / failed.
         """
         from apps.intelligence.models import LearningEvent
+        from django.contrib.auth import get_user_model
 
         time_window_days = int(request.data.get('time_window_days', 30))
 
-        user_ids = list(
-            LearningEvent.objects.values_list('user_id', flat=True).distinct()
-        )
+        User = get_user_model()
+        student_ids = set(User.objects.filter(role='student').values_list('id', flat=True))
+        event_user_ids = set(LearningEvent.objects.values_list('user_id', flat=True))
+        user_ids = list(student_ids & event_user_ids)
 
         if not user_ids:
             return Response(

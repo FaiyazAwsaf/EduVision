@@ -48,6 +48,7 @@ async function intelligenceFetch<T>(
 export interface LearnerInsight {
   id: string;
   user_id: string;
+  user_display_name: string;
   computed_at: string;
   learning_pace: "very_slow" | "slow" | "moderate" | "fast" | "very_fast";
   pace_score: number;
@@ -74,6 +75,7 @@ export interface LearnerInsight {
 function normaliseInsight(raw: Record<string, unknown>): LearnerInsight {
   return {
     ...(raw as unknown as LearnerInsight),
+    user_display_name: typeof raw.user_display_name === "string" ? raw.user_display_name : String(raw.user_id ?? ""),
     weak_topics: Array.isArray(raw.weak_topics) ? (raw.weak_topics as string[]) : [],
     strong_topics: Array.isArray(raw.strong_topics) ? (raw.strong_topics as string[]) : [],
     topic_metrics:
