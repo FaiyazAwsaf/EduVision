@@ -129,14 +129,19 @@ else:
     }
 
 # Channel Layers Configuration (Django Channels)
-# Set USE_REDIS_CHANNELS=true in Docker/production to use Redis for cross-worker WebSocket support.
-# Local dev defaults to in-memory (sufficient for single-process runserver).
-if os.environ.get("USE_REDIS_CHANNELS", "").lower() in ("true", "1", "yes"):
+# Uses Redis when REDIS_URL is set (production/Railway) or USE_REDIS_CHANNELS=true.
+# Local dev without Redis defaults to in-memory.
+_use_redis_channels = (
+    os.environ.get("USE_REDIS_CHANNELS", "").lower() in ("true", "1", "yes")
+    or bool(REDIS_URL)
+)
+
+if _use_redis_channels:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [os.environ.get("REDIS_URL", "redis://localhost:6379/0")],
+                "hosts": [REDIS_URL or "redis://localhost:6379/0"],
             },
         },
     }
