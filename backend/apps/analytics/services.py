@@ -227,6 +227,109 @@ def get_student_overview(student_id: str) -> dict[str, Any]:
     }
 
 
+def compute_subject_weak_topics(student_id: str) -> dict[str, list[str]]:
+    """
+    For each subject, return concise topic names where the student is weak.
+    Uses AI to distil question texts into short topic labels.
+    """
+    from django.core.cache import cache
+
+    cache_key = f"weak_topics:{student_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    snapshots = StudentPerformanceSnapshot.objects.filter(
+        student_id=student_id
+    ).values("subject", "question_breakdown")
+
+    subject_questions: dict[str, dict[str, dict]] = defaultdict(dict)
+    for snap in snapshots:
+        subject = snap["subject"] or "General"
+        for entry in snap["question_breakdown"] or []:
+            q_text = entry.get("question_text", "").strip()
+            if not q_text:
+                continue
+            if q_text not in subject_questions[subject]:
+                subject_questions[subject][q_text] = {"awarded": 0, "max": 0}
+            subject_questions[subject][q_text]["awarded"] += float(entry.get("marks_awarded", 0))
+            subject_questions[subject][q_text]["max"] += float(entry.get("max_marks", 0))
+
+    # Collect weak question texts per subject
+    weak_texts: dict[str, list[str]] = {}
+    for subject, questions in subject_questions.items():
+        weak = []
+        for q_text, scores in questions.items():
+            if scores["max"] > 0:
+                pct = scores["awarded"] / scores["max"] * 100
+                if pct < 75:
+                    weak.append(q_text)
+        if weak:
+            weak_texts[subject] = weak[:5]
+
+    if not weak_texts:
+        cache.set(cache_key, {}, timeout=3600)
+        return {}
+
+    result = _extract_topic_names(weak_texts)
+    cache.set(cache_key, result, timeout=3600)
+    return result
+
+
+def _extract_topic_names(weak_texts: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Use Gemini to convert verbose question texts into concise topic names."""
+    import json
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        from apps.evaluation.services import get_gemini_model
+        import google.generativeai as genai
+
+        model = get_gemini_model()
+
+        # Build a compact prompt with all subjects at once
+        lines = []
+        for subject, texts in weak_texts.items():
+            numbered = "; ".join(f'"{t}"' for t in texts)
+            lines.append(f"{subject}: [{numbered}]")
+
+        prompt = (
+            "You are given exam question texts grouped by subject. "
+            "For each subject, extract the short topic name (2-5 words max) that each question is testing. "
+            "Remove duplicates within a subject. "
+            "Respond ONLY with valid JSON: {\"Subject\": [\"Topic1\", \"Topic2\"], ...}\n\n"
+            + "\n".join(lines)
+        )
+
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                temperature=0.0,
+            ),
+        )
+        raw = (response.text or "").strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        data = json.loads(raw)
+
+        result: dict[str, list[str]] = {}
+        for subject in weak_texts:
+            topics = data.get(subject, [])
+            if isinstance(topics, list):
+                result[subject] = [str(t) for t in topics if t][:5]
+        return result
+    except Exception as exc:
+        logger.warning("AI topic extraction failed, falling back to raw texts: %s", exc)
+        # Fallback: truncate question texts
+        return {
+            subj: [t[:40] + ("…" if len(t) > 40 else "") for t in texts]
+            for subj, texts in weak_texts.items()
+        }
+
+
 # ─── Class / Teacher Analytics ────────────────────────────────────────────────
 
 

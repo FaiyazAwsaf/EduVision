@@ -41,6 +41,7 @@ function PracticePageContent() {
   const { isReady, isAuthenticated, user } = useAuth();
 
   const subjectParam = searchParams.get("subject") ?? "";
+  const topicParam = searchParams.get("topic") ?? "";
   const isFromAnalytics = subjectParam.length > 0;
 
   // Phase state
@@ -50,6 +51,7 @@ function PracticePageContent() {
   const [subject, setSubject] = useState<string>(subjectParam);
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [topic, setTopic] = useState<string>(topicParam);
   const [numQuestions, setNumQuestions] = useState<5 | 10 | 15>(5);
   const [answerMode, setAnswerMode] = useState<AnswerMode>("typed");
 
@@ -118,7 +120,7 @@ function PracticePageContent() {
     setIsGenerating(true);
     setError(null);
     try {
-      const data = await generatePractice(subject, numQuestions);
+      const data = await generatePractice(subject, numQuestions, topic || undefined);
       setSession(data);
       // Initialise empty typed answers
       const initial: Record<string, string> = {};
@@ -193,6 +195,7 @@ function PracticePageContent() {
     setSelectedQuestionId("");
     setResults(null);
     setError(null);
+    setTopic("");
     // Keep subject so they can practise the same subject again,
     // but don't lock them in — they can change it in the setup form.
     setPhase("setup");
@@ -235,6 +238,8 @@ function PracticePageContent() {
             <SetupPhase
               subject={subject}
               setSubject={setSubject}
+              topic={topic}
+              setTopic={setTopic}
               isAutoSelected={isFromAnalytics}
               availableSubjects={availableSubjects}
               subjectsLoading={subjectsLoading}
@@ -285,6 +290,8 @@ function PracticePageContent() {
 interface SetupPhaseProps {
   subject: string;
   setSubject: (s: string) => void;
+  topic: string;
+  setTopic: (t: string) => void;
   isAutoSelected: boolean;
   availableSubjects: string[];
   subjectsLoading: boolean;
@@ -300,6 +307,8 @@ interface SetupPhaseProps {
 function SetupPhase({
   subject,
   setSubject,
+  topic,
+  setTopic,
   isAutoSelected,
   availableSubjects,
   subjectsLoading,
@@ -371,6 +380,19 @@ function SetupPhase({
               className="w-full text-sm text-primary-dark border border-secondary/40 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-secondary/50"
             />
           )}
+        </div>
+
+        {/* Topic (optional) */}
+        <div>
+          <label className="block text-sm font-medium text-primary-dark mb-1">Topic</label>
+          <p className="text-xs text-secondary mb-2">Optional — narrow questions to a specific topic within the subject.</p>
+          <input
+            type="text"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder={subject ? `e.g. a topic in ${subject}…` : "e.g. Calculus, Photosynthesis…"}
+            className="w-full text-sm text-primary-dark border border-secondary/40 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-secondary/50"
+          />
         </div>
 
         {/* Number of questions */}

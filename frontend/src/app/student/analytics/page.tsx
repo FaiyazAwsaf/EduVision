@@ -229,7 +229,11 @@ export default function StudentAnalyticsPage() {
                                 {s.avg_percentage}%
                               </span>
                               <button
-                                onClick={() => router.push(`/student/practice?subject=${encodeURIComponent(s.subject)}`)}
+                                onClick={() => {
+                                  const weakTopics = analytics?.subject_weak_topics?.[s.subject];
+                                  const topicParam = weakTopics?.length ? `&topic=${encodeURIComponent(weakTopics.join(", "))}` : "";
+                                  router.push(`/student/practice?subject=${encodeURIComponent(s.subject)}${topicParam}`);
+                                }}
                                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
                               >
                                 Study <ChevronRight className="w-3 h-3" />
@@ -271,7 +275,11 @@ export default function StudentAnalyticsPage() {
                 </p>
                 <SubjectPerformanceChart
                   data={analytics.subjects}
-                  onBarClick={(subjectName) => router.push(`/student/practice?subject=${encodeURIComponent(subjectName)}`)}
+                  onBarClick={(subjectName) => {
+                    const weakTopics = analytics?.subject_weak_topics?.[subjectName];
+                    const topicParam = weakTopics?.length ? `&topic=${encodeURIComponent(weakTopics.join(", "))}` : "";
+                    router.push(`/student/practice?subject=${encodeURIComponent(subjectName)}${topicParam}`);
+                  }}
                 />
               </section>
 

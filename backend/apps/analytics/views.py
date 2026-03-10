@@ -152,6 +152,7 @@ class MyAnalyticsView(APIView):
         progress = services.generate_student_progress(student_id)
         subjects = services.compute_student_subject_performance(student_id)
         topics = services.compute_topic_performance(student_id)
+        subject_weak_topics = services.compute_subject_weak_topics(student_id)
 
         return Response(
             {
@@ -159,6 +160,7 @@ class MyAnalyticsView(APIView):
                 "progress": progress,
                 "subjects": subjects,
                 "topics": topics,
+                "subject_weak_topics": subject_weak_topics,
             }
         )
 

@@ -21,7 +21,8 @@ class PracticeGenerateView(APIView):
     Request body (JSON):
         {
             "subject": "Mathematics",
-            "num_questions": 5   // 5, 10, or 15
+            "num_questions": 5,  // 5, 10, or 15
+            "topic": "Calculus"  // optional
         }
 
     Response:
@@ -41,6 +42,7 @@ class PracticeGenerateView(APIView):
 
     def post(self, request):
         subject = (request.data.get("subject") or "").strip()
+        topic = (request.data.get("topic") or "").strip()
         num_questions_raw = request.data.get("num_questions", 5)
 
         if not subject:
@@ -64,7 +66,7 @@ class PracticeGenerateView(APIView):
 
         try:
             service = PracticeService()
-            result = service.generate_questions(subject=subject, num_questions=num_questions)
+            result = service.generate_questions(subject=subject, num_questions=num_questions, topic=topic)
             return Response(result, status=status.HTTP_200_OK)
         except RuntimeError as exc:
             logger.error("Practice generation error: %s", exc)
