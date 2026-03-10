@@ -184,7 +184,7 @@ export default function AssignmentsPage() {
               {assignments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((a) => (
                 <tr
                   key={a.id}
-                  className="hover:bg-primary/[0.02] transition-colors"
+                  className="hover:bg-primary/2 transition-colors"
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
