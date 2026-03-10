@@ -47,10 +47,40 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 class UserSerializer(serializers.ModelSerializer):
+    department = serializers.SerializerMethodField()
+    student_class = serializers.SerializerMethodField()
+    student_section = serializers.SerializerMethodField()
+
     class Meta:
         model = CustomUser
-        fields = ["id", "username", "email", "first_name", "last_name", "is_active", "role", "date_joined"]
+        fields = ["id", "username", "email", "first_name", "last_name", "is_active", "role", "date_joined", "department", "student_class", "student_section"]
         read_only_fields = ["id", "date_joined"]
+
+    def get_department(self, obj):
+        try:
+            return obj.teacher_profile.department or None
+        except Exception:
+            return None
+
+    def get_student_class(self, obj):
+        try:
+            sec = obj.student_profile.section
+            if sec is None:
+                return None
+            cls = sec.class_ref
+            label = cls.name
+            if cls.stream:
+                label += f" - {cls.stream}"
+            return label
+        except Exception:
+            return None
+
+    def get_student_section(self, obj):
+        try:
+            sec = obj.student_profile.section
+            return sec.name if sec else None
+        except Exception:
+            return None
 
 
 class AdminUserCreateSerializer(serializers.Serializer):

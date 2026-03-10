@@ -374,3 +374,31 @@ export async function saveState(
     throw error;
   }
 }
+
+export interface WhiteboardVoiceToken {
+  livekit_token: string;
+  livekit_ws_url: string;
+  room_id: string;
+}
+
+/**
+ * Get a LiveKit voice token for a whiteboard session
+ */
+export async function getVoiceToken(
+  sessionId: string,
+): Promise<WhiteboardVoiceToken> {
+  const response = await fetch(
+    `${API_BASE_URL}/whiteboard/sessions/${sessionId}/voice-token/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get voice token: ${response.statusText}`);
+  }
+
+  return await response.json();
+}

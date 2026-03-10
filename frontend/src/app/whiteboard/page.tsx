@@ -117,7 +117,7 @@ function WhiteboardContent() {
           errorMessage.includes("401")
         ) {
           console.log("[Whiteboard] Redirecting to login...");
-          setTimeout(() => router.push("/auth/login"), 2000);
+          setTimeout(() => router.push("/signin"), 2000);
         }
       }
     };
@@ -183,6 +183,8 @@ function WhiteboardContent() {
     setShowPicker(true);
     setNewSessionName("");
     setError(null);
+    // Clear the session URL parameter
+    router.replace("/whiteboard");
   };
 
   const handleInviteStudents = async (sessionId: string) => {
@@ -499,45 +501,7 @@ function WhiteboardContent() {
                       e.currentTarget.style.borderColor = "#9acbd0";
                     }}
                   >
-                    <h3
-                      style={{
-                        margin: "0 0 8px 0",
-                        fontSize: "1.1em",
-                        color: "#48A6A7",
-                      }}
-                    >
-                      {sess.name}
-                    </h3>
-                    <p
-                      style={{
-                        margin: "0 0 12px 0",
-                        fontSize: "12px",
-                        color: "#6b7280",
-                      }}
-                    >
-                      Owner: {sess.owner.username}
-                    </p>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "12px",
-                        color: "#6b7280",
-                      }}
-                    >
-                      <span>Members: {sess.members?.length || 0}</span>
-                      <span>
-                        Updated:{" "}
-                        {new Date(sess.updated_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "12px",
-                        paddingTop: "12px",
-                        borderTop: "1px solid #d1e5e8",
-                      }}
-                    >
+                    <div>
                       {/* Session name */}
                       <h3 className="text-sm font-semibold text-primary mb-1 truncate group-hover:text-primary-dark transition-colors">
                         {sess.name}

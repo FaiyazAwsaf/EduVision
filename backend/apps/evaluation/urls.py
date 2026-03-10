@@ -12,6 +12,7 @@ from .views import (
     StudentMyScriptsView,
     EvaluationInsightsView,
 )
+from .practice_views import PracticeGenerateView, PracticeSubmitView
 
 router = DefaultRouter()
 router.register(r"scripts", AnswerScriptViewSet, basename="script")
@@ -42,4 +43,7 @@ urlpatterns = [
     path("my-scripts/", StudentMyScriptsView.as_view(), name="student-scripts"),
     # ── Insights / Analytics ──────────────────────────────────────────────
     path("insights/", EvaluationInsightsView.as_view(), name="evaluation-insights"),
+    # ── Practice Quiz ─────────────────────────────────────────────────────
+    path("practice/generate/", PracticeGenerateView.as_view(), name="practice-generate"),
+    path("practice/submit/", PracticeSubmitView.as_view(), name="practice-submit"),
 ]

@@ -81,6 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     apiLogout();
     setIsAuthenticated(false);
     setUser(null);
+    // Redirect to login page after logout
+    window.location.href = "/signin";
   }, []);
 
   return (

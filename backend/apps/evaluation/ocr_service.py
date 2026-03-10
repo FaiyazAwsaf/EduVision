@@ -57,17 +57,21 @@ class OCRExtractionService:
 
         raise ValueError("Could not parse OCR JSON response")
 
-    def _preprocess_image_for_ocr(self, image_path: str) -> str:
-        try:
-            with open(image_path, "rb") as image_file:
-                original_bytes = image_file.read()
+    def _write_temp_image(self, image_bytes: bytes, suffix: str = ".png") -> str:
+        fd, temp_path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        with open(temp_path, "wb") as output_file:
+            output_file.write(image_bytes)
+        return temp_path
 
+    def _preprocess_image_for_ocr(self, image_bytes: bytes) -> str:
+        try:
             max_dimension = None
             if self.fast_mode:
                 max_dimension = int(os.getenv("EVALUATION_OCR_MAX_DIMENSION", "1800"))
 
             processed_bytes = preprocess_script_image(
-                original_bytes,
+                image_bytes,
                 sharpen=True,
                 equalize=True,
                 equalize_method="clahe",
@@ -78,15 +82,10 @@ class OCRExtractionService:
                 adaptive_c=3,
                 max_dimension=max_dimension,
             )
-
-            fd, temp_path = tempfile.mkstemp(suffix=".png")
-            os.close(fd)
-            with open(temp_path, "wb") as output_file:
-                output_file.write(processed_bytes)
-            return temp_path
+            return self._write_temp_image(processed_bytes, suffix=".png")
         except Exception as e:
-            logger.warning(f"Image preprocessing failed, using original image: {e}")
-            return image_path
+            logger.warning(f"Image preprocessing failed, using original image bytes: {e}")
+            return self._write_temp_image(image_bytes, suffix=".png")
 
     def _fallback_plain_text_ocr(self, image_path: str) -> dict:
         image_file = genai.upload_file(image_path)
@@ -122,8 +121,11 @@ class OCRExtractionService:
         for page in script.pages.all().order_by("page_number"):
             processed_path = None
             try:
-                image_path = page.image.path
-                processed_path = self._preprocess_image_for_ocr(image_path)
+                # Use storage API instead of .path to support cloud backends like S3/Supabase.
+                with page.image.open("rb") as image_file:
+                    original_bytes = image_file.read()
+
+                processed_path = self._preprocess_image_for_ocr(original_bytes)
 
                 extraction_prompt = """
                 You are an expert at reading handwritten mathematical answers.
@@ -207,7 +209,7 @@ class OCRExtractionService:
                     }
                 )
             finally:
-                if processed_path and processed_path != page.image.path and os.path.exists(processed_path):
+                if processed_path and os.path.exists(processed_path):
                     try:
                         os.unlink(processed_path)
                     except Exception:

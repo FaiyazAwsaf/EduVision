@@ -8,6 +8,7 @@ Serializers handle:
 """
 
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 
 from ..models import (
     LearningEvent,
@@ -145,16 +146,37 @@ class LearnerInsightSerializer(serializers.ModelSerializer):
 
 class LearnerInsightSummarySerializer(serializers.ModelSerializer):
     """
-    Summary serializer for insight listing.
+    Summary serializer for insight listing (teacher class view).
+    Includes all fields required by the frontend intelligence dashboard.
     """
+    user_display_name = serializers.SerializerMethodField()
+
+    def get_user_display_name(self, obj):
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=obj.user_id)
+            full = f"{user.first_name} {user.last_name}".strip()
+            return full or user.username
+        except User.DoesNotExist:
+            return str(obj.user_id)
+
     class Meta:
         model = LearnerInsight
         fields = [
             'id',
             'user_id',
+            'user_display_name',
             'computed_at',
             'learning_pace',
+            'pace_score',
+            'consistency_score',
+            'retry_frequency',
+            'average_difficulty',
+            'average_mastery',
             'overall_health_score',
+            'weak_topics',
+            'strong_topics',
+            'topic_metrics',
             'events_analyzed_count',
         ]
         read_only_fields = fields

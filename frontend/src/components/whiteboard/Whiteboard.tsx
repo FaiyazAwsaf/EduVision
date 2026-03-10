@@ -16,6 +16,7 @@ import { LatexObject } from "./LatexRenderer";
 import { convertHandwritingToLatex, evaluateHandwrittenEquation } from "@/api/geminiService";
 import { saveState, WhiteboardState } from "@/api/whiteboardService";
 import Toolbar, { Tool } from "./Toolbar";
+import VoiceChat from "./VoiceChat";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
 import MembersList, { Member } from "./MembersList";
 import * as fabric from "fabric";
@@ -980,6 +981,9 @@ export default function Whiteboard({
 
   return (
     <div className="w-screen h-screen bg-[#1a1a1a] flex overflow-hidden">
+      {/* Voice chat bar */}
+      <VoiceChat sessionId={sessionId} userId={userId} role={role} />
+
       {/* toolbar - sidebar on left */}
       <div className="h-full overflow-y-auto">
         <Toolbar
