@@ -70,16 +70,11 @@ class AnswerScriptViewSet(viewsets.ModelViewSet):
             "rubric_set", "student_user", "submission_form"
         ).prefetch_related("pages")
 
-        # Scope to teacher's assigned sections
+        # Scope to scripts owned by this teacher only
         if user.role == "teacher":
-            teacher_sections = TeacherSubjectAssignment.objects.filter(
-                teacher=user
-            ).values_list("section_id", flat=True)
-
             queryset = queryset.filter(
                 Q(uploaded_by=user)
                 | Q(submission_form__assignment__teacher=user)
-                | Q(student_user__student_profile__section_id__in=teacher_sections)
             ).distinct()
 
         # Filter by rubric set
