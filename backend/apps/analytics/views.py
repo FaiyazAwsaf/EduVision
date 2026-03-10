@@ -251,9 +251,19 @@ class MisconceptionRecomputeView(APIView):
             return Response({"error": "Teachers only"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            QuestionRubric.objects.get(pk=question_rubric_id)
+            qr = QuestionRubric.objects.select_related("rubric_set").get(pk=question_rubric_id)
         except QuestionRubric.DoesNotExist:
             return Response({"error": "Question not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Verify the teacher owns this rubric (same logic as MisconceptionView.get)
+        teacher_rubric_set_ids = set(
+            ScriptSubmissionForm.objects.filter(
+                assignment__teacher=request.user
+            ).values_list("scripts__rubric_set_id", flat=True)
+        )
+        if str(qr.rubric_set_id) not in {str(i) for i in teacher_rubric_set_ids if i}:
+            if str(qr.rubric_set.created_by) != str(request.user.id):
+                return Response({"error": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
         data = services.detect_misconceptions(question_rubric_id)
         return Response({"misconceptions": data, "question_rubric_id": question_rubric_id})
