@@ -438,12 +438,14 @@ export interface EvaluationInsights {
     pending_count: number;
     avg_score: number;
     avg_percentage: number;
+    student_count: number;
   };
   section_performance: {
     section_name: string;
     class_name: string;
     avg_percentage: number;
     script_count: number;
+    student_count: number;
   }[];
   score_distribution: {
     bucket: string;
@@ -475,6 +477,11 @@ export interface PerformerEntry {
 }
 
 /** Fetch aggregated evaluation analytics for the logged-in teacher. */
-export async function getEvaluationInsights(): Promise<EvaluationInsights> {
-  return authenticatedEvaluationFetch<EvaluationInsights>("/insights/");
+export async function getEvaluationInsights(
+  classId?: number,
+): Promise<EvaluationInsights> {
+  const params = classId ? `?class_id=${classId}` : "";
+  return authenticatedEvaluationFetch<EvaluationInsights>(
+    `/insights/${params}`,
+  );
 }

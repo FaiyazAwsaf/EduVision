@@ -15,7 +15,7 @@ import os
 import tempfile
 
 from apps.authentication.backends import CustomUserJWTAuthentication
-from apps.students.models import TeacherSubjectAssignment, StudentProfile
+from apps.students.models import TeacherSubjectAssignment, StudentProfile, Section
 
 from .models import (
     AnswerScript,
@@ -621,8 +621,10 @@ class StudentMyScriptsView(generics.ListAPIView):
 class EvaluationInsightsView(APIView):
     """
     GET /api/evaluation/insights/
+    GET /api/evaluation/insights/?class_id=<id>
     Returns aggregated evaluation analytics scoped to the logged-in teacher's
-    assigned sections/subjects.
+    assigned sections/subjects.  When class_id is provided, results are
+    narrowed to all sections of that class the teacher is assigned to.
     """
 
     authentication_classes = [CustomUserJWTAuthentication]
@@ -632,16 +634,58 @@ class EvaluationInsightsView(APIView):
         user = request.user
 
         # All sections this teacher is assigned to
-        teacher_sections = TeacherSubjectAssignment.objects.filter(
-            teacher=user
-        ).values_list("section_id", flat=True)
+        teacher_sections = list(
+            TeacherSubjectAssignment.objects.filter(
+                teacher=user
+            ).values_list("section_id", flat=True)
+        )
 
-        # All scripts the teacher can see
+        # Optional class filter — resolves to all teacher-assigned sections in that class
+        class_id = request.query_params.get("class_id")
+        if class_id:
+            try:
+                class_id = int(class_id)
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Invalid class_id"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            # Sections belonging to this class that the teacher is assigned to
+            class_sections = list(
+                Section.objects.filter(
+                    id__in=teacher_sections,
+                    class_ref_id=class_id,
+                ).values_list("id", flat=True)
+            )
+            if not class_sections:
+                return Response(
+                    {"error": "Forbidden"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            active_sections = class_sections
+        else:
+            active_sections = teacher_sections
+
+        # All scripts the teacher can see (scoped to active sections)
         scripts = AnswerScript.objects.filter(
             Q(uploaded_by=user)
             | Q(submission_form__assignment__teacher=user)
-            | Q(student_user__student_profile__section_id__in=teacher_sections)
+            | Q(student_user__student_profile__section_id__in=active_sections)
         ).distinct()
+
+        # When a class filter is active, narrow to that class's students
+        if class_id:
+            scripts = scripts.filter(
+                student_user__student_profile__section_id__in=active_sections
+            )
+
+        # Count of students in the active sections
+        student_count = (
+            StudentProfile.objects.filter(section_id__in=active_sections)
+            .values("user_id")
+            .distinct()
+            .count()
+        )
 
         total_scripts = scripts.count()
         evaluated_scripts = scripts.filter(status="evaluated")
@@ -665,6 +709,7 @@ class EvaluationInsightsView(APIView):
             .annotate(
                 avg_percentage=Avg("percentage"),
                 script_count=Count("id"),
+                student_count=Count("student_user", distinct=True),
             )
             .order_by("class_name", "section_name")
         )
@@ -731,8 +776,8 @@ class EvaluationInsightsView(APIView):
             except StudentProfile.DoesNotExist:
                 return None
 
-        top_entries = student_avgs.order_by("-avg_pct")[:5]
-        bottom_entries = student_avgs.order_by("avg_pct")[:5]
+        top_entries = student_avgs.order_by("-avg_pct")[:10]
+        bottom_entries = student_avgs.order_by("avg_pct")[:10]
 
         top_performers = [p for p in (_build_performer(e) for e in top_entries) if p]
         bottom_performers = [p for p in (_build_performer(e) for e in bottom_entries) if p]
@@ -767,6 +812,7 @@ class EvaluationInsightsView(APIView):
                 "pending_count": pending_scripts.count(),
                 "avg_score": round(float(agg["avg_score"] or 0), 1),
                 "avg_percentage": round(float(agg["avg_percentage"] or 0), 1),
+                "student_count": student_count,
             },
             "section_performance": list(section_perf),
             "score_distribution": buckets,
