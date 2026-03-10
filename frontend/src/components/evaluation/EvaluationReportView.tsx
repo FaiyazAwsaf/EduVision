@@ -258,22 +258,7 @@ export default function EvaluationReportView({
                       </ul>
                     </div>
                   </div>
-                )}
-
-              {/* Overall Feedback */}
-              {result.overall_feedback && (
-                <div className="border-t border-secondary pt-4">
-                  <div className="p-3 bg-primary/10 rounded-lg border border-secondary">
-                    <h4 className="text-sm font-medium text-primary-dark mb-2">
-                      Feedback
-                    </h4>
-                    <p className="text-sm text-primary-dark">
-                      {result.overall_feedback}
-                    </p>
-                  </div>
-                </div>
-              )}
-
+                )}              
               {/* Manual Review Flag */}
               {result.needs_manual_review && (
                 <div className="border-t border-secondary pt-4">
