@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Check,
-  X as XIcon,
   AlertTriangle,
   ArrowRight,
   ChevronLeft,
@@ -240,47 +239,6 @@ export default function EvaluationReportView({
                   {result.marks.answer.feedback || "No specific feedback"}
                 </div>
               </div>
-
-              {/* Key Points */}
-              {(result.key_points_found?.length ||
-                result.key_points_missing?.length) && (
-                <div className="border-t border-secondary pt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {result.key_points_found &&
-                      result.key_points_found.length > 0 && (
-                        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                          <h4 className="text-sm font-medium text-emerald-700 mb-2 flex items-center gap-1.5">
-                            <Check className="w-4 h-4" /> Key Points Covered
-                          </h4>
-                          <ul className="text-sm text-emerald-800 space-y-1">
-                            {result.key_points_found.map((point, i) => (
-                              <li key={i} className="flex items-start gap-2">
-                                <span className="text-emerald-500">•</span>
-                                {point}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    {result.key_points_missing &&
-                      result.key_points_missing.length > 0 && (
-                        <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                          <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1.5">
-                            <XIcon className="w-4 h-4" /> Key Points Missing
-                          </h4>
-                          <ul className="text-sm text-red-800 space-y-1">
-                            {result.key_points_missing.map((point, i) => (
-                              <li key={i} className="flex items-start gap-2">
-                                <span className="text-red-500">•</span>
-                                {point}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                  </div>
-                </div>
-              )}
 
               {/* Mistakes */}
               {result.mistakes_identified &&
