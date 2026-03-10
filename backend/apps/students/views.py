@@ -330,6 +330,36 @@ class MyTeachingAssignmentsView(generics.ListAPIView):
 # ─── Class-teacher-scoped views ──────────────────────────────────────────────
 
 
+class MySubjectsView(APIView):
+    """
+    GET /api/school/my-subjects/
+    Returns the distinct subjects taught in the logged-in student's section.
+    """
+
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            profile = StudentProfile.objects.select_related(
+                "section"
+            ).get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response({"subjects": []})
+
+        if not profile.section:
+            return Response({"subjects": []})
+
+        subject_names = (
+            TeacherSubjectAssignment.objects.filter(section=profile.section)
+            .select_related("subject")
+            .values_list("subject__name", flat=True)
+            .distinct()
+            .order_by("subject__name")
+        )
+        return Response({"subjects": list(subject_names)})
+
+
 def _get_teacher_section(user):
     """Return the Section the authenticated teacher is class-teacher of, or None."""
     try:

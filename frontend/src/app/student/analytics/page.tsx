@@ -229,7 +229,7 @@ export default function StudentAnalyticsPage() {
                                 {s.avg_percentage}%
                               </span>
                               <button
-                                onClick={() => router.push("/student/tutoring")}
+                                onClick={() => router.push(`/student/practice?subject=${encodeURIComponent(s.subject)}`)}
                                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
                               >
                                 Study <ChevronRight className="w-3 h-3" />
@@ -267,11 +267,11 @@ export default function StudentAnalyticsPage() {
                   Subject Performance
                 </h3>
                 <p className="text-xs text-secondary mb-4">
-                  Average score across each subject — click a bar to start tutoring
+                  Average score across each subject — click a bar to start practice
                 </p>
                 <SubjectPerformanceChart
                   data={analytics.subjects}
-                  onBarClick={() => router.push("/student/tutoring")}
+                  onBarClick={(subjectName) => router.push(`/student/practice?subject=${encodeURIComponent(subjectName)}`)}
                 />
               </section>
 

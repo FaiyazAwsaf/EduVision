@@ -19,6 +19,7 @@ from .views import (
     MyStudentsListView,
     MyStudentDetailView,
     SchoolInsightsView,
+    MySubjectsView,
 )
 
 app_name = "students"
@@ -52,8 +53,7 @@ urlpatterns = [
     # ── Teaching Assignments ──────────────────────────────────────────────────
     path("assignments/", TeacherSubjectAssignmentListCreateView.as_view(), name="assignment-list"),
     path("assignments/<uuid:pk>/", TeacherSubjectAssignmentDetailView.as_view(), name="assignment-detail"),
-    path("my-assignments/", MyTeachingAssignmentsView.as_view(), name="my-assignments"),
-    # ── Class-teacher-scoped ─────────────────────────────────────────────────
+    path("my-assignments/", MyTeachingAssignmentsView.as_view(), name="my-assignments"),    path("my-subjects/", MySubjectsView.as_view(), name="my-subjects"),    # ── Class-teacher-scoped ─────────────────────────────────────────────────
     path("my-class/", MyClassView.as_view(), name="my-class"),
     path("my-students/", MyStudentsListView.as_view(), name="my-students-list"),
     path(
