@@ -47,7 +47,9 @@ export default function ConsistencyChart({ progress, subjects }: Props) {
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-sm font-medium text-primary-dark">{row.subject}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-secondary">{row.min}%–{row.max}%</span>
+                <span className="text-xs text-secondary">
+                  {row.min === row.max ? `${row.min}%` : `${row.min}%–${row.max}%`}
+                </span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lbl.bg}`}>
                   {lbl.text}
                 </span>
