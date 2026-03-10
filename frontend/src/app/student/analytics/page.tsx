@@ -7,6 +7,8 @@ import Sidebar from "@/components/shared/Sidebar";
 import StatCard from "@/components/insights/StatCard";
 import StudentProgressChart from "@/components/analytics/StudentProgressChart";
 import SubjectPerformanceChart from "@/components/analytics/SubjectPerformanceChart";
+import ScoreDistributionChart from "@/components/analytics/ScoreDistributionChart";
+import ConsistencyChart from "@/components/analytics/ConsistencyChart";
 import { getMyAnalytics, type MyAnalytics } from "@/api/analytics";
 import {
   BarChart3,
@@ -272,6 +274,34 @@ export default function StudentAnalyticsPage() {
                   onBarClick={() => router.push("/student/tutoring")}
                 />
               </section>
+
+              {/* ── Score Distribution & Consistency ── */}
+              {analytics.progress.length > 0 && (
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-primary-dark mb-1">
+                      Score Distribution
+                    </h3>
+                    <p className="text-xs text-secondary mb-4">
+                      How your scores spread across performance bands
+                    </p>
+                    <ScoreDistributionChart data={filteredProgress} />
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-primary-dark mb-1">
+                      Consistency by Subject
+                    </h3>
+                    <p className="text-xs text-secondary mb-4">
+                      Score range per subject — narrow band means reliable performance
+                    </p>
+                    <ConsistencyChart
+                      progress={analytics.progress}
+                      subjects={analytics.subjects}
+                    />
+                  </div>
+                </section>
+              )}
 
               {/* ── Recent Assessments ── */}
               {filteredProgress.length > 0 && (
