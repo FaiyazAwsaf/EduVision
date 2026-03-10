@@ -145,7 +145,8 @@ class LearnerInsightSerializer(serializers.ModelSerializer):
 
 class LearnerInsightSummarySerializer(serializers.ModelSerializer):
     """
-    Summary serializer for insight listing.
+    Summary serializer for insight listing (teacher class view).
+    Includes all fields required by the frontend intelligence dashboard.
     """
     class Meta:
         model = LearnerInsight
@@ -154,7 +155,15 @@ class LearnerInsightSummarySerializer(serializers.ModelSerializer):
             'user_id',
             'computed_at',
             'learning_pace',
+            'pace_score',
+            'consistency_score',
+            'retry_frequency',
+            'average_difficulty',
+            'average_mastery',
             'overall_health_score',
+            'weak_topics',
+            'strong_topics',
+            'topic_metrics',
             'events_analyzed_count',
         ]
         read_only_fields = fields

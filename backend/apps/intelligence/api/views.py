@@ -265,6 +265,54 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
         
         return Response(LearnerInsightSummarySerializer(insights, many=True).data)
 
+    @action(detail=False, methods=['post'])
+    def compute_all(self, request):
+        """
+        Compute (or refresh) insights for every student who has learning events.
+
+        POST /api/intelligence/insights/compute_all/
+        Optional body: {"time_window_days": 30}
+
+        Returns a summary of how many succeeded / failed.
+        """
+        from apps.intelligence.models import LearningEvent
+
+        time_window_days = int(request.data.get('time_window_days', 30))
+
+        user_ids = list(
+            LearningEvent.objects.values_list('user_id', flat=True).distinct()
+        )
+
+        if not user_ids:
+            return Response(
+                {"message": "No learning events found.", "computed": 0, "failed": 0},
+                status=status.HTTP_200_OK,
+            )
+
+        insight_service = InsightService()
+        succeeded = []
+        failed = []
+
+        for uid in user_ids:
+            try:
+                insight_service.compute_insight(
+                    user_id=uid,
+                    time_window_days=time_window_days,
+                    save=True,
+                )
+                succeeded.append(str(uid))
+            except Exception as exc:  # noqa: BLE001
+                failed.append({"user_id": str(uid), "error": str(exc)})
+
+        return Response(
+            {
+                "computed": len(succeeded),
+                "failed": len(failed),
+                "failures": failed,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class RecommendationViewSet(viewsets.ReadOnlyModelViewSet):
     """

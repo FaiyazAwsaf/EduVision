@@ -226,8 +226,6 @@ export async function performRecommendationAction(
   );
 }
 
-// ─── All Insights (teacher view) ─────────────────────────────────────────────
-
 /**
  * List all insights (teacher use – filtered by query params).
  * Calls GET /api/intelligence/insights/?user_id=<id>
@@ -237,8 +235,28 @@ export async function listInsights(
 ): Promise<LearnerInsight[]> {
   const qs = userId ? `?user_id=${userId}` : "";
   const data = await intelligenceFetch<
-    LearnerInsight[] | { results: LearnerInsight[] }
+    Record<string, unknown>[] | { results: Record<string, unknown>[] }
   >(`/insights/${qs}`);
   // Handle both paginated ({ results: [...] }) and plain array responses
-  return Array.isArray(data) ? data : (data.results ?? []);
+  const raw = Array.isArray(data) ? data : (data.results ?? []);
+  return raw.map(normaliseInsight);
+}
+
+export interface ComputeAllResult {
+  computed: number;
+  failed: number;
+  failures: { user_id: string; error: string }[];
+}
+
+/**
+ * Compute (or refresh) insights for all students who have learning events.
+ * Calls POST /api/intelligence/insights/compute_all/
+ */
+export async function computeAllInsights(
+  timeWindowDays = 30,
+): Promise<ComputeAllResult> {
+  return intelligenceFetch<ComputeAllResult>("/insights/compute_all/", {
+    method: "POST",
+    body: JSON.stringify({ time_window_days: timeWindowDays }),
+  });
 }
