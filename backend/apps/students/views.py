@@ -277,6 +277,7 @@ class TeacherSubjectAssignmentListCreateView(generics.ListCreateAPIView):
     """
 
     serializer_class = TeacherSubjectAssignmentSerializer
+    pagination_class = None
 
     def get_queryset(self):
         qs = TeacherSubjectAssignment.objects.select_related(
