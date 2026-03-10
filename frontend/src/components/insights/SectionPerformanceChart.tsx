@@ -16,6 +16,7 @@ interface SectionPerformanceProps {
     class_name: string;
     avg_percentage: number;
     script_count: number;
+    student_count: number;
   }[];
 }
 
@@ -26,6 +27,7 @@ export default function SectionPerformanceChart({
     name: `${d.class_name}-${d.section_name}`,
     avg: Math.round(d.avg_percentage * 10) / 10,
     scripts: d.script_count,
+    students: d.student_count,
   }));
 
   if (chartData.length === 0) {
@@ -48,7 +50,19 @@ export default function SectionPerformanceChart({
             border: "1px solid #e2e8f0",
             fontSize: "13px",
           }}
-          formatter={(value) => [`${value}%`, "Avg Score"]}
+          formatter={(value, _name, props) => {
+            const students = props.payload?.students;
+            return [
+              <span key="v">
+                {value}%
+                <br />
+                <span style={{ color: "#6b7280", fontSize: "12px" }}>
+                  {students} student{students !== 1 ? "s" : ""}
+                </span>
+              </span>,
+              "Avg Score",
+            ];
+          }}
         />
         <Bar dataKey="avg" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
       </BarChart>

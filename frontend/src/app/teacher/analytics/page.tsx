@@ -8,10 +8,7 @@ import StatCard from "@/components/insights/StatCard";
 import ClassDistributionChart from "@/components/analytics/ClassDistributionChart";
 import QuestionDifficultyChart from "@/components/analytics/QuestionDifficultyChart";
 import MisconceptionList from "@/components/analytics/MisconceptionList";
-import {
-  getSubmissionForms,
-  type SubmissionForm,
-} from "@/api/evaluation";
+import { getSubmissionForms, type SubmissionForm } from "@/api/evaluation";
 import {
   getClassDistribution,
   getClassQuestionPerformance,
@@ -46,13 +43,19 @@ export default function TeacherAnalyticsPage() {
   const [selectedFormId, setSelectedFormId] = useState<string>("");
 
   // Analytics data
-  const [distribution, setDistribution] = useState<ClassDistribution | null>(null);
-  const [questionPerf, setQuestionPerf] = useState<QuestionPerformanceEntry[]>([]);
+  const [distribution, setDistribution] = useState<ClassDistribution | null>(
+    null,
+  );
+  const [questionPerf, setQuestionPerf] = useState<QuestionPerformanceEntry[]>(
+    [],
+  );
 
   // Misconception selection
   const [rubricSets, setRubricSets] = useState<RubricSetListItem[]>([]);
   const [selectedRubricSetId, setSelectedRubricSetId] = useState<string>("");
-  const [questions, setQuestions] = useState<{ id: string; number: number; text: string }[]>([]);
+  const [questions, setQuestions] = useState<
+    { id: string; number: number; text: string }[]
+  >([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
   const [misconceptions, setMisconceptions] = useState<Misconception[]>([]);
 
@@ -208,25 +211,19 @@ export default function TeacherAnalyticsPage() {
                 Smart Analytics
               </h1>
               <p className="text-sm text-primary">
-                Class performance, question difficulty, and misconception intelligence
+                Class performance, question difficulty, and misconception
+                intelligence
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleRebuildSnapshots}
-                disabled={isRebuilding}
-                title="Rebuild performance snapshots for all evaluated scripts"
-                className="px-3 py-2 text-xs text-secondary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Database className={`w-3.5 h-3.5 ${isRebuilding ? "animate-spin" : ""}`} />
-                Rebuild Snapshots
-              </button>
               <button
                 onClick={loadAnalytics}
                 disabled={isLoadingAnalytics || !selectedFormId}
                 className="px-4 py-2 text-sm text-primary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoadingAnalytics ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${isLoadingAnalytics ? "animate-spin" : ""}`}
+                />
                 Refresh
               </button>
             </div>
@@ -269,7 +266,8 @@ export default function TeacherAnalyticsPage() {
                 >
                   {forms.map((f) => (
                     <option key={f.id} value={f.id}>
-                      {f.title} — {f.subject_name} · {f.section_name} ({f.evaluated_count} evaluated)
+                      {f.title} — {f.subject_name} · {f.section_name} (
+                      {f.evaluated_count} evaluated)
                     </option>
                   ))}
                 </select>
@@ -336,83 +334,13 @@ export default function TeacherAnalyticsPage() {
                     Question Difficulty
                   </h3>
                   <p className="text-xs text-secondary mb-4">
-                    Average class score per question — lower bars indicate harder questions
+                    Average class score per question — lower bars indicate
+                    harder questions
                   </p>
                   <QuestionDifficultyChart data={questionPerf} />
                 </div>
               </section>
             )
-          )}
-
-          {/* ── Question Performance Table ── */}
-          {questionPerf.length > 0 && (
-            <section className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
-              <h3 className="text-base font-semibold text-primary-dark mb-4">
-                Per-Question Analysis
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-secondary/20">
-                      <th className="pb-3 text-left text-xs font-semibold text-secondary uppercase tracking-wide">
-                        Question
-                      </th>
-                      <th className="pb-3 text-left text-xs font-semibold text-secondary uppercase tracking-wide">
-                        Text
-                      </th>
-                      <th className="pb-3 text-right text-xs font-semibold text-secondary uppercase tracking-wide">
-                        Avg Marks
-                      </th>
-                      <th className="pb-3 text-right text-xs font-semibold text-secondary uppercase tracking-wide">
-                        Max Marks
-                      </th>
-                      <th className="pb-3 text-right text-xs font-semibold text-secondary uppercase tracking-wide">
-                        Avg %
-                      </th>
-                      <th className="pb-3 text-right text-xs font-semibold text-secondary uppercase tracking-wide">
-                        Responses
-                      </th>
-                      <th className="pb-3 text-left text-xs font-semibold text-secondary uppercase tracking-wide pl-4">
-                        Difficulty
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-secondary/10">
-                    {questionPerf.map((q) => {
-                      const difficulty =
-                        q.avg_percentage < 40
-                          ? { label: "Hard", color: "text-red-600 bg-red-50" }
-                          : q.avg_percentage < 65
-                            ? { label: "Medium", color: "text-amber-600 bg-amber-50" }
-                            : { label: "Easy", color: "text-emerald-600 bg-emerald-50" };
-                      return (
-                        <tr key={q.question_number} className="hover:bg-gray-50">
-                          <td className="py-3 font-medium text-primary-dark">
-                            Q{q.question_number}
-                          </td>
-                          <td className="py-3 text-secondary max-w-[220px] truncate">
-                            {q.question_text || "—"}
-                          </td>
-                          <td className="py-3 text-right text-primary-dark font-semibold">
-                            {q.avg_marks}
-                          </td>
-                          <td className="py-3 text-right text-secondary">{q.max_marks}</td>
-                          <td className="py-3 text-right font-semibold">{q.avg_percentage}%</td>
-                          <td className="py-3 text-right text-secondary">{q.response_count}</td>
-                          <td className="py-3 pl-4">
-                            <span
-                              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${difficulty.color}`}
-                            >
-                              {difficulty.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
           )}
 
           {/* ── Misconception Intelligence ── */}
@@ -431,7 +359,9 @@ export default function TeacherAnalyticsPage() {
                 disabled={isLoadingMisconceptions || !selectedQuestionId}
                 className="px-3 py-1.5 text-xs text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors flex items-center gap-1.5 disabled:opacity-50"
               >
-                <RefreshCw className={`w-3 h-3 ${isLoadingMisconceptions ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-3 h-3 ${isLoadingMisconceptions ? "animate-spin" : ""}`}
+                />
                 Re-analyse
               </button>
             </div>
@@ -474,7 +404,8 @@ export default function TeacherAnalyticsPage() {
                   )}
                   {questions.map((q) => (
                     <option key={q.id} value={q.id}>
-                      Q{q.number}: {q.text.length > 50 ? q.text.slice(0, 50) + "…" : q.text}
+                      Q{q.number}:{" "}
+                      {q.text.length > 50 ? q.text.slice(0, 50) + "…" : q.text}
                     </option>
                   ))}
                 </select>

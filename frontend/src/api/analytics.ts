@@ -66,6 +66,7 @@ export interface MyAnalytics {
   progress: ProgressDataPoint[];
   subjects: SubjectPerformance[];
   topics: TopicPerformance[];
+  subject_weak_topics: Record<string, string[]>;
 }
 
 export interface ClassDistribution {

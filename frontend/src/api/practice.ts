@@ -19,6 +19,7 @@ export interface PracticeQuestion {
 export interface GeneratePracticeResponse {
   session_id: string;
   subject: string;
+  topic: string;
   questions: PracticeQuestion[];
   total_marks: number;
 }
@@ -54,13 +55,14 @@ export interface PracticeResultsResponse {
 export async function generatePractice(
   subject: string,
   numQuestions: 5 | 10 | 15,
+  topic?: string,
 ): Promise<GeneratePracticeResponse> {
   const response = await authenticatedFetch(
     `${API_BASE_URL}/evaluation/practice/generate/`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, num_questions: numQuestions }),
+      body: JSON.stringify({ subject, num_questions: numQuestions, ...(topic ? { topic } : {}) }),
     },
   );
 

@@ -26,7 +26,6 @@ import {
   Layers,
   UserCog,
   ShieldCheck,
-  Brain,
   PenTool,
   BookOpenCheck,
   AlertTriangle,
@@ -86,9 +85,14 @@ const teacherNavItems: NavEntry[] = [
       },
     ],
   },
-  { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
-  { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
-  { label: "Class Intelligence", href: "/teacher/intelligence", icon: Brain },
+  {
+    label: "Metrics",
+    icon: BarChart3,
+    children: [
+      { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
+      { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
+    ],
+  },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
 const studentNavItems: NavEntry[] = [
@@ -107,7 +111,6 @@ const studentNavItems: NavEntry[] = [
   { label: "Practice", href: "/student/practice", icon: BookOpen },
   { label: "Scripts", href: "/student/scripts", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
-  { label: "My Insights", href: "/student/insights", icon: Brain },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
 

@@ -71,8 +71,10 @@ export default function StudentAnalyticsPage() {
       : analytics.progress
     : [];
 
-  const strengths = analytics?.subjects.filter((s) => s.avg_percentage >= 75) ?? [];
-  const needsWork = analytics?.subjects.filter((s) => s.avg_percentage < 75) ?? [];
+  const strengths =
+    analytics?.subjects.filter((s) => s.avg_percentage >= 75) ?? [];
+  const needsWork =
+    analytics?.subjects.filter((s) => s.avg_percentage < 75) ?? [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -82,7 +84,9 @@ export default function StudentAnalyticsPage() {
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
           <div className="flex items-center justify-between px-8 py-4">
             <div>
-              <h1 className="text-2xl font-bold text-primary-dark">My Analytics</h1>
+              <h1 className="text-2xl font-bold text-primary-dark">
+                My Analytics
+              </h1>
               <p className="text-sm text-primary">
                 Your performance across all assessments
               </p>
@@ -107,7 +111,9 @@ export default function StudentAnalyticsPage() {
                 disabled={isLoading}
                 className="px-4 py-2 text-sm text-primary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </button>
             </div>
@@ -168,17 +174,25 @@ export default function StudentAnalyticsPage() {
                   <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                       <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      <h3 className="text-base font-semibold text-primary-dark">Your Strengths</h3>
+                      <h3 className="text-base font-semibold text-primary-dark">
+                        Your Strengths
+                      </h3>
                     </div>
                     {strengths.length === 0 ? (
                       <p className="text-sm text-secondary">
-                        Keep working — strengths will appear here once you hit 75% in a subject.
+                        Keep working — strengths will appear here once you hit
+                        75% in a subject.
                       </p>
                     ) : (
                       <div className="space-y-3">
                         {strengths.map((s) => (
-                          <div key={s.subject} className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-primary-dark">{s.subject}</span>
+                          <div
+                            key={s.subject}
+                            className="flex items-center justify-between"
+                          >
+                            <span className="text-sm font-medium text-primary-dark">
+                              {s.subject}
+                            </span>
                             <div className="flex items-center gap-3">
                               <div className="w-24 bg-gray-100 rounded-full h-2">
                                 <div
@@ -200,36 +214,62 @@ export default function StudentAnalyticsPage() {
                   <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                       <AlertTriangle className="w-5 h-5 text-amber-500" />
-                      <h3 className="text-base font-semibold text-primary-dark">Needs Attention</h3>
+                      <h3 className="text-base font-semibold text-primary-dark">
+                        Needs Attention
+                      </h3>
                     </div>
                     {needsWork.length === 0 ? (
                       <div className="flex items-center gap-2 text-emerald-600">
                         <CheckCircle2 className="w-4 h-4" />
-                        <p className="text-sm font-medium">You're on track in all subjects!</p>
+                        <p className="text-sm font-medium">
+                          You're on track in all subjects!
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {needsWork.map((s) => (
-                          <div key={s.subject} className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-primary-dark">{s.subject}</span>
+                          <div
+                            key={s.subject}
+                            className="flex items-center justify-between"
+                          >
+                            <span className="text-sm font-medium text-primary-dark">
+                              {s.subject}
+                            </span>
                             <div className="flex items-center gap-3">
                               <div className="w-24 bg-gray-100 rounded-full h-2">
                                 <div
                                   className="h-2 rounded-full transition-all"
                                   style={{
                                     width: `${s.avg_percentage}%`,
-                                    backgroundColor: s.avg_percentage >= 50 ? "#eab308" : "#ef4444",
+                                    backgroundColor:
+                                      s.avg_percentage >= 50
+                                        ? "#eab308"
+                                        : "#ef4444",
                                   }}
                                 />
                               </div>
                               <span
                                 className="text-xs font-semibold w-10 text-right"
-                                style={{ color: s.avg_percentage >= 50 ? "#ca8a04" : "#dc2626" }}
+                                style={{
+                                  color:
+                                    s.avg_percentage >= 50
+                                      ? "#ca8a04"
+                                      : "#dc2626",
+                                }}
                               >
                                 {s.avg_percentage}%
                               </span>
                               <button
-                                onClick={() => router.push(`/student/practice?subject=${encodeURIComponent(s.subject)}`)}
+                                onClick={() => {
+                                  const weakTopics =
+                                    analytics?.subject_weak_topics?.[s.subject];
+                                  const topicParam = weakTopics?.length
+                                    ? `&topic=${encodeURIComponent(weakTopics.join(", "))}`
+                                    : "";
+                                  router.push(
+                                    `/student/practice?subject=${encodeURIComponent(s.subject)}${topicParam}`,
+                                  );
+                                }}
                                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
                               >
                                 Study <ChevronRight className="w-3 h-3" />
@@ -246,7 +286,9 @@ export default function StudentAnalyticsPage() {
               {/* ── Score Progression ── */}
               <section className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
                 <div className="flex items-start justify-between mb-1">
-                  <h3 className="text-base font-semibold text-primary-dark">Score Progression</h3>
+                  <h3 className="text-base font-semibold text-primary-dark">
+                    Score Progression
+                  </h3>
                   {selectedSubject && (
                     <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                       {selectedSubject}
@@ -267,11 +309,21 @@ export default function StudentAnalyticsPage() {
                   Subject Performance
                 </h3>
                 <p className="text-xs text-secondary mb-4">
-                  Average score across each subject — click a bar to start practice
+                  Average score across each subject — click a bar to start
+                  practice
                 </p>
                 <SubjectPerformanceChart
                   data={analytics.subjects}
-                  onBarClick={(subjectName) => router.push(`/student/practice?subject=${encodeURIComponent(subjectName)}`)}
+                  onBarClick={(subjectName) => {
+                    const weakTopics =
+                      analytics?.subject_weak_topics?.[subjectName];
+                    const topicParam = weakTopics?.length
+                      ? `&topic=${encodeURIComponent(weakTopics.join(", "))}`
+                      : "";
+                    router.push(
+                      `/student/practice?subject=${encodeURIComponent(subjectName)}${topicParam}`,
+                    );
+                  }}
                 />
               </section>
 
@@ -293,7 +345,8 @@ export default function StudentAnalyticsPage() {
                       Consistency by Subject
                     </h3>
                     <p className="text-xs text-secondary mb-4">
-                      Score range per subject — narrow band means reliable performance
+                      Score range per subject — narrow band means reliable
+                      performance
                     </p>
                     <ConsistencyChart
                       progress={analytics.progress}
@@ -307,7 +360,9 @@ export default function StudentAnalyticsPage() {
               {filteredProgress.length > 0 && (
                 <section className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
                   <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-base font-semibold text-primary-dark">Recent Assessments</h3>
+                    <h3 className="text-base font-semibold text-primary-dark">
+                      Recent Assessments
+                    </h3>
                     {selectedSubject && (
                       <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                         {selectedSubject}
@@ -336,33 +391,38 @@ export default function StudentAnalyticsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-secondary/10">
-                        {[...filteredProgress].reverse().slice(0, 10).map((p, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="py-3 font-medium text-primary-dark max-w-[200px] truncate">
-                              {p.assessment}
-                            </td>
-                            <td className="py-3 text-secondary">{p.subject}</td>
-                            <td className="py-3 text-right text-secondary">
-                              {p.score}/{p.max_score}
-                            </td>
-                            <td className="py-3 text-right">
-                              <span
-                                className={`font-semibold ${
-                                  p.percentage >= 75
-                                    ? "text-emerald-600"
-                                    : p.percentage >= 50
-                                      ? "text-amber-600"
-                                      : "text-red-600"
-                                }`}
-                              >
-                                {p.percentage}%
-                              </span>
-                            </td>
-                            <td className="py-3 text-right text-secondary text-xs">
-                              {p.date ?? "—"}
-                            </td>
-                          </tr>
-                        ))}
+                        {[...filteredProgress]
+                          .reverse()
+                          .slice(0, 10)
+                          .map((p, i) => (
+                            <tr key={i} className="hover:bg-gray-50">
+                              <td className="py-3 font-medium text-primary-dark max-w-[200px] truncate">
+                                {p.assessment}
+                              </td>
+                              <td className="py-3 text-secondary">
+                                {p.subject}
+                              </td>
+                              <td className="py-3 text-right text-secondary">
+                                {p.score}/{p.max_score}
+                              </td>
+                              <td className="py-3 text-right">
+                                <span
+                                  className={`font-semibold ${
+                                    p.percentage >= 75
+                                      ? "text-emerald-600"
+                                      : p.percentage >= 50
+                                        ? "text-amber-600"
+                                        : "text-red-600"
+                                  }`}
+                                >
+                                  {p.percentage}%
+                                </span>
+                              </td>
+                              <td className="py-3 text-right text-secondary text-xs">
+                                {p.date ?? "—"}
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -374,7 +434,8 @@ export default function StudentAnalyticsPage() {
               <BarChart3 className="w-12 h-12 text-secondary/40" />
               <p className="text-base">No analytics data yet</p>
               <p className="text-sm text-secondary/70">
-                Complete your first assessment to see your performance analytics.
+                Complete your first assessment to see your performance
+                analytics.
               </p>
             </div>
           )}

@@ -78,7 +78,7 @@ class PracticeService:
     # Public API
     # ─────────────────────────────────────────────────────────────
 
-    def generate_questions(self, subject: str, num_questions: int) -> dict:
+    def generate_questions(self, subject: str, num_questions: int, topic: str = "") -> dict:
         """
         Generate exam-style questions + marking scheme for a given subject.
 
@@ -86,11 +86,12 @@ class PracticeService:
             {
                 session_id: str,
                 subject: str,
+                topic: str,
                 questions: [{id, number, text, marks}],
                 total_marks: int,
             }
         """
-        prompt = self._build_generation_prompt(subject, num_questions)
+        prompt = self._build_generation_prompt(subject, num_questions, topic)
 
         try:
             response = self.model.generate_content(
@@ -152,6 +153,7 @@ class PracticeService:
             f"practice_session:{session_id}",
             {
                 "subject": subject,
+                "topic": topic,
                 "questions": questions,
                 "marking_schemes": marking_schemes,
                 "total_marks": total_marks,
@@ -162,6 +164,7 @@ class PracticeService:
         return {
             "session_id": session_id,
             "subject": subject,
+            "topic": topic,
             "questions": questions,
             "total_marks": total_marks,
         }
@@ -358,12 +361,16 @@ Respond ONLY with valid JSON in this exact format:
             logger.exception("Gemini grading failed for question: %s", question_text[:80])
             return {"marks_awarded": 0, "feedback": "Grading could not be completed."}
 
-    def _build_generation_prompt(self, subject: str, num_questions: int) -> str:
+    def _build_generation_prompt(self, subject: str, num_questions: int, topic: str = "") -> str:
+        topic_instruction = ""
+        if topic:
+            topic_instruction = f"\nAll questions MUST be specifically about the topic: {topic} (within {subject}).\n"
+
         return f"""
 You are an expert {subject} examiner creating an end-of-year exam.
 
 Generate exactly {num_questions} exam-style questions for the subject: {subject}.
-
+{topic_instruction}
 Requirements:
 - Mix difficulty levels (some straightforward, some challenging)
 - Each question should be answerable in a short exam setting
@@ -381,5 +388,5 @@ Respond ONLY with a valid JSON array in this exact format (no markdown, no extra
   ...
 ]
 
-Generate exactly {num_questions} questions for {subject}.
+Generate exactly {num_questions} questions for {subject}{f' on the topic: {topic}' if topic else ''}.
 """
