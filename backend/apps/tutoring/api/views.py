@@ -275,6 +275,20 @@ class SessionJoinView(APIView):
 
         logger.info(f"Student {user.id} joined session {session.id}")
 
+        # Record SESSION_JOINED learning event (non-blocking)
+        try:
+            from apps.intelligence.services.event_service import EventService
+            topic = session.section.name if session.section else None
+            EventService().record_event(
+                event_type='session_joined',
+                user_id=user.id,
+                topic=topic,
+                session_id=session.id,
+                metadata={'session_id': str(session.id)},
+            )
+        except Exception:
+            pass
+
         # Broadcast WebSocket events
         try:
             if previous_status != session.status:

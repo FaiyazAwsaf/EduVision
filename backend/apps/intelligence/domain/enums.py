@@ -40,7 +40,14 @@ class EventType(str, Enum):
     
     # Feedback events
     FEEDBACK_SUBMITTED = 'feedback_submitted'
-    
+
+    # Evaluation pipeline events (Phase 7)
+    SCRIPT_SUBMITTED = 'script_submitted'
+    SCRIPT_EVALUATED = 'script_evaluated'
+    CONTENT_GENERATED = 'content_generated'
+    CONTENT_VIEWED = 'content_viewed'
+    SESSION_JOINED = 'session_joined'
+
     @classmethod
     def content_events(cls) -> list['EventType']:
         """Events related to content interaction."""

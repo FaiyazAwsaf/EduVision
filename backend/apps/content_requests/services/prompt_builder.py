@@ -26,6 +26,22 @@ def build_system_prompt(role: str = 'student') -> str:
     Teacher prompts emphasize classroom-ready material.
     Student prompts emphasize learning.
     """
+    off_topic_guard = """\n
+CRITICAL RULE — TOPIC RELEVANCE CHECK:
+Before generating any content, evaluate whether the requested topic is genuinely
+related to academics, education, or learning. If the topic is clearly unrelated
+(e.g. weather, time, jokes, personal questions, news, sports scores, shopping,
+recipes, greetings, or any non-educational query), you MUST respond with ONLY
+the following text and nothing else:
+
+[OFF_TOPIC]
+
+Do NOT generate any educational content for off-topic requests. Do NOT explain
+why. Just return [OFF_TOPIC].
+
+If the topic IS educational, proceed normally with the content generation below.
+"""
+
     if role == 'teacher':
         return """You are an expert educational content creator helping teachers build
 classroom-ready materials. Your goal is to create professional, structured content
@@ -38,7 +54,7 @@ Guidelines:
 - Use proper formatting (headers, lists, emphasis)
 - Support mathematical notation when needed
 - Make content engaging and age-appropriate for the target class
-- Include assessment-ready elements (questions, rubrics) when relevant"""
+- Include assessment-ready elements (questions, rubrics) when relevant""" + off_topic_guard
     
     return """You are an expert educational content creator specializing in clear, 
 accurate, and pedagogically sound explanations. Your goal is to help students 
@@ -51,7 +67,7 @@ Guidelines:
 - Use proper formatting (headers, lists, emphasis)
 - Support mathematical notation when needed
 - Be thorough but concise
-- Focus on understanding, not just memorization"""
+- Focus on understanding, not just memorization""" + off_topic_guard
 
 
 def build_context_aware_prompt(
@@ -105,6 +121,12 @@ def build_context_aware_prompt(
     if request.notes:
         prompt_parts.append(f"\nAdditional Context: {request.notes}")
     
+    # Add curriculum context if a curriculum topic is linked
+    curriculum_section = _build_curriculum_context(request)
+    if curriculum_section:
+        prompt_parts.append("\n" + curriculum_section)
+        logger.info("Including curriculum context in prompt")
+
     # Add learning context if provided (Phase 4: Manual inputs)
     if learning_context:
         context_section = _build_learning_context_section(learning_context)
@@ -288,3 +310,46 @@ Create a comprehensive topic explanation suitable for classroom use:
     }
     
     return instructions.get(content_type, "").strip()
+
+
+def _build_curriculum_context(request: ContentRequest) -> str:
+    """
+    Build prompt section from a linked curriculum topic.
+
+    When a content request is linked to a CourseTopic, we enrich the prompt
+    with course objectives and course outcomes so the AI aligns its output
+    with the curriculum scope.
+    """
+    # The ORM attribute is set on the domain object when loaded via repository
+    curriculum_topic_id = getattr(request, "curriculum_topic_id", None)
+    if not curriculum_topic_id:
+        return ""
+
+    try:
+        from apps.curriculum.models import CourseTopic
+
+        topic = (
+            CourseTopic.objects.select_related("course_outline")
+            .get(pk=curriculum_topic_id)
+        )
+    except CourseTopic.DoesNotExist:
+        return ""
+
+    parts = ["\n=== Curriculum Alignment ==="]
+    parts.append(f"Course: {topic.course_outline.title}")
+
+    objectives = topic.course_outline.course_objectives
+    if objectives:
+        parts.append("Course Objectives:")
+        for idx, obj in enumerate(objectives, 1):
+            parts.append(f"  {idx}. {obj}")
+
+    if topic.course_outcomes:
+        parts.append(f"Target Course Outcomes: {', '.join(topic.course_outcomes)}")
+
+    parts.append(
+        "Ensure the generated content is scoped to this course's curriculum "
+        "and aligns with the objectives and outcomes listed above."
+    )
+
+    return "\n".join(parts)

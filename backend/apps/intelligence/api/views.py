@@ -16,7 +16,9 @@ from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny  # Change to appropriate permission in production
+from rest_framework.permissions import IsAuthenticated
+
+from apps.authentication.backends import CustomUserJWTAuthentication
 
 from ..models import LearningEvent, LearnerInsight, Recommendation
 from ..services import EventService, InsightService, RecommendationService
@@ -46,8 +48,9 @@ class LearningEventViewSet(viewsets.ModelViewSet):
     """
     queryset = LearningEvent.objects.all()
     serializer_class = LearningEventSerializer
-    permission_classes = [AllowAny]  # TODO: Use proper authentication
-    
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     # Disable mutation operations
     http_method_names = ['get', 'post', 'head', 'options']
     
@@ -168,8 +171,9 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = LearnerInsight.objects.all()
     serializer_class = LearnerInsightSerializer
-    permission_classes = [AllowAny]  # TODO: Use proper authentication
-    
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         """Filter insights by user_id."""
         queryset = super().get_queryset()
@@ -236,10 +240,7 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
         insight = insight_service.get_latest_insight(UUID(user_id))
         
         if not insight:
-            return Response(
-                {"error": "No insight found for this user"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
         
         return Response(LearnerInsightSerializer(insight).data)
     
@@ -279,8 +280,9 @@ class RecommendationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Recommendation.objects.all()
     serializer_class = RecommendationSerializer
-    permission_classes = [AllowAny]  # TODO: Use proper authentication
-    
+    authentication_classes = [CustomUserJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         """Filter recommendations by user_id and status."""
         queryset = super().get_queryset()

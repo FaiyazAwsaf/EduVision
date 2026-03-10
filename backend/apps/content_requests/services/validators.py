@@ -6,12 +6,71 @@ the domain layer. It performs:
 - Type checking
 - Format validation
 - Business rule validation
+- Topic relevance validation (blocks non-educational requests)
 
 Validation happens at the service boundary to fail fast with meaningful errors.
 """
+import re
 from typing import Dict, Any, List, Optional
 
 from ..domain.enums import ContentType, Style, OutputFormat, Difficulty
+
+
+# Patterns that indicate a non-educational / off-topic request.
+# Each entry is a compiled regex matched against the lowercased topic string.
+_OFF_TOPIC_PATTERNS: List[re.Pattern] = [
+    # Time / date queries (conversational, not academic "what is time in physics")
+    re.compile(r'\bwhat(\s+is|\s*\'s)?\s+(the\s+)?(current\s+)?(time|date|day)\s*(now|today|right\s+now)?\s*\??$'),
+    re.compile(r'\b(tell|give)\s+(me\s+)?(the\s+)?(time|date|day)\s*\??$'),
+    re.compile(r'\bwhat\s+time\s+is\s+it\b'),
+    re.compile(r'\bwhat\s+day\s+is\s+(it|today)\b'),
+
+    # Weather queries
+    re.compile(r'\b(what|how)(\s+is|\s*\'s)?\s+(the\s+)?weather\b'),
+    re.compile(r'\bweather\s+(today|tomorrow|forecast)\b'),
+    re.compile(r'\bis\s+it\s+(raining|sunny|cold|hot|cloudy|snowing)\s*(today|outside|now)?\s*\??$'),
+    re.compile(r'\btemperature\s+(today|outside|right\s+now)\s*\??$'),
+
+    # Jokes / entertainment
+    re.compile(r'\btell\s+(me\s+)?a?\s*joke\b'),
+    re.compile(r'\b(say|tell)\s+(something\s+)?funny\b'),
+    re.compile(r'\bmake\s+me\s+laugh\b'),
+
+    # Personal / conversational
+    re.compile(r'\b(how\s+are\s+you|who\s+are\s+you|what\s+are\s+you)\s*\??$'),
+    re.compile(r'\bwhat(\s+is|\s*\'s)?\s+your\s+(name|age|favorite)\b'),
+    re.compile(r'\b(hello|hi|hey|good\s+morning|good\s+night)\s*[!?.]*\s*$'),
+    re.compile(r'^\s*do\s+you\s+(like|love|hate|know)\b'),
+
+    # News / current events
+    re.compile(r'\b(latest|breaking|today\'?s?)\s+news\b'),
+    re.compile(r'\bwhat(\s+is|\s*\'s)?\s+happening\s+(in\s+the\s+world|around\s+the\s+world|today)\b'),
+
+    # Sports scores (specific: "who won the match", not just "score")
+    re.compile(r'\bwho\s+won\s+(the|last|yesterday)\b'),
+    re.compile(r'\b(cricket|football|basketball|baseball|tennis)\s+(score|match\s+result|game\s+result)\b'),
+    re.compile(r'\b(match|game)\s+result\s*(today|yesterday)?\s*\??$'),
+
+    # Food / recipes (not academic)
+    re.compile(r'\b(recipe|cook|how\s+to\s+make)\s+(a\s+)?(pizza|cake|pasta|biryani|burger|sandwich)\b'),
+
+    # Shopping / prices (specific phrasing, not economics topics)
+    re.compile(r'\b(buy|shop)\s+(online|for\s+me)\b'),
+    re.compile(r'\bhow\s+much\s+(does|is|are)\b.+\b(cost|price)\s*\??$'),
+
+    # Navigation / location (specific non-academic directions)
+    re.compile(r'\b(directions\s+to|navigate\s+to|how\s+to\s+get\s+to)\b'),
+    re.compile(r'\bnearest\s+(restaurant|hospital|atm|store|shop)\b'),
+
+    # Greetings-only inputs (very short, no educational value)
+    re.compile(r'^\s*(hi|hello|hey|yo|sup|hola|namaste|salam|bye|goodbye)\s*[!?.]*\s*$'),
+]
+
+
+def is_off_topic(topic: str) -> bool:
+    """Return True if the topic is clearly non-educational."""
+    lowered = topic.lower().strip()
+    return any(pat.search(lowered) for pat in _OFF_TOPIC_PATTERNS)
 
 
 class ValidationError(Exception):
@@ -70,6 +129,11 @@ class ContentRequestValidator:
             errors['topic'] = ['Topic cannot be empty']
         elif len(data['topic']) > 500:
             errors['topic'] = ['Topic must not exceed 500 characters']
+        elif is_off_topic(data['topic']):
+            errors['topic'] = [
+                'This topic does not appear to be related to academics or education. '
+                'Please enter a study-related topic.'
+            ]
         
         # Validate content_type
         if 'content_type' not in data:

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -32,6 +32,7 @@ import {
   type TeachingAssignment,
 } from "@/api/school";
 import { getScripts, type AnswerScript } from "@/api/evaluation";
+import NotificationBell from "@/components/curriculum/NotificationBell";
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -184,6 +185,9 @@ export default function TeacherDashboard() {
   const [recentScripts, setRecentScripts] = useState<AnswerScript[]>([]);
   const [loadingScripts, setLoadingScripts] = useState(true);
 
+  // Track whether the initial session fetch has completed
+  const initialSessionsLoaded = useRef(false);
+
   // Section picker modal state
   const [showSectionPicker, setShowSectionPicker] = useState(false);
   const [sections, setSections] = useState<UniqueSection[]>([]);
@@ -198,10 +202,12 @@ export default function TeacherDashboard() {
     }
   }, [isReady, isAuthenticated, user, router]);
 
-  // Fetch active sessions
+  // Fetch active sessions (silent after initial load)
   const fetchSessions = useCallback(async () => {
     try {
-      setLoadingSessions(true);
+      if (!initialSessionsLoaded.current) {
+        setLoadingSessions(true);
+      }
       const [waiting, active] = await Promise.all([
         listSessions("WAITING"),
         listSessions("ACTIVE"),
@@ -210,6 +216,7 @@ export default function TeacherDashboard() {
     } catch (err) {
       console.error("Failed to fetch sessions:", err);
     } finally {
+      initialSessionsLoaded.current = true;
       setLoadingSessions(false);
     }
   }, []);
@@ -363,13 +370,14 @@ export default function TeacherDashboard() {
               Classroom Monitoring
             </h1>
             <p className="text-sm text-primary">
-              {loadingSessions
+              {loadingSessions && !initialSessionsLoaded.current
                 ? "Loading sessions..."
                 : `Monitoring ${activeSessions.length} active session${activeSessions.length !== 1 ? "s" : ""} in real-time`}
             </p>
           </div>
 
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <button
               onClick={handleOpenSectionPicker}
               disabled={creatingSession || loadingSections}
@@ -447,8 +455,8 @@ export default function TeacherDashboard() {
           </h2>
 
           {loadingSessions ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
+              <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
             </div>
           ) : activeSessions.length === 0 ? (
             <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
@@ -617,8 +625,17 @@ export default function TeacherDashboard() {
           </div>
 
           {loadingScripts ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-background/50 border-b border-secondary/20 text-xs font-semibold text-muted uppercase tracking-wide">
+                <span className="col-span-3">Student</span>
+                <span className="col-span-3">Form / Rubric</span>
+                <span className="col-span-2">Status</span>
+                <span className="col-span-2">Score</span>
+                <span className="col-span-2">Submitted</span>
+              </div>
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
             </div>
           ) : recentScripts.length === 0 ? (
             <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
@@ -732,11 +749,11 @@ export default function TeacherDashboard() {
                                     : "text-red-600"
                             }`}
                           >
-                            {script.percentage.toFixed(1)}%
+                            {script.percentage.toFixed(2)}%
                           </p>
                           {script.total_score != null && (
                             <p className="text-[10px] text-muted">
-                              {script.total_score.toFixed(1)} marks
+                              {script.total_score.toFixed(2)} marks
                             </p>
                           )}
                         </div>

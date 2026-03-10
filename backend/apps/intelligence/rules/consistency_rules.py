@@ -60,6 +60,10 @@ class RuleBasedConsistencyAnalyzer(ConsistencyAnalyzer):
             fallback_value=0.5,
         )
     
+    def estimate(self, *args, **kwargs) -> EstimatorResult[float]:
+        """Satisfy BaseEstimator contract — delegates to analyze()."""
+        return self.analyze(*args, **kwargs)
+
     def analyze(
         self,
         user_id: UUID,

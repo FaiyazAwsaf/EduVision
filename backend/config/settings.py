@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     "apps.rubrics.apps.RubricsConfig",
     "apps.students.apps.StudentsConfig",
     "apps.whiteboard.apps.WhiteboardConfig",
+    "apps.curriculum.apps.CurriculumConfig",
+    "apps.analytics.apps.AnalyticsConfig",
 ]
 
 MIDDLEWARE = [
@@ -105,6 +107,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
+
+# Cache Configuration (Django cache API)
+# Used by websocket ticket auth and any cache.get/cache.set usage.
+# Prefer Redis when available so tickets work across workers/instances.
+REDIS_URL = os.environ.get("REDIS_URL", "")
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "eduvision-default-cache",
+        }
+    }
 
 # Channel Layers Configuration (Django Channels)
 # Set USE_REDIS_CHANNELS=true in Docker/production to use Redis for cross-worker WebSocket support.
@@ -196,7 +218,7 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Media files (User uploads)
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type

@@ -57,5 +57,9 @@ python manage.py migrate --noinput
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear || true
 
+# Start Celery worker in the background (needed for single-container deploys like Railway)
+echo "Starting Celery worker in the background..."
+celery -A config worker -l info --concurrency=2 &
+
 echo "Starting server..."
 exec "$@"
