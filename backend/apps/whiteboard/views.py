@@ -311,7 +311,12 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
             )
         
         serializer = WhiteboardSessionDetailSerializer(session)
-        return Response(serializer.data)
+        response_data = serializer.data
+        print(f"[Whiteboard API] Session {pk} retrieved by {user.username} (role: {user.role})")
+        print(f"[Whiteboard API] Latest state present: {response_data.get('latest_state') is not None}")
+        if response_data.get('latest_state'):
+            print(f"[Whiteboard API] Latest state version: {response_data['latest_state'].get('version')}")
+        return Response(response_data)
 
     @action(detail=True, methods=["post"], url_path="invite")
     def invite_student(self, request, pk=None):
@@ -404,19 +409,27 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
         
         serializer = WhiteboardStateCreateSerializer(data=request.data)
         if serializer.is_valid():
+            page_number = serializer.validated_data.get("page", 1)
+
             # Get next version number
-            latest_state = WhiteboardState.objects.filter(session=session).latest("version") if WhiteboardState.objects.filter(session=session).exists() else None
+            page_states = WhiteboardState.objects.filter(session=session, page=page_number)
+            latest_state = page_states.latest("version") if page_states.exists() else None
             next_version = (latest_state.version + 1) if latest_state else 0
             
             # Create new state
             state = WhiteboardState.objects.create(
                 session=session,
+                page=page_number,
                 version=next_version,
                 snapshot_json=serializer.validated_data["snapshot_json"],
                 latex_objects=serializer.validated_data.get("latex_objects", []),
                 created_by=user,
                 description=serializer.validated_data.get("description", "")
             )
+
+            if page_number > session.page_count:
+                session.page_count = page_number
+                session.save(update_fields=["page_count", "updated_at"])
             
             return Response(
                 WhiteboardStateSerializer(state).data,
@@ -442,7 +455,20 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        latest_state = WhiteboardState.objects.filter(session=session).latest("version") if WhiteboardState.objects.filter(session=session).exists() else None
+        page_param = request.query_params.get("page")
+        if page_param:
+            try:
+                page_number = int(page_param)
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid page query parameter."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            state_qs = WhiteboardState.objects.filter(session=session, page=page_number)
+        else:
+            state_qs = WhiteboardState.objects.filter(session=session)
+
+        latest_state = state_qs.latest("version") if state_qs.exists() else None
         
         if latest_state:
             serializer = WhiteboardStateSerializer(latest_state)
