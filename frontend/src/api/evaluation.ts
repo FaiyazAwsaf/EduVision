@@ -155,7 +155,7 @@ async function evaluationFetch<T>(
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
     const text = await response.text();
-    return (text ? (text as unknown as T) : (undefined as T));
+    return text ? (text as unknown as T) : (undefined as T);
   }
 
   const bodyText = await response.text();
@@ -199,7 +199,7 @@ async function authenticatedEvaluationFetch<T>(
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
     const text = await response.text();
-    return (text ? (text as unknown as T) : (undefined as T));
+    return text ? (text as unknown as T) : (undefined as T);
   }
 
   const bodyText = await response.text();
@@ -233,6 +233,7 @@ export async function getScript(id: string): Promise<AnswerScript> {
 
 export async function uploadScript(data: {
   rubric_set?: string;
+  student_user_id: string;
   student_name?: string;
   student_id?: string;
   roll_number?: string;
@@ -241,6 +242,7 @@ export async function uploadScript(data: {
 }): Promise<AnswerScript> {
   const formData = new FormData();
   if (data.rubric_set) formData.append("rubric_set", data.rubric_set);
+  formData.append("student_user_id", data.student_user_id);
   if (data.student_name) formData.append("student_name", data.student_name);
   if (data.student_id) formData.append("student_id", data.student_id);
   if (data.roll_number) formData.append("roll_number", data.roll_number);

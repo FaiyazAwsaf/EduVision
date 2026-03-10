@@ -146,6 +146,23 @@ export async function getSections(classId?: number): Promise<SchoolSection[]> {
   return Array.isArray(data) ? data : (data.results ?? []);
 }
 
+// ─── Students (general, with filters) ───────────────────────────────────────
+
+/** List student profiles, optionally filtered by section or class. */
+export async function getStudents(filters?: {
+  section?: number;
+  class_id?: number;
+}): Promise<StudentProfile[]> {
+  const params = new URLSearchParams();
+  if (filters?.section) params.set("section", String(filters.section));
+  if (filters?.class_id) params.set("class_id", String(filters.class_id));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const data = await schoolFetch<
+    StudentProfile[] | { results: StudentProfile[] }
+  >(`/students/${query}`);
+  return Array.isArray(data) ? data : (data.results ?? []);
+}
+
 // ─── Class Teacher Scoped ───────────────────────────────────────────────────
 
 export interface MyClassInfo {
@@ -164,7 +181,9 @@ export async function getMyClass(): Promise<MyClassInfo> {
 }
 
 /** List all students in the logged-in teacher's assigned section. */
-export async function getMyStudents(search?: string): Promise<StudentProfile[]> {
+export async function getMyStudents(
+  search?: string,
+): Promise<StudentProfile[]> {
   const params = search ? `?search=${encodeURIComponent(search)}` : "";
   return schoolFetch<StudentProfile[]>(`/my-students/${params}`);
 }

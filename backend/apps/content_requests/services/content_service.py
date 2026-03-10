@@ -67,6 +67,7 @@ class ContentRequestService:
         subject: Optional[str] = None,
         target_class_id=None,
         target_section_id=None,
+        curriculum_topic_id=None,
     ) -> ContentRequest:
         """
         Create a new content request.
@@ -122,6 +123,7 @@ class ContentRequestService:
             subject=subject or '',
             target_class_id=target_class_id,
             target_section_id=target_section_id,
+            curriculum_topic_id=curriculum_topic_id,
         )
         
         logger.info(

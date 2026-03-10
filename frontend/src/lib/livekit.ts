@@ -98,6 +98,7 @@ export class LiveKitManager {
   private audioElements: Map<string, HTMLAudioElement> = new Map();
 
   private connectionState: LiveKitConnectionState = "disconnected";
+  private audioOnly: boolean = false;
   private handlers: LiveKitEventHandlers = {};
 
   private audioError: string | null = null;
@@ -154,12 +155,13 @@ export class LiveKitManager {
     };
   }
 
-  async connect(wsUrl: string, token: string): Promise<void> {
+  async connect(wsUrl: string, token: string, audioOnly: boolean = false): Promise<void> {
     if (this.room) {
       await this.disconnect();
     }
 
-    console.log("[LiveKit] Connecting to room...");
+    this.audioOnly = audioOnly;
+    console.log(`[LiveKit] Connecting to room...${audioOnly ? " (audio only)" : ""}`);
     this.setConnectionState("connecting");
 
     try {
@@ -567,16 +569,18 @@ export class LiveKitManager {
       this.handlers.onError?.(err, "audio");
     }
 
-    // Video (optional - failure is non-critical)
-    try {
-      this.localVideoTrack = await createLocalVideoTrack({
-        resolution: { width: 1280, height: 720, frameRate: 30 },
-      });
-      await this.room.localParticipant.publishTrack(this.localVideoTrack);
-    } catch (error) {
-      const err = error as Error;
-      this.videoError = this.getMediaErrorMessage(err, "camera");
-      console.log("[LiveKit] Continuing with audio-only session");
+    // Video (optional - failure is non-critical, skipped in audioOnly mode)
+    if (!this.audioOnly) {
+      try {
+        this.localVideoTrack = await createLocalVideoTrack({
+          resolution: { width: 1280, height: 720, frameRate: 30 },
+        });
+        await this.room.localParticipant.publishTrack(this.localVideoTrack);
+      } catch (error) {
+        const err = error as Error;
+        this.videoError = this.getMediaErrorMessage(err, "camera");
+        console.log("[LiveKit] Continuing with audio-only session");
+      }
     }
 
     this.notifyLocalTracksChanged();

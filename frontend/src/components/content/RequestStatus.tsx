@@ -92,7 +92,10 @@ export default function RequestStatusComponent({
           }
         } else if (status.status === RequestStatus.FAILED) {
           setLifecycleState("failed");
-          setError("Content generation failed. Please try again.");
+          setError(
+            status.error_message ||
+              "Content generation failed. Please try again.",
+          );
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
           }

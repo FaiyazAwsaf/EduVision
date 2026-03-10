@@ -27,6 +27,8 @@ import {
   UserCog,
   ShieldCheck,
   PenTool,
+  BookOpenCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -72,6 +74,18 @@ const teacherNavItems: NavEntry[] = [
     ],
   },
   {
+    label: "Curriculum",
+    icon: BookOpenCheck,
+    children: [
+      { label: "Course Outlines", href: "/teacher/curriculum", icon: FileText },
+      {
+        label: "Difficulty Reports",
+        href: "/teacher/curriculum/difficulty",
+        icon: AlertTriangle,
+      },
+    ],
+  },
+  {
     label: "Metrics",
     icon: BarChart3,
     children: [
@@ -83,6 +97,7 @@ const teacherNavItems: NavEntry[] = [
 ];
 const studentNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
+  { label: "My Courses", href: "/student/courses", icon: BookOpenCheck },
   {
     label: "Content",
     icon: LibraryBig,
@@ -98,7 +113,6 @@ const studentNavItems: NavEntry[] = [
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
-
 
 const adminNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },

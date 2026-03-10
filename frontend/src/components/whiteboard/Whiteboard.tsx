@@ -12,11 +12,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WhiteboardCanvas, { WhiteboardCanvasHandle } from "./WhiteboardCanvas";
-import LatexRenderer, { LatexObject } from "./LatexRenderer";
+import { LatexObject } from "./LatexRenderer";
 import { convertHandwritingToLatex, evaluateHandwrittenEquation } from "@/api/geminiService";
 import { saveState, WhiteboardState } from "@/api/whiteboardService";
 import Toolbar, { Tool } from "./Toolbar";
+import VoiceChat from "./VoiceChat";
 import { useWebSocket, WebSocketMessage } from "../../hooks/useWebSocket";
+import MembersList, { Member } from "./MembersList";
 import * as fabric from "fabric";
 
 /**
@@ -37,7 +39,11 @@ export type WhiteboardProps = {
   userId: string;
   role: "teacher" | "student";
   initialState?: WhiteboardState | null;
+  initialPageStates?: WhiteboardState[];
+  pageCount?: number;
   onExitSession?: () => Promise<void> | void;
+  members?: Member[];
+  ownerId?: string;
 };
 
 /**
@@ -72,6 +78,24 @@ function isLatexIntersecting(
   );
 }
 
+function normalizeLatexPayload(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates = [obj.latex, obj.katex, obj.expression, obj.original_latex, obj.solution_latex];
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * main whiteboard component
  * coordinates drawing canvas, toolbar controls, and real-time collaboration
@@ -81,7 +105,11 @@ export default function Whiteboard({
   userId,
   role,
   initialState,
+  initialPageStates = [],
+  pageCount = 1,
   onExitSession,
+  members = [],
+  ownerId = "",
 }: WhiteboardProps) {
   // ============================================================
   // state management
@@ -92,7 +120,8 @@ export default function Whiteboard({
     { id: "page-1", canvasState: null, latexObjects: [] },
   ]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const pagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const pagesRef = useRef<PageData[]>([]);
   const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -114,6 +143,10 @@ export default function Whiteboard({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
+
   const selectionBounds = useMemo(
     () => selectionData?.bounds ?? null,
     [selectionData],
@@ -132,38 +165,67 @@ export default function Whiteboard({
   }, [latexObjects]);
 
   // ============================================================
-  // Load initial state from backend
+  // Load initial state(s) from backend
   // ============================================================
   useEffect(() => {
-    if (hasLoadedInitialState || !initialState || !isCanvasReady || !canvasRef.current) return;
-
-    console.log("[Whiteboard] Loading initial state from backend:", initialState);
+    if (hasLoadedInitialState || !isCanvasReady || !canvasRef.current) return;
 
     const loadInitialState = async () => {
       try {
-      const canvasHandle = canvasRef.current;
-      if (!canvasHandle) return;
+        const canvasHandle = canvasRef.current;
+        if (!canvasHandle) return;
 
-      // Load canvas state
-      const snapshot =
-        typeof initialState.snapshot_json === "string"
-          ? JSON.parse(initialState.snapshot_json)
-          : initialState.snapshot_json;
+        const seedStates = initialPageStates.length > 0
+          ? initialPageStates
+          : initialState
+            ? [initialState]
+            : [];
 
-      if (snapshot && typeof snapshot === "object") {
-        await canvasHandle.loadFromJSON(snapshot);
-        setPages([
-          {
-            id: "page-1",
-            canvasState: snapshot,
-            latexObjects: initialState.latex_objects || [],
-          },
-        ]);
-        setLatexObjects(initialState.latex_objects || []);
-        console.log("[Whiteboard] Initial state restored successfully");
-      }
+        const highestSeedPage = seedStates.reduce((max, s) => {
+          const page = Number(s.page || 1);
+          return page > max ? page : max;
+        }, 1);
 
-      setHasLoadedInitialState(true);
+        const resolvedPageCount = Math.max(pageCount, highestSeedPage, 1);
+        const seededPages: PageData[] = Array.from({ length: resolvedPageCount }, (_, idx) => ({
+          id: `page-${idx + 1}`,
+          canvasState: null,
+          latexObjects: [],
+        }));
+
+        for (const state of seedStates) {
+          const targetPage = Math.max(Number(state.page || 1), 1);
+          const targetIndex = targetPage - 1;
+          if (!seededPages[targetIndex]) continue;
+
+          const snapshot =
+            typeof state.snapshot_json === "string"
+              ? JSON.parse(state.snapshot_json)
+              : state.snapshot_json;
+
+          seededPages[targetIndex] = {
+            ...seededPages[targetIndex],
+            canvasState: snapshot && typeof snapshot === "object" ? snapshot : null,
+            latexObjects: state.latex_objects || [],
+          };
+        }
+
+        setPages(seededPages);
+        setCurrentPageIndex(0);
+        setLatexObjects(seededPages[0]?.latexObjects || []);
+
+        if (seededPages[0]?.canvasState) {
+          await canvasHandle.loadFromJSON(seededPages[0].canvasState);
+        } else {
+          canvasHandle.clearCanvas();
+        }
+
+        console.log("[Whiteboard] Initial page states restored", {
+          pageCount: seededPages.length,
+          seededPages: seedStates.length,
+        });
+
+        setHasLoadedInitialState(true);
       } catch (error) {
         console.error("[Whiteboard] Error loading initial state:", error);
         setHasLoadedInitialState(true);
@@ -171,7 +233,7 @@ export default function Whiteboard({
     };
 
     void loadInitialState();
-  }, [initialState, hasLoadedInitialState, isCanvasReady]);
+  }, [initialState, initialPageStates, pageCount, hasLoadedInitialState, isCanvasReady]);
 
   // ============================================================
   // Periodic state saving to backend
@@ -184,11 +246,19 @@ export default function Whiteboard({
       const currentCanvasState = canvasRef.current.exportToJSON();
       if (!currentCanvasState) return;
 
+      const currentPage = currentPageIndex + 1;
       const stateToSave = {
+        page: currentPage,
         snapshot_json: currentCanvasState,
         latex_objects: latexObjectsRef.current,
         description: `Auto-saved at ${new Date().toLocaleTimeString()}`,
       };
+
+      const hasCanvasObjects = Array.isArray(currentCanvasState?.objects) && currentCanvasState.objects.length > 0;
+      const hasLatexObjects = (latexObjectsRef.current?.length || 0) > 0;
+      if (!hasCanvasObjects && !hasLatexObjects) {
+        return;
+      }
 
       const stateKey = JSON.stringify(stateToSave);
 
@@ -206,6 +276,7 @@ export default function Whiteboard({
         stateToSave.snapshot_json,
         stateToSave.latex_objects,
         stateToSave.description,
+        stateToSave.page,
       )
         .then(() => {
           console.log("[Whiteboard] State saved successfully");
@@ -216,7 +287,7 @@ export default function Whiteboard({
     }, 30000); // Save every 30 seconds
 
     return () => clearInterval(saveIntervalId);
-  }, [sessionId]);
+  }, [sessionId, currentPageIndex]);
 
   const updateHistoryAvailability = useCallback(() => {
     const { undo, redo } = historyRef.current;
@@ -263,6 +334,9 @@ export default function Whiteboard({
 
       switch (message.type) {
         case "canvas_event":
+          if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
+            break;
+          }
           // handle remote drawing events
           if (message.data?.pathData) {
             console.log(
@@ -279,6 +353,9 @@ export default function Whiteboard({
           break;
 
         case "clear_canvas":
+          if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
+            break;
+          }
           // remote clear event
           console.log("[Whiteboard] Remote clear canvas");
           canvasRef.current?.clearCanvas();
@@ -286,12 +363,20 @@ export default function Whiteboard({
 
         case "lock_state":
           // update drawing lock state for students
+          console.log(
+            "[Whiteboard] Received lock_state message:",
+            message.data?.isLocked,
+            "Role:",
+            role,
+          );
           if (role === "student") {
             setIsDrawingLocked(Boolean(message.data?.isLocked));
             console.log(
-              "[Whiteboard] Drawing lock state:",
+              "[Whiteboard] Student - Drawing lock state updated to:",
               message.data?.isLocked,
             );
+          } else {
+            console.log("[Whiteboard] Teacher - Ignoring lock_state (teacher can always draw)");
           }
           break;
 
@@ -304,11 +389,24 @@ export default function Whiteboard({
           break;
 
         case "latex_added":
-          if (message.data?.latexObject) {
-            setLatexObjects((prev) => [
-              ...prev,
-              message.data!.latexObject as LatexObject,
-            ]);
+          if (Number(message.data?.page || 1) !== currentPageIndex + 1) {
+            break;
+          }
+          {
+            const payload = message.data;
+            const latex = normalizeLatexPayload(message.data?.latex);
+            if (!latex || !payload) {
+              break;
+            }
+            // Add remote LaTeX directly to canvas
+            void canvasRef.current?.addLatexAsImage(
+              latex,
+              (payload.left as number) || 0,
+              (payload.top as number) || 0,
+              (payload.fontSize as number) || 24,
+              (payload.width as number) || undefined,
+              (payload.height as number) || undefined,
+            );
             console.log("[Whiteboard] Remote LaTeX object added");
           }
           break;
@@ -317,7 +415,7 @@ export default function Whiteboard({
           console.warn("[Whiteboard] Unknown message type:", message.type);
       }
     },
-    [role],
+    [role, currentPageIndex],
   );
 
   /**
@@ -357,109 +455,85 @@ export default function Whiteboard({
   }, [currentPageIndex, latexObjects]);
 
   /**
-   * load a specific page
+   * navigate to previous page
    */
-  const loadPage = useCallback(
-    (pageIndex: number) => {
-      if (pageIndex === currentPageIndex) return;
-      if (pageIndex < 0 || pageIndex >= pages.length) return;
+  const handlePreviousPage = useCallback(async () => {
+    if (currentPageIndex === 0 || isTransitioning) return;
 
-      // save current page
-      saveCurrentPage();
+    setIsTransitioning(true);
+    saveCurrentPage();
 
-      // load new page
-      const page = pages[pageIndex];
-      setCurrentPageIndex(pageIndex);
-      setLatexObjects(page.latexObjects);
+    const targetPageIndex = currentPageIndex - 1;
+    setCurrentPageIndex(targetPageIndex);
 
-      // load canvas state
-      if (page.canvasState) {
-        canvasRef.current?.loadFromJSON(page.canvasState);
+    // Load previous page canvas
+    const canvas = canvasRef.current;
+    const targetPage = pagesRef.current[targetPageIndex];
+    
+    if (canvas && targetPage) {
+      if (targetPage.canvasState) {
+        await canvas.loadFromJSON(targetPage.canvasState);
       } else {
-        canvasRef.current?.clearCanvas();
+        canvas.clearCanvas();
       }
-
-      console.log(`[Whiteboard] Loaded page ${pageIndex + 1}/${pages.length}`);
-    },
-    [currentPageIndex, pages, saveCurrentPage],
-  );
-
-  // Track if page creation has been triggered at this scroll position to prevent duplicates
-  const pageCreationThresholdRef = useRef<number>(-1);
-
-  /**
-   * handle scroll to load pages and create new ones when needed
-   * stricter logic: only create new page when scrolled close to bottom (~95%)
-   */
-  useEffect(() => {
-    const container = pagesContainerRef.current;
-    if (!container) {
-      console.log("[Whiteboard] Pages container ref not available");
-      return;
+      setLatexObjects(targetPage.latexObjects || []);
     }
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      console.log("[Whiteboard] Scroll event fired:", { scrollTop, scrollHeight, clientHeight });
-      const pageHeight = clientHeight;
-      
-      // Calculate how close to bottom we are (0 = top, 1 = bottom)
-      // If scrollHeight <= clientHeight (no scroll needed), consider it as being at bottom
-      const scrollProgress = scrollHeight > clientHeight 
-        ? (scrollTop + clientHeight) / scrollHeight 
-        : 1.0;  // At max scroll when content fits in viewport
-
-      // Load page based on scroll position
-      const visiblePageIndex = Math.floor(scrollTop / pageHeight);
-      if (
-        visiblePageIndex !== currentPageIndex &&
-        visiblePageIndex >= 0 &&
-        visiblePageIndex < pages.length
-      ) {
-        console.log(
-          `[Whiteboard] ✓ Scrolled to page ${visiblePageIndex + 1}/${pages.length}`
-        );
-        loadPage(visiblePageIndex);
-      }
-
-      // Only create new page when scrolled to 95% and there's room for more
-      // AND only once per threshold (prevent multiple creations)
-      if (
-        scrollProgress > 0.95 &&
-        pages.length < 100 &&
-        pageCreationThresholdRef.current < scrollProgress
-      ) {
-        pageCreationThresholdRef.current = scrollProgress;
-        const newPageId = `page-${Date.now()}`;
-        setPages((prev) => {
-          console.log("[Whiteboard] ✓ Auto-created new page", prev.length + 1);
-          return [
-            ...prev,
-            { id: newPageId, canvasState: null, latexObjects: [] },
-          ];
-        });
-      }
-
-      // Reset threshold when scrolling back up (below 90%)
-      if (scrollProgress < 0.9) {
-        pageCreationThresholdRef.current = -1;
-      }
-
-      console.log("[Whiteboard] Scroll progress:", {
-        scrollProgress: scrollProgress.toFixed(2),
-        visiblePageIndex,
-        pagesLength: pages.length,
-      });
-    };
-
-    container.addEventListener("scroll", handleScroll);
-    console.log("[Whiteboard] Scroll event listener attached to pages container");
+    console.log(`[Whiteboard] Navigated to page ${targetPageIndex + 1}/${pages.length}`);
     
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      console.log("[Whiteboard] Scroll event listener removed");
-    };
-  }, [currentPageIndex, pages.length, loadPage]);
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [currentPageIndex, pages.length, saveCurrentPage, isTransitioning]);
+
+  /**
+   * navigate to next page (create if needed)
+   */
+  const handleNextPage = useCallback(async () => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    saveCurrentPage();
+
+    // Create new page if on last page
+    if (currentPageIndex === pages.length - 1 && pages.length < 100) {
+      const newPageNumber = pages.length + 1;
+      const newPage: PageData = {
+        id: `page-${newPageNumber}`,
+        canvasState: null,
+        latexObjects: [],
+      };
+
+      setPages((prev) => [...prev, newPage]);
+      setCurrentPageIndex(newPageNumber - 1);
+      setLatexObjects([]);
+
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.clearCanvas();
+      }
+
+      console.log(`[Whiteboard] Created and navigated to new page ${newPageNumber}`);
+    } else if (currentPageIndex < pages.length - 1) {
+      // Navigate to existing next page
+      const targetPageIndex = currentPageIndex + 1;
+      setCurrentPageIndex(targetPageIndex);
+
+      const canvas = canvasRef.current;
+      const targetPage = pagesRef.current[targetPageIndex];
+      
+      if (canvas && targetPage) {
+        if (targetPage.canvasState) {
+          await canvas.loadFromJSON(targetPage.canvasState);
+        } else {
+          canvas.clearCanvas();
+        }
+        setLatexObjects(targetPage.latexObjects || []);
+      }
+
+      console.log(`[Whiteboard] Navigated to page ${targetPageIndex + 1}/${pages.length}`);
+    }
+    
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [currentPageIndex, pages.length, saveCurrentPage, isTransitioning]);
 
   /**
    * update current page when latex objects change
@@ -480,6 +554,16 @@ export default function Whiteboard({
   // ============================================================
 
   const canDraw = role === "teacher" || !isDrawingLocked;
+
+  // Debug logging for drawing permission changes
+  useEffect(() => {
+    console.log("[Whiteboard] canDraw updated:", {
+      canDraw,
+      role,
+      isDrawingLocked,
+      reason: role === "teacher" ? "teacher (always allowed)" : isDrawingLocked ? "locked" : "unlocked"
+    });
+  }, [canDraw, role, isDrawingLocked]);
 
   useEffect(() => {
     if (currentTool !== "select") {
@@ -536,6 +620,7 @@ export default function Whiteboard({
           currentCanvasState,
           latexObjectsRef.current,
           `Saved on exit at ${new Date().toLocaleTimeString()}`,
+          currentPageIndex + 1,
         );
       }
 
@@ -545,7 +630,7 @@ export default function Whiteboard({
     } finally {
       setIsExiting(false);
     }
-  }, [isExiting, onExitSession, sessionId]);
+  }, [isExiting, onExitSession, sessionId, currentPageIndex]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -619,39 +704,46 @@ export default function Whiteboard({
       try {
         // call gemini
         const result = await convertHandwritingToLatex(imageData, "math");
+        const normalizedLatex = normalizeLatexPayload(result.latex);
 
-        if (result.success && result.latex) {
+        if (result.success && normalizedLatex) {
           // clear the hand-drawn content in the selected region
           canvasRef.current?.clearRegion(bounds);
 
-          // create new Latex object positioned at the selection
-          const newLatexObject: LatexObject = {
-            id: `latex-${Date.now()}`,
-            latex: result.latex,
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
-          };
+          // Calculate font size based on bounds
+          const fontSize = Math.min(Math.max(bounds.height * 0.6, 16), 48);
 
-          // add to state
-          const nextLatex = [...latexObjectsRef.current, newLatexObject];
-          setLatexObjects(nextLatex);
+          // Add LaTeX directly to canvas as selectable image
+          await canvasRef.current?.addLatexAsImage(
+            normalizedLatex,
+            bounds.left,
+            bounds.top,
+            fontSize,
+            bounds.width,
+            bounds.height,
+          );
 
           // broadcast to other users
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: newLatexObject },
+              data: {
+                latex: normalizedLatex,
+                left: bounds.left,
+                top: bounds.top,
+                fontSize: fontSize,
+                width: bounds.width,
+                height: bounds.height,
+                page: currentPageIndex + 1,
+              },
             });
           }
 
-          captureHistory(nextLatex);
+          captureHistory();
 
           console.log(
             "[Whiteboard] LaTeX conversion successful:",
-            result.latex,
+            normalizedLatex,
           );
         } else {
           console.error("[Whiteboard] LaTeX conversion failed:", result.error);
@@ -663,7 +755,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     },
-    [websocket],
+    [websocket, currentPageIndex, captureHistory],
   );
 
   const handleSelectionReady = useCallback(
@@ -697,60 +789,47 @@ export default function Whiteboard({
       try {
         // Call evaluate endpoint
         const result = await evaluateHandwrittenEquation(imageData);
+        const originalLatex = normalizeLatexPayload(result.original_latex);
+        const solutionLatex = normalizeLatexPayload(result.solution_latex);
 
-        if (result.success && result.original_latex && result.solution_latex) {
+        if (result.success && solutionLatex) {
           // Clear the hand-drawn content in the selected region
           canvasRef.current?.clearRegion(bounds);
 
-          // Create original equation object on the left
-          const originalLatexObject: LatexObject = {
-            id: `latex-${Date.now()}`,
-            latex: result.original_latex,
-            left: bounds.left,
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
-          };
+          // Calculate font size
+          const fontSize = Math.min(Math.max(bounds.height * 0.6, 16), 48);
 
-          // Create solution object to the right with some spacing
-          const solutionLatexObject: LatexObject = {
-            id: `latex-${Date.now() + 1}`,
-            latex: result.solution_latex,
-            left: bounds.left + bounds.width + 30, // 30px spacing from original
-            top: bounds.top,
-            width: bounds.width,
-            height: bounds.height,
-            fontSize: Math.min(Math.max(bounds.height * 0.6, 16), 48),
-          };
-
-          // Add both to state
-          const nextLatex = [
-            ...latexObjectsRef.current,
-            originalLatexObject,
-            solutionLatexObject,
-          ];
-          setLatexObjects(nextLatex);
+          // Add only the evaluated solution at the selected area
+          await canvasRef.current?.addLatexAsImage(
+            solutionLatex,
+            bounds.left,
+            bounds.top,
+            fontSize,
+            bounds.width,
+            bounds.height,
+          );
 
           // Broadcast to other users
           if (websocket.isConnected) {
             websocket.sendMessage({
               type: "latex_added",
-              data: { latexObject: originalLatexObject },
-            });
-            websocket.sendMessage({
-              type: "latex_added",
-              data: { latexObject: solutionLatexObject },
+              data: {
+                latex: solutionLatex,
+                left: bounds.left,
+                top: bounds.top,
+                fontSize: fontSize,
+                width: bounds.width,
+                height: bounds.height,
+                page: currentPageIndex + 1,
+              },
             });
           }
 
-          captureHistory(nextLatex);
+          captureHistory();
 
           console.log(
             "[Whiteboard] Equation evaluation successful:",
-            result.original_latex,
-            "=",
-            result.solution_latex,
+            solutionLatex,
           );
         } else {
           console.error("[Whiteboard] Equation evaluation failed:", result.error);
@@ -762,7 +841,7 @@ export default function Whiteboard({
         setCurrentTool("pen");
       }
     })();
-  }, [selectionData, websocket]);
+  }, [selectionData, websocket, currentPageIndex, captureHistory]);
 
   /**
    * handle local drawing events
@@ -771,6 +850,7 @@ export default function Whiteboard({
   const handlePathCreated = useCallback(
     (path: CanvasPath) => {
       if (isApplyingHistoryRef.current) return;
+      if (currentTool === "select") return;
       const pathData = path.toObject();
 
       if (!websocket.isConnected) {
@@ -785,13 +865,13 @@ export default function Whiteboard({
 
       websocket.sendMessage({
         type: "canvas_event",
-        data: { pathData },
+        data: { pathData, page: currentPageIndex + 1 },
       });
 
       console.log("[Whiteboard] Broadcasted path to peers");
       captureHistory();
     },
-    [websocket, canDraw, captureHistory],
+    [websocket, canDraw, captureHistory, currentPageIndex, currentTool],
   );
 
   /**
@@ -832,11 +912,11 @@ export default function Whiteboard({
 
     websocket.sendMessage({
       type: "clear_canvas",
-      data: {},
+      data: { page: currentPageIndex + 1 },
     });
 
     console.log("[Whiteboard] Cleared canvas");
-  }, [role, selectionBounds, websocket]);
+  }, [role, selectionBounds, websocket, currentPageIndex]);
 
   const handleLatexObjectClick = useCallback(
     (id: string) => {
@@ -879,14 +959,18 @@ export default function Whiteboard({
     setIsDrawingLocked((prevLocked) => {
       const newLockState = !prevLocked;
 
+      console.log("[Whiteboard] Teacher toggling lock to:", newLockState);
+
       if (websocket.isConnected) {
         websocket.sendMessage({
           type: "lock_state",
           data: { isLocked: newLockState },
         });
+        console.log("[Whiteboard] Lock state broadcasted via WebSocket");
+      } else {
+        console.warn("[Whiteboard] Cannot broadcast lock state - WebSocket not connected");
       }
 
-      console.log("[Whiteboard] Drawing lock:", newLockState);
       return newLockState;
     });
   }, [role, websocket]);
@@ -897,6 +981,9 @@ export default function Whiteboard({
 
   return (
     <div className="w-screen h-screen bg-[#1a1a1a] flex overflow-hidden">
+      {/* Voice chat bar */}
+      <VoiceChat sessionId={sessionId} userId={userId} role={role} />
+
       {/* toolbar - sidebar on left */}
       <div className="h-full overflow-y-auto">
         <Toolbar
@@ -921,87 +1008,54 @@ export default function Whiteboard({
           onClear={handleClear}
           onExport={handleExport}
           onToggleLock={role === "teacher" ? handleToggleLock : undefined}
+          onSaveExit={() => void handleSaveAndExit()}
+          isExiting={isExiting}
+          currentPageIndex={currentPageIndex}
+          totalPages={pages.length}
+          onPreviousPage={handlePreviousPage}
+          onNextPage={handleNextPage}
+          isTransitioning={isTransitioning}
         />
       </div>
 
-      <button
-        onClick={() => void handleSaveAndExit()}
-        disabled={isExiting}
-        style={{
-          position: "fixed",
-          top: "20px",
-          right: "20px",
-          zIndex: 1200,
-          padding: "10px 20px",
-          backgroundColor: "#ff6b6b",
-          color: "#fff",
-          border: "none",
-          borderRadius: "6px",
-          cursor: isExiting ? "not-allowed" : "pointer",
-          fontSize: "14px",
-          fontWeight: "600",
-          opacity: isExiting ? 0.7 : 1,
-        }}
-      >
-        {isExiting ? "Saving..." : "Save & Exit"}
-      </button>
+      {/* Members List */}
+      <MembersList
+        members={members}
+        ownerId={ownerId}
+        isConnected={websocket.isConnected}
+      />
 
-      {/* pages container - scrollable */}
-      <div
-        ref={pagesContainerRef}
-        className="flex-1 h-screen overflow-y-auto scroll-smooth"
-        style={{ 
-          scrollBehavior: "smooth", 
-          touchAction: "auto"
-        }}
-      >
-        {/* pages */}
-        {pages.map((page, index) => (
-          <div
-            key={page.id}
-            className="w-full relative bg-white"
-            style={{ 
-              height: "100vh",
-              position: "relative",
-              flexShrink: 0
+      {/* current page - single page display with transitions */}
+      <div className="flex-1 h-screen relative overflow-hidden">
+        <div
+          className={`w-full h-full bg-white relative transition-opacity duration-300 ${
+            isTransitioning ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <WhiteboardCanvas
+            ref={canvasRef}
+            isDrawingEnabled={canDraw}
+            penColor={penColor}
+            strokeWidth={strokeWidth}
+            eraserWidth={eraserWidth}
+            tool={currentTool}
+            onPathCreated={handlePathCreated}
+            onSelectionReady={handleSelectionReady}
+            onObjectModified={captureHistory}
+            onCanvasReady={() => {
+              setIsCanvasReady(true);
+              historyRef.current.undo = [];
+              historyRef.current.redo = [];
+              lastSnapshotRef.current = "";
+              captureHistory([]);
             }}
-          >
-            {index === currentPageIndex && (
-              <>
-                <WhiteboardCanvas
-                  ref={canvasRef}
-                  isDrawingEnabled={canDraw}
-                  penColor={penColor}
-                  strokeWidth={strokeWidth}
-                  eraserWidth={eraserWidth}
-                  tool={currentTool}
-                  onPathCreated={handlePathCreated}
-                  onSelectionReady={handleSelectionReady}
-                  onCanvasReady={() => {
-                    setIsCanvasReady(true);
-                    historyRef.current.undo = [];
-                    historyRef.current.redo = [];
-                    lastSnapshotRef.current = "";
-                    captureHistory([]);
-                  }}
-                />
+          />
 
-                {/* latex overlay for current page */}
-                <div style={{ pointerEvents: 'auto' }}>
-                  <LatexRenderer
-                    objects={latexObjects}
-                    onObjectClick={handleLatexObjectClick}
-                  />
-                </div>
-
-                {/* page number indicator */}
-                <div className="fixed top-20 right-2.5 text-gray-600 text-sm z-[900] font-medium">
-                  {index + 1}/{pages.length}
-                </div>
-              </>
-            )}
+          {/* page number indicator */}
+          <div className="fixed top-20 right-2.5 text-gray-600 text-sm z-[900] font-medium">
+            {currentPageIndex + 1}/{pages.length}
           </div>
-        ))}
+        </div>
       </div>
 
       {/* converting indicator - positioned near selection */}
@@ -1031,13 +1085,6 @@ export default function Whiteboard({
           </span>
         </div>
       )}
-
-      {/* session info */}
-      <div className="fixed top-2.5 right-2.5 bg-slate-700 bg-opacity-90 text-slate-100 px-3 py-2 rounded text-xs z-[900] flex flex-col gap-1">
-        <div>Session: {sessionId}</div>
-        <div>Role: {role}</div>
-        <div>Status: {websocket.connectionState}</div>
-      </div>
     </div>
   );
 }

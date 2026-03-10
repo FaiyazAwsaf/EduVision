@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "apps.rubrics.apps.RubricsConfig",
     "apps.students.apps.StudentsConfig",
     "apps.whiteboard.apps.WhiteboardConfig",
+    "apps.curriculum.apps.CurriculumConfig",
     "apps.analytics.apps.AnalyticsConfig",
 ]
 
@@ -108,15 +109,42 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+# Cache Configuration (Django cache API)
+# Used by websocket ticket auth and any cache.get/cache.set usage.
+# Prefer Redis when available so tickets work across workers/instances.
+REDIS_URL = os.environ.get("REDIS_URL", "")
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "eduvision-default-cache",
+        }
+    }
+
 # Channel Layers Configuration (Django Channels)
-# Set USE_REDIS_CHANNELS=true in Docker/production to use Redis for cross-worker WebSocket support.
-# Local dev defaults to in-memory (sufficient for single-process runserver).
-if os.environ.get("USE_REDIS_CHANNELS", "").lower() in ("true", "1", "yes"):
+# Uses Redis when REDIS_URL is set (production/Railway) or USE_REDIS_CHANNELS=true.
+# Explicitly set USE_REDIS_CHANNELS=false to force in-memory (useful when local
+# Redis is too old, e.g. Windows Redis 3.x which lacks BZPOPMIN).
+_redis_channels_env = os.environ.get("USE_REDIS_CHANNELS", "").lower()
+_use_redis_channels = (
+    _redis_channels_env in ("true", "1", "yes")
+    or (bool(REDIS_URL) and _redis_channels_env not in ("false", "0", "no"))
+)
+
+if _use_redis_channels:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
             "CONFIG": {
-                "hosts": [os.environ.get("REDIS_URL", "redis://localhost:6379/0")],
+                "hosts": [REDIS_URL or "redis://localhost:6379/0"],
             },
         },
     }

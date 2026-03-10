@@ -21,6 +21,7 @@ export interface UseLiveKitOptions {
   token: string | null;
   role: "teacher" | "student";
   autoConnect?: boolean;
+  audioOnly?: boolean;
 }
 
 export interface UseLiveKitReturn {
@@ -80,6 +81,7 @@ export function useLiveKit({
   token,
   role,
   autoConnect = true,
+  audioOnly = false,
 }: UseLiveKitOptions): UseLiveKitReturn {
   const [connectionState, setConnectionState] =
     useState<LiveKitConnectionState>("disconnected");
@@ -126,12 +128,12 @@ export function useLiveKit({
     const manager = getManager();
     try {
       setError(null);
-      await manager.connect(wsUrl, token);
+      await manager.connect(wsUrl, token, audioOnly);
       hasConnectedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
     }
-  }, [wsUrl, token, getManager]);
+  }, [wsUrl, token, audioOnly, getManager]);
 
   const disconnect = useCallback(async () => {
     const manager = managerRef.current;

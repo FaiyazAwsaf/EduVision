@@ -8,6 +8,7 @@ from .models import (
 from apps.rubrics.models import RubricSet, QuestionRubric
 from apps.rubrics.serializers import RubricSetSerializer
 from apps.students.models import TeacherSubjectAssignment, StudentProfile
+from apps.authentication.models import CustomUser
 
 
 class ScriptPageSerializer(serializers.ModelSerializer):
@@ -197,9 +198,13 @@ class AnswerScriptCreateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=True
     )
+    student_user_id = serializers.UUIDField(
+        write_only=True, required=True,
+        help_text="UUID of the student user to link this script to.",
+    )
     roll_number = serializers.CharField(
         write_only=True, required=False, allow_blank=True,
-        help_text="Student roll number to look up and link the student automatically.",
+        help_text="Student roll number (legacy, optional if student_user_id is provided).",
     )
     
     class Meta:
@@ -208,6 +213,7 @@ class AnswerScriptCreateSerializer(serializers.ModelSerializer):
             "rubric_set",
             "student_name",
             "student_id",
+            "student_user_id",
             "roll_number",
             "submission_form",
             "pages",
@@ -219,14 +225,38 @@ class AnswerScriptCreateSerializer(serializers.ModelSerializer):
         if len(value) == 0:
             raise serializers.ValidationError("At least one page is required.")
         return value
+
+    def validate_student_user_id(self, value):
+        try:
+            user = CustomUser.objects.get(id=value, role="student")
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("Student not found.")
+        return value
     
     def create(self, validated_data):
         pages_data = validated_data.pop("pages")
+        student_user_id = validated_data.pop("student_user_id", None)
         roll_number = validated_data.pop("roll_number", None)
         request = self.context.get("request")
 
-        # Look up student by roll number if provided
-        if roll_number:
+        # Link student by user ID (primary method)
+        if student_user_id:
+            try:
+                student_user = CustomUser.objects.get(id=student_user_id, role="student")
+                validated_data["student_user"] = student_user
+                validated_data.setdefault(
+                    "student_name",
+                    f"{student_user.first_name} {student_user.last_name}",
+                )
+                try:
+                    profile = student_user.student_profile
+                    validated_data.setdefault("student_id", profile.roll_number)
+                except StudentProfile.DoesNotExist:
+                    pass
+            except CustomUser.DoesNotExist:
+                pass
+        elif roll_number:
+            # Fallback: look up by roll number
             try:
                 student_profile = StudentProfile.objects.select_related("user").get(
                     roll_number=roll_number
@@ -238,7 +268,7 @@ class AnswerScriptCreateSerializer(serializers.ModelSerializer):
                 )
                 validated_data.setdefault("student_id", roll_number)
             except StudentProfile.DoesNotExist:
-                pass  # Leave student_user as null
+                pass
 
         # Record who uploaded
         if request and request.user and request.user.is_authenticated:

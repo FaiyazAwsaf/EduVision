@@ -22,10 +22,11 @@ class WhiteboardStateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WhiteboardState
-        fields = ["id", "version", "snapshot_json", "latex_objects", "created_by", "created_at", "description"]
-        read_only_fields = ["id", "version", "created_by", "created_at"]
+        fields = ["id", "page", "version", "snapshot_json", "latex_objects", "created_by", "created_at", "description"]
+        read_only_fields = ["id", "page", "version", "created_by", "created_at"]
 
 class WhiteboardStateCreateSerializer(serializers.Serializer):
+    page = serializers.IntegerField(required=False, min_value=1, default=1)
     snapshot_json = serializers.JSONField()
     latex_objects = serializers.ListField(child=serializers.JSONField(), default=list, required=False)
     description = serializers.CharField(max_length=255, required=False, allow_blank=True)
@@ -37,7 +38,7 @@ class WhiteboardSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WhiteboardSession
-        fields = ['id', 'name', 'owner', 'created_at', 'updated_at', 'is_active', 'metadata', 'members']
+        fields = ['id', 'name', 'owner', 'created_at', 'updated_at', 'is_active', 'page_count', 'metadata', 'members']
         read_only_fields = ['id', 'created_at', 'updated_at', 'owner', 'members']
 
     def create(self, validated_data):
@@ -46,13 +47,26 @@ class WhiteboardSessionSerializer(serializers.ModelSerializer):
     
 class WhiteboardSessionDetailSerializer(WhiteboardSessionSerializer):
     latest_state = serializers.SerializerMethodField()
+    page_states = serializers.SerializerMethodField()
 
     class Meta(WhiteboardSessionSerializer.Meta):
-        fields = WhiteboardSessionSerializer.Meta.fields + ['latest_state']
-        read_only_fields = WhiteboardSessionSerializer.Meta.read_only_fields + ['latest_state']
+        fields = WhiteboardSessionSerializer.Meta.fields + ['latest_state', 'page_states']
+        read_only_fields = WhiteboardSessionSerializer.Meta.read_only_fields + ['latest_state', 'page_states']
 
     def get_latest_state(self, obj):
         latest = WhiteboardState.objects.filter(session=obj).order_by('-version').first()
         if latest:
             return WhiteboardStateSerializer(latest).data
         return None
+
+    def get_page_states(self, obj):
+        latest_by_page = []
+        for page_number in range(1, (obj.page_count or 1) + 1):
+            latest = (
+                WhiteboardState.objects.filter(session=obj, page=page_number)
+                .order_by('-version')
+                .first()
+            )
+            if latest:
+                latest_by_page.append(WhiteboardStateSerializer(latest).data)
+        return latest_by_page

@@ -26,6 +26,7 @@ export interface WhiteboardSession {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  page_count: number;
   metadata: Record<string, any>;
   members: Array<{
     id: string;
@@ -43,6 +44,7 @@ export interface WhiteboardSession {
 
 export interface WhiteboardSessionDetail extends WhiteboardSession {
   latest_state?: WhiteboardState;
+  page_states?: WhiteboardState[];
 }
 
 export interface SessionInviteResult {
@@ -64,6 +66,7 @@ export interface SessionInviteResult {
 
 export interface WhiteboardState {
   id: string;
+  page: number;
   version: number;
   snapshot_json: any;
   latex_objects: any[];
@@ -306,10 +309,11 @@ export async function getUserSessions(): Promise<WhiteboardSession[]> {
  */
 export async function getLatestState(
   sessionId: string,
+  page?: number,
 ): Promise<WhiteboardState | null> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/latest-state/`,
+      `${API_BASE_URL}/whiteboard/sessions/${sessionId}/latest-state/${page ? `?page=${page}` : ""}`,
       {
         method: "GET",
         credentials: "include",
@@ -341,6 +345,7 @@ export async function saveState(
   snapshotJson: any,
   latexObjects: any[] = [],
   description?: string,
+  page: number = 1,
 ): Promise<WhiteboardState> {
   try {
     const response = await fetch(
@@ -350,6 +355,7 @@ export async function saveState(
         credentials: "include",
         headers: getAuthHeaders(),
         body: JSON.stringify({
+          page,
           snapshot_json: snapshotJson,
           latex_objects: latexObjects,
           description: description || "",
@@ -367,4 +373,32 @@ export async function saveState(
     console.error("[Whiteboard API] Error saving state:", error);
     throw error;
   }
+}
+
+export interface WhiteboardVoiceToken {
+  livekit_token: string;
+  livekit_ws_url: string;
+  room_id: string;
+}
+
+/**
+ * Get a LiveKit voice token for a whiteboard session
+ */
+export async function getVoiceToken(
+  sessionId: string,
+): Promise<WhiteboardVoiceToken> {
+  const response = await fetch(
+    `${API_BASE_URL}/whiteboard/sessions/${sessionId}/voice-token/`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get voice token: ${response.statusText}`);
+  }
+
+  return await response.json();
 }

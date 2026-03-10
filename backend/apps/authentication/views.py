@@ -16,9 +16,14 @@ from .serializers import (
 from .models import CustomUser
 from secrets import randbelow
 from uuid import uuid4
+import os
 
 
 WS_TICKET_TTL_SECONDS = 60
+
+# Cookie settings: use SameSite=None + Secure in production (cross-origin deploy)
+_SECURE_COOKIES = not os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
+_SAMESITE_POLICY = "None" if _SECURE_COOKIES else "Lax"
 
 # Create your views here.
 class RegisterView(APIView):
@@ -68,8 +73,8 @@ class LoginView(APIView):
                 key="refresh_token",
                 value=str(refresh),
                 httponly=True,
-                secure=False,
-                samesite="Lax",
+                secure=_SECURE_COOKIES,
+                samesite=_SAMESITE_POLICY,
                 path="/"
             )
 
@@ -108,8 +113,8 @@ class RefreshView(APIView):
                 key="refresh_token",
                 value=new_refresh,
                 httponly=True,
-                secure=False,
-                samesite="Lax",
+                secure=_SECURE_COOKIES,
+                samesite=_SAMESITE_POLICY,
                 path="/"
             )
             
@@ -151,7 +156,7 @@ class WebSocketTicketView(APIView):
         cache_key = f"ws_ticket:{ticket}"
         cache.set(cache_key, str(request.user.id), timeout=WS_TICKET_TTL_SECONDS)
 
-        return Response(
+        response = Response(
             {
                 "message": "WebSocket ticket created",
                 "payload": {
@@ -162,6 +167,8 @@ class WebSocketTicketView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+        return response
+
 class LogoutView(APIView):
     def post(self, request):
         try:
@@ -169,7 +176,11 @@ class LogoutView(APIView):
                 {"message": "Logged out successfully"},
                 status=status.HTTP_200_OK,
             )
-            response.delete_cookie("refresh_token", path="/")
+            response.delete_cookie(
+                "refresh_token",
+                path="/",
+                samesite=_SAMESITE_POLICY,
+            )
             return response
         except Exception as e:
             return self.handle_exception(e)

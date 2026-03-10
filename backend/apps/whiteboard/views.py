@@ -2,6 +2,8 @@ import os
 import json
 import base64
 import google.generativeai as genai
+from django.db import IntegrityError
+from django.db.models import Max
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -21,6 +23,7 @@ from .serializers import (
     SessionMemberSerializer,
 )
 from apps.authentication.models import CustomUser
+from apps.tutoring.utils import generate_livekit_token, get_livekit_ws_url
 
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY_2"))
 
@@ -311,7 +314,12 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
             )
         
         serializer = WhiteboardSessionDetailSerializer(session)
-        return Response(serializer.data)
+        response_data = serializer.data
+        print(f"[Whiteboard API] Session {pk} retrieved by {user.username} (role: {user.role})")
+        print(f"[Whiteboard API] Latest state present: {response_data.get('latest_state') is not None}")
+        if response_data.get('latest_state'):
+            print(f"[Whiteboard API] Latest state version: {response_data['latest_state'].get('version')}")
+        return Response(response_data)
 
     @action(detail=True, methods=["post"], url_path="invite")
     def invite_student(self, request, pk=None):
@@ -404,19 +412,39 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
         
         serializer = WhiteboardStateCreateSerializer(data=request.data)
         if serializer.is_valid():
-            # Get next version number
-            latest_state = WhiteboardState.objects.filter(session=session).latest("version") if WhiteboardState.objects.filter(session=session).exists() else None
-            next_version = (latest_state.version + 1) if latest_state else 0
-            
-            # Create new state
-            state = WhiteboardState.objects.create(
-                session=session,
-                version=next_version,
-                snapshot_json=serializer.validated_data["snapshot_json"],
-                latex_objects=serializer.validated_data.get("latex_objects", []),
-                created_by=user,
-                description=serializer.validated_data.get("description", "")
-            )
+            page_number = serializer.validated_data.get("page", 1)
+
+            # Retry loop to handle concurrent saves racing on the same version
+            for attempt in range(3):
+                max_version = (
+                    WhiteboardState.objects
+                    .filter(session=session, page=page_number)
+                    .aggregate(max_v=Max("version"))["max_v"]
+                )
+                next_version = (max_version + 1) if max_version is not None else 0
+
+                try:
+                    state = WhiteboardState.objects.create(
+                        session=session,
+                        page=page_number,
+                        version=next_version,
+                        snapshot_json=serializer.validated_data["snapshot_json"],
+                        latex_objects=serializer.validated_data.get("latex_objects", []),
+                        created_by=user,
+                        description=serializer.validated_data.get("description", "")
+                    )
+                    break
+                except IntegrityError:
+                    if attempt == 2:
+                        return Response(
+                            {"detail": "Could not save state, please try again."},
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    continue
+
+            if page_number > session.page_count:
+                session.page_count = page_number
+                session.save(update_fields=["page_count", "updated_at"])
             
             return Response(
                 WhiteboardStateSerializer(state).data,
@@ -442,7 +470,20 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        latest_state = WhiteboardState.objects.filter(session=session).latest("version") if WhiteboardState.objects.filter(session=session).exists() else None
+        page_param = request.query_params.get("page")
+        if page_param:
+            try:
+                page_number = int(page_param)
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid page query parameter."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            state_qs = WhiteboardState.objects.filter(session=session, page=page_number)
+        else:
+            state_qs = WhiteboardState.objects.filter(session=session)
+
+        latest_state = state_qs.latest("version") if state_qs.exists() else None
         
         if latest_state:
             serializer = WhiteboardStateSerializer(latest_state)
@@ -452,3 +493,41 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
                 {"detail": "No state found for this session."},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    @action(detail=True, methods=["post"], url_path="voice-token")
+    def voice_token(self, request, pk=None):
+        """Generate a LiveKit token for voice chat in this whiteboard session."""
+        user = request.user
+        session = get_object_or_404(WhiteboardSession, id=pk)
+
+        is_owner = session.owner_id == user.id
+        is_member = SessionMember.objects.filter(
+            session=session, user=user
+        ).exists()
+
+        if not (is_owner or is_member):
+            return Response(
+                {"detail": "You don't have access to this session."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        ws_url = get_livekit_ws_url()
+        if not ws_url:
+            return Response(
+                {"detail": "Voice chat is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        room_id = f"whiteboard-voice-{pk}"
+        token = generate_livekit_token(
+            room_id=room_id,
+            user_id=str(user.id),
+            user_name=user.get_full_name() or user.username,
+            role=user.role.upper(),
+        )
+
+        return Response({
+            "livekit_token": token,
+            "livekit_ws_url": ws_url,
+            "room_id": room_id,
+        })

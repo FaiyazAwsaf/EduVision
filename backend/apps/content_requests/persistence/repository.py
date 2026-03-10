@@ -81,7 +81,7 @@ class ContentRequestRepository:
             updated_at=domain.updated_at,
         )
     
-    def create(self, request: ContentRequest, user=None, subject='', target_class_id=None, target_section_id=None) -> ContentRequest:
+    def create(self, request: ContentRequest, user=None, subject='', target_class_id=None, target_section_id=None, curriculum_topic_id=None) -> ContentRequest:
         """
         Persist a new content request.
         
@@ -114,6 +114,8 @@ class ContentRequestRepository:
             model.target_class_id = target_class_id
         if target_section_id:
             model.target_section_id = target_section_id
+        if curriculum_topic_id:
+            model.curriculum_topic_id = curriculum_topic_id
             
         # Auto-suggest difficulty from target class if not set
         if target_class_id and not request.difficulty:

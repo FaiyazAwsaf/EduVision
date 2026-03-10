@@ -159,6 +159,23 @@ class ContentRequestModel(models.Model):
         help_text=_('Original request this was regenerated from')
     )
     
+    # Failure reason (set by background task when processing fails)
+    error_message = models.TextField(
+        null=True,
+        blank=True,
+        help_text=_('Human-readable error message when request fails')
+    )
+
+    # Optional link to a curriculum topic (for syllabus-aligned generation)
+    curriculum_topic = models.ForeignKey(
+        'curriculum.CourseTopic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='content_requests',
+        help_text=_('Curriculum topic this content is generated for')
+    )
+    
     class Meta:
         db_table = 'content_requests'
         verbose_name = _('Content Request')
