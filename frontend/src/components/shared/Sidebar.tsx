@@ -71,8 +71,14 @@ const teacherNavItems: NavEntry[] = [
       { label: "Content History", href: "/content/history", icon: History },
     ],
   },
-  { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
-  { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
+  {
+    label: "Metrics",
+    icon: BarChart3,
+    children: [
+      { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
+      { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
+    ],
+  },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
 const studentNavItems: NavEntry[] = [
