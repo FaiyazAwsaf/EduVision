@@ -301,8 +301,7 @@ function WhiteboardContent() {
             </div>
           </main>
         </div>
-      </>
-    );
+      </div>);
   }
 
   if (showPicker && !session) {
