@@ -37,14 +37,17 @@ class RubricSetViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     
     def get_queryset(self):
-        """Return rubric sets, optionally filtered by state and/or subject."""
+        """Return rubric sets, optionally filtered by state, subject, and mine."""
         qs = RubricSet.objects.all().prefetch_related('questions', 'versions')
         state = self.request.query_params.get('state')
         subject = self.request.query_params.get('subject')
+        mine = self.request.query_params.get('mine')
         if state:
             qs = qs.filter(state=state)
         if subject:
             qs = qs.filter(subject__iexact=subject)
+        if mine and self.request.user.is_authenticated:
+            qs = qs.filter(created_by=self.request.user.id)
         return qs
     
     def get_serializer_class(self):
@@ -56,8 +59,8 @@ class RubricSetViewSet(viewsets.ModelViewSet):
         return RubricSetSerializer
     
     def perform_create(self, serializer):
-        """Save the rubric set. Ownership (created_by) is handled in the serializer."""
-        serializer.save()
+        """Save the rubric set with the current user as owner."""
+        serializer.save(created_by=self.request.user.id)
     
     def update(self, request, *args, **kwargs):
         """Update a rubric set. All rubric sets can be updated."""

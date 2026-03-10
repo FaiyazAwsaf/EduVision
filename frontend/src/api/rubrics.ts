@@ -102,10 +102,12 @@ export async function getRubricSet(id: string): Promise<RubricSet> {
 export async function listRubricSets(filters?: {
   state?: string;
   subject?: string;
+  mine?: boolean;
 }): Promise<RubricSetListItem[]> {
   const params = new URLSearchParams();
   if (filters?.state) params.append("state", filters.state);
   if (filters?.subject) params.append("subject", filters.subject);
+  if (filters?.mine) params.append("mine", "1");
 
   const query = params.toString() ? `?${params.toString()}` : "";
   const data = await rubricsFetch<
