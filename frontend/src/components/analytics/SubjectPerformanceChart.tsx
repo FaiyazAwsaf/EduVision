@@ -61,7 +61,10 @@ export default function SubjectPerformanceChart({ data, onBarClick }: Props) {
           dataKey="avg_percentage"
           radius={[6, 6, 0, 0]}
           name="Avg Score"
-          onClick={(entry) => onBarClick?.(entry.subject as string)}
+          onClick={(_, index) => {
+            const subject = data[index]?.subject;
+            if (subject) onBarClick?.(subject);
+          }}
           style={onBarClick ? { cursor: "pointer" } : undefined}
         >
           {data.map((_, i) => (
