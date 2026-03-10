@@ -2,6 +2,8 @@ import os
 import json
 import base64
 import google.generativeai as genai
+from django.db import IntegrityError
+from django.db.models import Max
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -412,21 +414,33 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             page_number = serializer.validated_data.get("page", 1)
 
-            # Get next version number
-            page_states = WhiteboardState.objects.filter(session=session, page=page_number)
-            latest_state = page_states.latest("version") if page_states.exists() else None
-            next_version = (latest_state.version + 1) if latest_state else 0
-            
-            # Create new state
-            state = WhiteboardState.objects.create(
-                session=session,
-                page=page_number,
-                version=next_version,
-                snapshot_json=serializer.validated_data["snapshot_json"],
-                latex_objects=serializer.validated_data.get("latex_objects", []),
-                created_by=user,
-                description=serializer.validated_data.get("description", "")
-            )
+            # Retry loop to handle concurrent saves racing on the same version
+            for attempt in range(3):
+                max_version = (
+                    WhiteboardState.objects
+                    .filter(session=session, page=page_number)
+                    .aggregate(max_v=Max("version"))["max_v"]
+                )
+                next_version = (max_version + 1) if max_version is not None else 0
+
+                try:
+                    state = WhiteboardState.objects.create(
+                        session=session,
+                        page=page_number,
+                        version=next_version,
+                        snapshot_json=serializer.validated_data["snapshot_json"],
+                        latex_objects=serializer.validated_data.get("latex_objects", []),
+                        created_by=user,
+                        description=serializer.validated_data.get("description", "")
+                    )
+                    break
+                except IntegrityError:
+                    if attempt == 2:
+                        return Response(
+                            {"detail": "Could not save state, please try again."},
+                            status=status.HTTP_409_CONFLICT,
+                        )
+                    continue
 
             if page_number > session.page_count:
                 session.page_count = page_number
