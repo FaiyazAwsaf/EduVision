@@ -1,7 +1,5 @@
-import json
 import logging
-
-import google.generativeai as genai
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -12,58 +10,72 @@ class OverallFeedbackService:
         self.safety_settings = safety_settings
 
     def generate_overall_feedback(self, script, evaluations: list) -> dict:
-        eval_summary = "\n".join([
-            f"Q{e.question_rubric.question_number}: {e.total_marks_awarded}/{e.question_rubric.max_marks} marks"
-            for e in evaluations
-        ])
-
-        feedback_prompt = f"""
-        Based on the following question-by-question evaluation results,
-        generate an overall feedback summary for the student.
-
-        EVALUATION RESULTS:
-        {eval_summary}
-
-        Total Score: {script.total_score}/{script.rubric_set.total_marks}
-        Percentage: {script.percentage}%
-
-        Individual Question Feedback:
-        {json.dumps([{
-            'question': e.question_rubric.question_number,
-            'feedback': e.overall_feedback,
-            'mistakes': e.mistakes_identified
-        } for e in evaluations], indent=2)}
-
-        Generate a JSON response with:
-        {{
-            "feedback_summary": "2-3 paragraph overall assessment",
-            "strengths": ["list", "of", "strengths"],
-            "areas_for_improvement": ["list", "of", "areas", "to", "improve"],
-            "study_recommendations": ["specific", "topics", "to", "review"]
-        }}
-
-        Be encouraging but honest. Focus on constructive feedback.
-
-        Respond ONLY with valid JSON, no additional text.
-        """
-
         try:
-            response = self.model.generate_content(
-                feedback_prompt,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                    temperature=0.4,
-                ),
-                safety_settings=self.safety_settings,
-            )
+            total_awarded = sum(float(e.total_marks_awarded or 0) for e in evaluations)
+            total_max = sum(float(e.question_rubric.max_marks or 0) for e in evaluations)
+            full_marks = total_max > 0 and total_awarded >= (total_max - 1e-6)
 
-            return json.loads(response.text)
+            all_mistakes = []
+            for evaluation in evaluations:
+                mistakes = evaluation.mistakes_identified or []
+                if isinstance(mistakes, list):
+                    all_mistakes.extend(mistakes)
 
+            compact_mistakes = self._unique_compact_items(all_mistakes, max_items=5)
+
+            if full_marks:
+                return {
+                    "feedback_summary": "All questions answered perfectly.",
+                    "strengths": ["Accurate and complete answers."],
+                    "areas_for_improvement": [],
+                    "study_recommendations": [],
+                }
+
+            if compact_mistakes:
+                return {
+                    "feedback_summary": f"Main fixes: {'; '.join(compact_mistakes)}.",
+                    "strengths": [],
+                    "areas_for_improvement": compact_mistakes,
+                    "study_recommendations": [],
+                }
+
+            return {
+                "feedback_summary": "Some marks were lost. Review each question briefly.",
+                "strengths": [],
+                "areas_for_improvement": ["Check method, calculations, and final answers."],
+                "study_recommendations": [],
+            }
         except Exception as e:
             logger.error(f"Error generating overall feedback: {str(e)}")
             return {
-                "feedback_summary": "Unable to generate detailed feedback.",
+                "feedback_summary": "Unable to generate feedback.",
                 "strengths": [],
                 "areas_for_improvement": [],
                 "study_recommendations": [],
             }
+
+    def _compact_item(self, text: str, max_words: int = 10) -> str:
+        cleaned = " ".join(str(text or "").strip().split())
+        if not cleaned:
+            return ""
+        first_sentence = re.split(r"(?<=[.!?])\s+", cleaned)[0]
+        words = first_sentence.split()
+        if len(words) <= max_words:
+            return first_sentence
+        return " ".join(words[:max_words])
+
+    def _unique_compact_items(self, items: list, max_items: int = 5) -> list:
+        seen = set()
+        output = []
+        for item in items:
+            compact = self._compact_item(item)
+            if not compact:
+                continue
+            key = compact.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            output.append(compact)
+            if len(output) >= max_items:
+                break
+        return output
