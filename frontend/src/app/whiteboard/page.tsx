@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Whiteboard from "@/components/whiteboard/Whiteboard";
 import Sidebar from "@/components/shared/Sidebar";
+import { getUserData } from "@/api/auth";
 import {
   getCurrentUser,
   getSession,
@@ -51,10 +52,16 @@ function WhiteboardContent() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteSessionId, setInviteSessionId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<WhiteboardSession | null>(null);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [preInviteStudentIds, setPreInviteStudentIds] = useState<string[]>([]);
   const [isInviting, setIsInviting] = useState(false);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
   const canCreateSession = user?.role === "teacher";
+  const cachedRole = getUserData()?.role;
+  const shellRole: "teacher" | "student" | "admin" = user?.role ?? cachedRole ?? "teacher";
 
   useEffect(() => {
     const initializeWhiteboard = async () => {
@@ -71,6 +78,9 @@ function WhiteboardContent() {
         if (sessionId) {
           console.log("[Whiteboard] Loading session from URL:", sessionId);
           const loadedSession = await getSession(sessionId);
+          console.log("[Whiteboard Page] Loaded session for user:", currentUser.username, "role:", currentUser.role);
+          console.log("[Whiteboard Page] Session data:", loadedSession);
+          console.log("[Whiteboard Page] Latest state:", loadedSession.latest_state);
           setSession(loadedSession);
           setShowPicker(false);
           setIsLoading(false);
@@ -81,6 +91,17 @@ function WhiteboardContent() {
         console.log("[Whiteboard] Loading user sessions...");
         const userSessions = await getUserSessions();
         setSessions(userSessions);
+
+        // Load students early so teachers can pre-invite while creating a session.
+        if (currentUser.role === "teacher") {
+          try {
+            const fetchedStudents = await getMyStudents();
+            setStudents(fetchedStudents);
+          } catch (studentErr) {
+            console.warn("[Whiteboard] Failed to preload students for pre-invite:", studentErr);
+          }
+        }
+
         setIsLoading(false);
       } catch (err) {
         const errorMessage =
@@ -107,6 +128,9 @@ function WhiteboardContent() {
   const handleSelectSession = async (selectedSession: WhiteboardSession) => {
     try {
       const loadedSession = await getSession(selectedSession.id);
+      console.log("[Whiteboard Page] Loaded session for user:", user?.username, "role:", user?.role);
+      console.log("[Whiteboard Page] Session data:", loadedSession);
+      console.log("[Whiteboard Page] Latest state:", loadedSession.latest_state);
       setSession(loadedSession);
       setShowPicker(false);
       window.history.replaceState(null, "", `?session=${selectedSession.id}`);
@@ -129,8 +153,19 @@ function WhiteboardContent() {
         newSessionName.trim() ||
         `Whiteboard - ${new Date().toLocaleString()}`;
       const newSession = await createSession(name);
+
+      if (preInviteStudentIds.length > 0) {
+        try {
+          await inviteStudentsToSession(newSession.id, preInviteStudentIds);
+        } catch (inviteErr) {
+          console.error("[Whiteboard] Session created but pre-invite failed:", inviteErr);
+          setError("Session created, but inviting selected students failed.");
+        }
+      }
+
       setSession(newSession);
       setShowPicker(false);
+      setPreInviteStudentIds([]);
       window.history.replaceState(null, "", `?session=${newSession.id}`);
     } catch (err) {
       const errorMessage =
@@ -182,6 +217,14 @@ function WhiteboardContent() {
     );
   };
 
+  const togglePreInviteSelection = (studentId: string) => {
+    setPreInviteStudentIds((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId],
+    );
+  };
+
   const handleConfirmInvite = async () => {
     if (!inviteSessionId) return;
     if (selectedStudentIds.length === 0) {
@@ -207,47 +250,56 @@ function WhiteboardContent() {
     }
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
+  const handleDeleteSession = (targetSession: WhiteboardSession) => {
     if (!canCreateSession) {
       setError("Only teachers can delete sessions.");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Delete this session permanently? This cannot be undone.",
-    );
-    if (!confirmed) return;
+    setSessionToDelete(targetSession);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
 
     try {
-      await deleteSession(sessionId);
+      setIsDeletingSession(true);
+      await deleteSession(sessionToDelete.id);
       const updatedSessions = await getUserSessions();
       setSessions(updatedSessions);
+      setShowDeleteModal(false);
+      setSessionToDelete(null);
       setError(null);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to delete session";
       setError(errorMessage);
+    } finally {
+      setIsDeletingSession(false);
     }
   };
 
   if (isLoading) {
     return (
-      <>
-        {user && (
-          <Sidebar role={user.role === "student" ? "student" : "teacher"} />
-        )}
-        <div className={user ? "ml-60" : ""}>
-          <div className="min-h-screen flex items-center justify-center bg-background">
-            <div className="text-center">
-              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
-              <p className="text-sm font-medium text-primary-dark">
-                Initializing whiteboard...
-              </p>
-              <p className="text-xs text-muted mt-1">
-                Authenticating and loading sessions
+      <div className="min-h-screen bg-background">
+        <Sidebar role={shellRole} />
+        <div className="ml-60 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+            <div className="px-8 py-4">
+              <h1 className="text-2xl font-bold text-primary-dark">Whiteboard</h1>
+              <p className="text-sm text-primary">
+                Create or open collaborative whiteboard sessions
               </p>
             </div>
-          </div>
+          </header>
+          <main className="flex-1 flex items-center justify-center">
+            <div className="text-center flex flex-col items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-dark" />
+              <div className="text-lg text-primary-dark font-semibold mt-4">Initializing whiteboard...</div>
+              <div className="text-sm text-muted mt-2">Authenticating and loading sessions</div>
+            </div>
+          </main>
         </div>
       </>
     );
@@ -256,21 +308,68 @@ function WhiteboardContent() {
   if (showPicker && !session) {
     const sidebarRole = user?.role === "student" ? "student" : "teacher";
     return (
-      <>
-        <Sidebar role={sidebarRole} />
-        <div className="ml-60 min-h-screen bg-background">
-          {/* Header */}
+      <div className="min-h-screen bg-background">
+        <Sidebar role={user?.role === "student" ? "student" : "teacher"} />
+        <div className="ml-60 flex flex-col min-h-screen">
           <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
-            <div className="flex items-center justify-between px-8 py-4">
-              <div>
-                <h1 className="text-2xl font-bold text-primary-dark">
-                  Whiteboard
-                </h1>
-                <p className="text-sm text-primary">
-                  Welcome, {user?.username}
-                </p>
-              </div>
-              {canCreateSession && (
+            <div className="px-8 py-4">
+              <h1 className="text-2xl font-bold text-primary-dark">Whiteboard</h1>
+              <p className="text-sm text-primary">
+                Create or open collaborative whiteboard sessions
+              </p>
+            </div>
+          </header>
+
+          <main className="flex-1 px-8 py-8">
+            <div style={{ maxWidth: "980px" }}>
+
+          {error && (
+            <div
+              style={{
+                backgroundColor: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "8px",
+                padding: "16px",
+                marginBottom: "30px",
+                color: "#dc2626",
+                fontSize: "14px",
+              }}
+            >
+              ⚠️ {error}
+            </div>
+          )}
+
+          {canCreateSession && (
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #9acbd0",
+                borderRadius: "8px",
+                padding: "24px",
+                marginBottom: "40px",
+                boxShadow: "0 4px 12px rgba(0, 106, 113, 0.08)",
+              }}
+            >
+              <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "1.2em" }}>
+                Create New Session
+              </h2>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <input
+                  type="text"
+                  placeholder="Session name (optional)"
+                  value={newSessionName}
+                  onChange={(e) => setNewSessionName(e.target.value)}
+                  disabled={isCreatingSession}
+                  style={{
+                    flex: 1,
+                    padding: "10px 14px",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #9acbd0",
+                    borderRadius: "6px",
+                    color: "#006a71",
+                    fontSize: "14px",
+                  }}
+                />
                 <button
                   onClick={handleCreateSession}
                   disabled={isCreatingSession}
@@ -283,77 +382,162 @@ function WhiteboardContent() {
                   )}
                   {isCreatingSession ? "Creating..." : "New Session"}
                 </button>
-              )}
-            </div>
-          </header>
-
-          <main className="px-8 py-6 max-w-6xl">
-            {/* Error banner */}
-            {error && (
-              <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700">{error}</p>
               </div>
-            )}
 
-            {/* Create Session card */}
-            {canCreateSession && (
-              <div className="bg-white rounded-2xl border border-secondary/30 shadow-sm p-6 mb-8">
-                <h2 className="text-base font-semibold text-primary-dark mb-4">
-                  Create New Session
-                </h2>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="Session name (optional)"
-                    value={newSessionName}
-                    onChange={(e) => setNewSessionName(e.target.value)}
-                    disabled={isCreatingSession}
-                    className="flex-1 px-4 py-2.5 bg-background border border-secondary/40 rounded-lg text-sm text-primary-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:opacity-50"
-                  />
-                  <button
-                    onClick={handleCreateSession}
-                    disabled={isCreatingSession}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "12px",
+                  border: "1px solid #9acbd0",
+                  borderRadius: "6px",
+                  backgroundColor: "#f8fbfb",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                    fontSize: "13px",
+                    color: "#006a71",
+                  }}
+                >
+                  <span>Invite students before creating</span>
+                  <span style={{ color: "#48A6A7", fontWeight: 600 }}>
+                    Selected: {preInviteStudentIds.length}
+                  </span>
+                </div>
+
+                {students.length === 0 ? (
+                  <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                    No students available to pre-invite.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      maxHeight: "150px",
+                      overflowY: "auto",
+                      display: "grid",
+                      gap: "6px",
+                    }}
                   >
-                    {isCreatingSession ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                    {isCreatingSession ? "Creating..." : "Create"}
-                  </button>
-                </div>
+                    {students.map((student) => (
+                      <label
+                        key={student.user_id}
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          alignItems: "center",
+                          fontSize: "13px",
+                          color: "#006a71",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={preInviteStudentIds.includes(student.user_id)}
+                          onChange={() => togglePreInviteSelection(student.user_id)}
+                          disabled={isCreatingSession}
+                        />
+                        <span>
+                          {student.username} ({student.email})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Sessions list */}
-            <div>
-              <h2 className="text-lg font-semibold text-primary-dark mb-4">
-                Your Sessions ({sessions.length})
-              </h2>
-
-              {sessions.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-secondary/30 p-10 text-center shadow-sm">
-                  <PenTool className="w-10 h-10 text-secondary mx-auto mb-3" />
-                  <p className="text-sm font-medium text-primary-dark mb-1">
-                    {canCreateSession
-                      ? "No sessions yet"
-                      : "No sessions shared with you"}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {canCreateSession
-                      ? "Create a new session to get started!"
-                      : "Whiteboard sessions shared with you will appear here."}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {sessions.map((sess) => (
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "1.2em" }}>
+              Your Sessions ({sessions.length})
+            </h2>
+            {sessions.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #9acbd0",
+                  borderRadius: "8px",
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "#6b7280",
+                }}
+              >
+                {canCreateSession
+                  ? "No sessions yet. Create one to get started!"
+                  : "No whiteboard sessions shared with you yet."}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                  gap: "16px",
+                }}
+              >
+                {sessions.map((sess) => (
+                  <div
+                    key={sess.id}
+                    onClick={() => handleSelectSession(sess)}
+                    style={{
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #9acbd0",
+                      borderRadius: "8px",
+                      padding: "20px",
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                      boxShadow: "0 3px 10px rgba(0, 106, 113, 0.06)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f8fbfb";
+                      e.currentTarget.style.borderColor = "#48A6A7";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#ffffff";
+                      e.currentTarget.style.borderColor = "#9acbd0";
+                    }}
+                  >
+                    <h3
+                      style={{
+                        margin: "0 0 8px 0",
+                        fontSize: "1.1em",
+                        color: "#48A6A7",
+                      }}
+                    >
+                      {sess.name}
+                    </h3>
+                    <p
+                      style={{
+                        margin: "0 0 12px 0",
+                        fontSize: "12px",
+                        color: "#6b7280",
+                      }}
+                    >
+                      Owner: {sess.owner.username}
+                    </p>
                     <div
-                      key={sess.id}
-                      onClick={() => handleSelectSession(sess)}
-                      className="bg-white rounded-2xl border border-secondary/30 p-5 shadow-sm hover:shadow-md hover:border-primary/40 transition-all cursor-pointer group"
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "12px",
+                        color: "#6b7280",
+                      }}
+                    >
+                      <span>Members: {sess.members?.length || 0}</span>
+                      <span>
+                        Updated:{" "}
+                        {new Date(sess.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        paddingTop: "12px",
+                        borderTop: "1px solid #d1e5e8",
+                      }}
                     >
                       {/* Session name */}
                       <h3 className="text-sm font-semibold text-primary mb-1 truncate group-hover:text-primary-dark transition-colors">
@@ -391,7 +575,7 @@ function WhiteboardContent() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              void handleDeleteSession(sess.id);
+                              handleDeleteSession(sess);
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-500 text-xs font-medium hover:bg-red-50 transition-colors"
                           >
@@ -409,30 +593,46 @@ function WhiteboardContent() {
                         </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
             </div>
-          </main>
 
-          <InviteStudentsModal
-            open={showInviteModal}
-            students={students}
-            selectedStudentIds={selectedStudentIds}
-            onToggle={toggleStudentSelection}
-            onClose={() => {
-              setShowInviteModal(false);
-              setInviteSessionId(null);
-              setSelectedStudentIds([]);
-              setError(null);
-            }}
-            onConfirm={() => {
-              void handleConfirmInvite();
-            }}
-            isInviting={isInviting}
-          />
+            <InviteStudentsModal
+              open={showInviteModal}
+              students={students}
+              selectedStudentIds={selectedStudentIds}
+              onToggle={toggleStudentSelection}
+              onClose={() => {
+                setShowInviteModal(false);
+                setInviteSessionId(null);
+                setSelectedStudentIds([]);
+                setError(null);
+              }}
+              onConfirm={() => {
+                void handleConfirmInvite();
+              }}
+              isInviting={isInviting}
+            />
+
+            <DeleteSessionModal
+              open={showDeleteModal}
+              sessionName={sessionToDelete?.name ?? ""}
+              onClose={() => {
+                if (isDeletingSession) return;
+                setShowDeleteModal(false);
+                setSessionToDelete(null);
+              }}
+              onConfirm={() => {
+                void handleConfirmDeleteSession();
+              }}
+              isDeleting={isDeletingSession}
+            />
+          </main>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -444,30 +644,149 @@ function WhiteboardContent() {
           userId={user.id}
           role={user.role}
           initialState={session.latest_state}
+          initialPageStates={session.page_states || []}
+          pageCount={session.page_count || 1}
           onExitSession={handleExitSession}
+          members={session.members}
+          ownerId={session.owner.id}
         />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#f2efe7",
+        color: "#006a71",
+      }}
+    >
+      Initializing...
     </div>
   );
 }
 
 export default function WhiteboardPage() {
+  const cachedRole = getUserData()?.role;
+  const fallbackRole: "teacher" | "student" | "admin" = cachedRole ?? "teacher";
+
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <div className="min-h-screen bg-background">
+          <Sidebar role={fallbackRole} />
+          <div className="ml-60 flex flex-col min-h-screen">
+            <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
+              <div className="px-8 py-4">
+                <h1 className="text-2xl font-bold text-primary-dark">Whiteboard</h1>
+                <p className="text-sm text-primary">Create or open collaborative whiteboard sessions</p>
+              </div>
+            </header>
+            <main className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-dark" />
+                <div className="text-primary-dark mt-4">Loading...</div>
+              </div>
+            </main>
+          </div>
         </div>
       }
     >
       <WhiteboardContent />
     </Suspense>
+  );
+}
+
+function DeleteSessionModal({
+  open,
+  sessionName,
+  onClose,
+  onConfirm,
+  isDeleting,
+}: {
+  open: boolean;
+  sessionName: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        zIndex: 2100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "460px",
+          backgroundColor: "#1f1f1f",
+          border: "1px solid #5e2b2b",
+          borderRadius: "10px",
+          padding: "20px",
+          color: "#fff",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ marginTop: 0, marginBottom: "12px", color: "#ff9a9a" }}>
+          Delete Session
+        </h3>
+        <p style={{ margin: "0 0 8px 0", color: "#e7e7e7" }}>
+          Are you sure you want to delete <strong>{sessionName}</strong>?
+        </p>
+        <p style={{ margin: "0 0 16px 0", fontSize: "13px", color: "#9aa0a6" }}>
+          This action is permanent and cannot be undone.
+        </p>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button
+            onClick={onClose}
+            disabled={isDeleting}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "6px",
+              border: "1px solid #666",
+              backgroundColor: "transparent",
+              color: "#ddd",
+              cursor: isDeleting ? "not-allowed" : "pointer",
+              opacity: isDeleting ? 0.7 : 1,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "6px",
+              border: "none",
+              backgroundColor: "#ff6b6b",
+              color: "#fff",
+              cursor: isDeleting ? "not-allowed" : "pointer",
+              opacity: isDeleting ? 0.7 : 1,
+            }}
+          >
+            {isDeleting ? "Deleting..." : "Delete Session"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -19,6 +19,7 @@ class WhiteboardSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    page_count = models.PositiveIntegerField(default=1)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -70,6 +71,7 @@ class WhiteboardState(models.Model):
         on_delete=models.CASCADE,
         related_name="states"
     )
+    page = models.PositiveIntegerField(default=1, db_index=True)
     version = models.IntegerField(default=0)
     snapshot_json = models.JSONField()
     latex_objects = models.JSONField(default=dict)
@@ -83,11 +85,11 @@ class WhiteboardState(models.Model):
 
     class Meta:
         db_table = "whiteboard_states"
-        unique_together = [["session", "version"]]
-        ordering = ["-version"]
+        unique_together = [["session", "page", "version"]]
+        ordering = ["page", "-version"]
 
     def __str__(self):
-        return f"{self.session.name} - Version {self.version}"
+        return f"{self.session.name} - Page {self.page} - Version {self.version}"
     
     @classmethod
     def get_latest(cls, session):
