@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import google.generativeai as genai
 
@@ -72,12 +73,19 @@ class QuestionGradingService:
         3. Award partial marks for showing work and attempting the problem
         4. Check if calculations and steps are correct
         5. Verify the final answer against expected values
-        6. Provide constructive and encouraging feedback
+        6. Keep all feedback concise and direct
 
         IMPORTANT: Award partial credit generously. Even if the answer is wrong, give marks for:
         - Correct identification of the method/formula
         - Attempting calculations with correct approach
         - Showing work and reasoning
+
+        FEEDBACK STYLE RULES (STRICT):
+        - method_feedback, calculation_feedback, answer_feedback: max 8 words each
+        - mistakes_identified: only concrete mistakes, each max 10 words
+        - Return at most 3 mistakes
+        - Do not include praise in mistakes_identified
+        - Keep overall_feedback to ONE short sentence
 
         Respond with this exact JSON format:
         {{
@@ -135,6 +143,9 @@ class QuestionGradingService:
                 max_answer,
             )
 
+            # Enforce concise, mistakes-first output shape for the UI.
+            result = self._compact_feedback(result, total_max_marks)
+
             return result
 
         except Exception as e:
@@ -154,3 +165,52 @@ class QuestionGradingService:
                 "needs_manual_review": True,
                 "review_reason": f"Evaluation failed: {str(e)}",
             }
+
+    def _compact_text(self, text: str, max_words: int = 10) -> str:
+        if not text:
+            return ""
+        normalized = " ".join(str(text).strip().split())
+        first_sentence = re.split(r"(?<=[.!?])\s+", normalized)[0]
+        words = first_sentence.split()
+        if len(words) <= max_words:
+            return first_sentence
+        return " ".join(words[:max_words])
+
+    def _compact_mistakes(self, mistakes) -> list:
+        if not isinstance(mistakes, list):
+            return []
+        compact = []
+        for item in mistakes:
+            short = self._compact_text(str(item), max_words=10)
+            if short:
+                compact.append(short)
+            if len(compact) >= 3:
+                break
+        return compact
+
+    def _compact_feedback(self, result: dict, total_max_marks: float) -> dict:
+        method = float(result.get("method_marks_awarded", 0) or 0)
+        calc = float(result.get("calculation_marks_awarded", 0) or 0)
+        answer = float(result.get("answer_marks_awarded", 0) or 0)
+        total_awarded = method + calc + answer
+        full_marks = total_awarded >= (float(total_max_marks) - 1e-6)
+
+        result["method_feedback"] = self._compact_text(result.get("method_feedback", ""), max_words=8)
+        result["calculation_feedback"] = self._compact_text(result.get("calculation_feedback", ""), max_words=8)
+        result["answer_feedback"] = self._compact_text(result.get("answer_feedback", ""), max_words=8)
+
+        # Hide verbose key-point panels; keep report focused on mistakes.
+        result["key_points_found"] = []
+        result["key_points_missing"] = []
+
+        mistakes = self._compact_mistakes(result.get("mistakes_identified", []))
+        result["mistakes_identified"] = [] if full_marks else mistakes
+
+        if full_marks:
+            result["overall_feedback"] = "Question answered perfectly."
+        elif mistakes:
+            result["overall_feedback"] = f"Fix: {'; '.join(mistakes)}."
+        else:
+            result["overall_feedback"] = "Needs minor corrections."
+
+        return result
