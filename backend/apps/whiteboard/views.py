@@ -21,6 +21,7 @@ from .serializers import (
     SessionMemberSerializer,
 )
 from apps.authentication.models import CustomUser
+from apps.tutoring.utils import generate_livekit_token, get_livekit_ws_url
 
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY_2"))
 
@@ -478,3 +479,41 @@ class WhiteboardSessionViewSet(viewsets.ViewSet):
                 {"detail": "No state found for this session."},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    @action(detail=True, methods=["post"], url_path="voice-token")
+    def voice_token(self, request, pk=None):
+        """Generate a LiveKit token for voice chat in this whiteboard session."""
+        user = request.user
+        session = get_object_or_404(WhiteboardSession, id=pk)
+
+        is_owner = session.owner_id == user.id
+        is_member = SessionMember.objects.filter(
+            session=session, user=user
+        ).exists()
+
+        if not (is_owner or is_member):
+            return Response(
+                {"detail": "You don't have access to this session."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        ws_url = get_livekit_ws_url()
+        if not ws_url:
+            return Response(
+                {"detail": "Voice chat is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        room_id = f"whiteboard-voice-{pk}"
+        token = generate_livekit_token(
+            room_id=room_id,
+            user_id=str(user.id),
+            user_name=user.get_full_name() or user.username,
+            role=user.role.upper(),
+        )
+
+        return Response({
+            "livekit_token": token,
+            "livekit_ws_url": ws_url,
+            "room_id": room_id,
+        })

@@ -130,10 +130,12 @@ else:
 
 # Channel Layers Configuration (Django Channels)
 # Uses Redis when REDIS_URL is set (production/Railway) or USE_REDIS_CHANNELS=true.
-# Local dev without Redis defaults to in-memory.
+# Explicitly set USE_REDIS_CHANNELS=false to force in-memory (useful when local
+# Redis is too old, e.g. Windows Redis 3.x which lacks BZPOPMIN).
+_redis_channels_env = os.environ.get("USE_REDIS_CHANNELS", "").lower()
 _use_redis_channels = (
-    os.environ.get("USE_REDIS_CHANNELS", "").lower() in ("true", "1", "yes")
-    or bool(REDIS_URL)
+    _redis_channels_env in ("true", "1", "yes")
+    or (bool(REDIS_URL) and _redis_channels_env not in ("false", "0", "no"))
 )
 
 if _use_redis_channels:
