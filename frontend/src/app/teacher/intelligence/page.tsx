@@ -7,6 +7,7 @@ import Sidebar from "@/components/shared/Sidebar";
 import {
   listInsights,
   getRecommendationStats,
+  computeAllInsights,
   type LearnerInsight,
   type RecommendationStats,
 } from "@/api/intelligence";
@@ -139,6 +140,8 @@ export default function TeacherIntelligencePage() {
   const [recStats, setRecStats] = useState<RecommendationStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isComputing, setIsComputing] = useState(false);
+  const [computeMsg, setComputeMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Auth guard
@@ -152,22 +155,22 @@ export default function TeacherIntelligencePage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     setError(null);
-    try {
-      const [insightList, stats] = await Promise.allSettled([
-        listInsights(),
-        getRecommendationStats(user.id),
-      ]);
+    const [insightList, stats] = await Promise.allSettled([
+      listInsights(),
+      getRecommendationStats(user.id),
+    ]);
 
-      if (insightList.status === "fulfilled") {
-        setInsights(insightList.value);
-      }
-      if (stats.status === "fulfilled") {
-        setRecStats(stats.value);
-      }
-    } catch (err) {
+    if (insightList.status === "fulfilled") {
+      setInsights(insightList.value);
+    } else {
       setError(
-        err instanceof Error ? err.message : "Failed to load intelligence data",
+        insightList.reason instanceof Error
+          ? insightList.reason.message
+          : "Failed to load student insights",
       );
+    }
+    if (stats.status === "fulfilled") {
+      setRecStats(stats.value);
     }
   }, [user]);
 
@@ -182,6 +185,28 @@ export default function TeacherIntelligencePage() {
     setIsRefreshing(true);
     await loadData();
     setIsRefreshing(false);
+  };
+
+  const handleComputeAll = async () => {
+    setIsComputing(true);
+    setComputeMsg(null);
+    try {
+      const result = await computeAllInsights();
+      setComputeMsg(
+        result.computed > 0
+          ? `Computed insights for ${result.computed} student${result.computed !== 1 ? "s" : ""}.${
+              result.failed > 0 ? ` ${result.failed} failed.` : ""
+            }`
+          : "No learning events found to compute insights from.",
+      );
+      await loadData();
+    } catch (err) {
+      setComputeMsg(
+        err instanceof Error ? err.message : "Failed to compute insights",
+      );
+    } finally {
+      setIsComputing(false);
+    }
   };
 
   if (!isReady || !isAuthenticated || !user || user.role !== "teacher") {
@@ -220,20 +245,45 @@ export default function TeacherIntelligencePage() {
                 Aggregated learner insights across all students
               </p>
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing || isLoading}
-              className="px-4 py-2 text-sm text-primary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleComputeAll}
+                disabled={isComputing || isLoading}
+                className="px-4 py-2 text-sm text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <Brain
+                  className={`w-4 h-4 ${isComputing ? "animate-pulse" : ""}`}
+                />
+                {isComputing ? "Computing…" : "Compute All Insights"}
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading}
+                className="px-4 py-2 text-sm text-primary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </button>
+            </div>
           </div>
         </header>
 
         <main className="flex-1 px-8 py-6 space-y-8">
+          {/* Compute feedback banner */}
+          {computeMsg && (
+            <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-700">
+              <p className="text-sm">{computeMsg}</p>
+              <button
+                onClick={() => setComputeMsg(null)}
+                className="text-xs text-blue-500 hover:text-blue-700 shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Loading */}
           {isLoading && (
             <div className="flex items-center justify-center py-20">
@@ -254,8 +304,10 @@ export default function TeacherIntelligencePage() {
             <div className="text-center py-20 text-gray-400">
               <Brain className="w-12 h-12 mx-auto mb-3 opacity-40" />
               <p className="text-lg font-medium">No student insights yet</p>
-              <p className="text-sm mt-1">
-                Insights appear once students complete activities.
+              <p className="text-sm mt-1 max-w-sm mx-auto">
+                Insights are computed from student learning activity. Once
+                students have completed sessions or content, use the Refresh
+                button above to load their latest insights.
               </p>
             </div>
           )}
@@ -430,7 +482,7 @@ export default function TeacherIntelligencePage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                       <tr>
-                        <th className="text-left px-5 py-3">User ID</th>
+                        <th className="text-left px-5 py-3">Student</th>
                         <th className="text-left px-4 py-3">Pace</th>
                         <th className="text-left px-4 py-3">Health</th>
                         <th className="text-left px-4 py-3">Consistency</th>
@@ -443,8 +495,8 @@ export default function TeacherIntelligencePage() {
                           key={ins.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="px-5 py-3 font-mono text-xs text-gray-500 truncate max-w-[140px]">
-                            {ins.user_id.slice(0, 8)}…
+                          <td className="px-5 py-3 text-sm font-medium text-gray-700 truncate max-w-[180px]">
+                            {ins.user_display_name}
                           </td>
                           <td className="px-4 py-3">
                             <span

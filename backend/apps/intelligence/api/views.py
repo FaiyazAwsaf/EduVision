@@ -175,13 +175,26 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Filter insights by user_id."""
-        queryset = super().get_queryset()
-        
+        """Filter insights to students only, returning only the latest per student."""
+        from django.contrib.auth import get_user_model
+        from django.db.models import OuterRef, Subquery
+        User = get_user_model()
+        student_ids = User.objects.filter(role='student').values_list('id', flat=True)
+
+        # Subquery: latest computed_at per user_id
+        latest = LearnerInsight.objects.filter(
+            user_id=OuterRef('user_id')
+        ).order_by('-computed_at').values('id')[:1]
+
+        queryset = LearnerInsight.objects.filter(
+            user_id__in=student_ids,
+            id__in=Subquery(latest),
+        )
+
         user_id = self.request.query_params.get('user_id')
         if user_id:
             queryset = queryset.filter(user_id=user_id)
-        
+
         return queryset.order_by('-computed_at')
     
     def get_serializer_class(self):
@@ -264,6 +277,56 @@ class LearnerInsightViewSet(viewsets.ReadOnlyModelViewSet):
         insights = insight_service.get_insight_history(UUID(user_id), limit=limit)
         
         return Response(LearnerInsightSummarySerializer(insights, many=True).data)
+
+    @action(detail=False, methods=['post'])
+    def compute_all(self, request):
+        """
+        Compute (or refresh) insights for every student who has learning events.
+
+        POST /api/intelligence/insights/compute_all/
+        Optional body: {"time_window_days": 30}
+
+        Returns a summary of how many succeeded / failed.
+        """
+        from apps.intelligence.models import LearningEvent
+        from django.contrib.auth import get_user_model
+
+        time_window_days = int(request.data.get('time_window_days', 30))
+
+        User = get_user_model()
+        student_ids = set(User.objects.filter(role='student').values_list('id', flat=True))
+        event_user_ids = set(LearningEvent.objects.values_list('user_id', flat=True))
+        user_ids = list(student_ids & event_user_ids)
+
+        if not user_ids:
+            return Response(
+                {"message": "No learning events found.", "computed": 0, "failed": 0},
+                status=status.HTTP_200_OK,
+            )
+
+        insight_service = InsightService()
+        succeeded = []
+        failed = []
+
+        for uid in user_ids:
+            try:
+                insight_service.compute_insight(
+                    user_id=uid,
+                    time_window_days=time_window_days,
+                    save=True,
+                )
+                succeeded.append(str(uid))
+            except Exception as exc:  # noqa: BLE001
+                failed.append({"user_id": str(uid), "error": str(exc)})
+
+        return Response(
+            {
+                "computed": len(succeeded),
+                "failed": len(failed),
+                "failures": failed,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class RecommendationViewSet(viewsets.ReadOnlyModelViewSet):

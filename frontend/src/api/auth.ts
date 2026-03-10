@@ -25,6 +25,9 @@ export interface User {
   is_active: boolean;
   role: "teacher" | "student" | "admin";
   date_joined: string;
+  department?: string | null;
+  student_class?: string | null;
+  student_section?: string | null;
 }
 
 export interface AuthTokens {

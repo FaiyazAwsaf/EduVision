@@ -7,6 +7,8 @@ import Sidebar from "@/components/shared/Sidebar";
 import StatCard from "@/components/insights/StatCard";
 import StudentProgressChart from "@/components/analytics/StudentProgressChart";
 import SubjectPerformanceChart from "@/components/analytics/SubjectPerformanceChart";
+import ScoreDistributionChart from "@/components/analytics/ScoreDistributionChart";
+import ConsistencyChart from "@/components/analytics/ConsistencyChart";
 import { getMyAnalytics, type MyAnalytics } from "@/api/analytics";
 import {
   BarChart3,
@@ -227,7 +229,7 @@ export default function StudentAnalyticsPage() {
                                 {s.avg_percentage}%
                               </span>
                               <button
-                                onClick={() => router.push("/student/tutoring")}
+                                onClick={() => router.push(`/student/practice?subject=${encodeURIComponent(s.subject)}`)}
                                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
                               >
                                 Study <ChevronRight className="w-3 h-3" />
@@ -265,103 +267,38 @@ export default function StudentAnalyticsPage() {
                   Subject Performance
                 </h3>
                 <p className="text-xs text-secondary mb-4">
-                  Average score across each subject — click a bar to start tutoring
+                  Average score across each subject — click a bar to start practice
                 </p>
                 <SubjectPerformanceChart
                   data={analytics.subjects}
-                  onBarClick={() => router.push("/student/tutoring")}
+                  onBarClick={(subjectName) => router.push(`/student/practice?subject=${encodeURIComponent(subjectName)}`)}
                 />
               </section>
 
-              {/* ── Question Breakdown Table ── */}
-              {analytics.topics.length > 0 && (
-                <section className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
-                  <h3 className="text-base font-semibold text-primary-dark mb-4">
-                    Question-Level Breakdown
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-secondary/20">
-                          <th className="pb-3 text-left text-xs font-semibold text-secondary uppercase tracking-wide">
-                            Question
-                          </th>
-                          <th className="pb-3 text-left text-xs font-semibold text-secondary uppercase tracking-wide">
-                            Topic
-                          </th>
-                          <th className="pb-3 text-right text-xs font-semibold text-secondary uppercase tracking-wide">
-                            Avg Score
-                          </th>
-                          <th className="pb-3 text-right text-xs font-semibold text-secondary uppercase tracking-wide">
-                            Attempts
-                          </th>
-                          <th className="pb-3 text-left text-xs font-semibold text-secondary uppercase tracking-wide pl-4">
-                            Performance
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-secondary/10">
-                        {analytics.topics.map((t) => (
-                          <tr key={t.topic} className="hover:bg-gray-50">
-                            <td className="py-3 font-medium text-primary-dark">
-                              {t.topic}
-                            </td>
-                            <td className="py-3 text-secondary max-w-[200px] truncate">
-                              {t.question_text || "—"}
-                            </td>
-                            <td className="py-3 text-right font-semibold text-primary-dark">
-                              {t.avg_percentage}%
-                            </td>
-                            <td className="py-3 text-right text-secondary">
-                              {t.attempts}
-                            </td>
-                            <td className="py-3 pl-4">
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 bg-gray-100 rounded-full h-2 max-w-[120px]">
-                                  <div
-                                    className="h-2 rounded-full transition-all"
-                                    style={{
-                                      width: `${t.avg_percentage}%`,
-                                      backgroundColor:
-                                        t.avg_percentage >= 75
-                                          ? "#22c55e"
-                                          : t.avg_percentage >= 50
-                                            ? "#eab308"
-                                            : "#ef4444",
-                                    }}
-                                  />
-                                </div>
-                                <span
-                                  className="text-xs font-medium"
-                                  style={{
-                                    color:
-                                      t.avg_percentage >= 75
-                                        ? "#16a34a"
-                                        : t.avg_percentage >= 50
-                                          ? "#ca8a04"
-                                          : "#dc2626",
-                                  }}
-                                >
-                                  {t.avg_percentage >= 75
-                                    ? "Strong"
-                                    : t.avg_percentage >= 50
-                                      ? "Fair"
-                                      : "Needs Work"}
-                                </span>
-                                {t.avg_percentage < 75 && (
-                                  <button
-                                    onClick={() => router.push("/student/tutoring")}
-                                    className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors ml-1"
-                                  >
-                                    Study <ChevronRight className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* ── Score Distribution & Consistency ── */}
+              {analytics.progress.length > 0 && (
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-primary-dark mb-1">
+                      Score Distribution
+                    </h3>
+                    <p className="text-xs text-secondary mb-4">
+                      How your scores spread across performance bands
+                    </p>
+                    <ScoreDistributionChart data={filteredProgress} />
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-primary-dark mb-1">
+                      Consistency by Subject
+                    </h3>
+                    <p className="text-xs text-secondary mb-4">
+                      Score range per subject — narrow band means reliable performance
+                    </p>
+                    <ConsistencyChart
+                      progress={analytics.progress}
+                      subjects={analytics.subjects}
+                    />
                   </div>
                 </section>
               )}

@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "channels",  # Django Channels for WebSocket support
+    "storages",  # Cloud file storage (S3 / Supabase)
     
     # Project apps
     "apps.authentication.apps.AuthenticationConfig",
@@ -227,6 +228,33 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Media files (User uploads)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ── Supabase / S3-compatible cloud storage ────────────────────────────────────
+# Set these env vars to store uploads in Supabase Storage instead of locally.
+# Get S3 credentials from: Supabase Dashboard → Storage → S3 Access Keys
+_SUPABASE_URL = os.environ.get("SUPABASE_URL", "")           # e.g. https://xxxx.supabase.co
+_SUPABASE_S3_KEY = os.environ.get("SUPABASE_S3_ACCESS_KEY", "")
+_SUPABASE_S3_SECRET = os.environ.get("SUPABASE_S3_SECRET_KEY", "")
+_SUPABASE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "script-pages")
+
+if _SUPABASE_URL and _SUPABASE_S3_KEY and _SUPABASE_S3_SECRET:
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
+    AWS_S3_ENDPOINT_URL = f"{_SUPABASE_URL}/storage/v1/s3"
+    AWS_ACCESS_KEY_ID = _SUPABASE_S3_KEY
+    AWS_SECRET_ACCESS_KEY = _SUPABASE_S3_SECRET
+    AWS_STORAGE_BUCKET_NAME = _SUPABASE_BUCKET
+    AWS_S3_REGION_NAME = "auto"
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = "public-read"
+    AWS_QUERYSTRING_AUTH = False  # Use public (unsigned) URLs
+    # Public URL: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+    _supabase_host = _SUPABASE_URL.replace("https://", "").replace("http://", "")
+    AWS_S3_CUSTOM_DOMAIN = (
+        f"{_supabase_host}/storage/v1/object/public/{_SUPABASE_BUCKET}"
+    )
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

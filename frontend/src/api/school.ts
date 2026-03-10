@@ -249,3 +249,9 @@ export interface SchoolInsights {
 export async function getSchoolInsights(): Promise<SchoolInsights> {
   return schoolFetch<SchoolInsights>("/insights/");
 }
+
+/** Fetch the distinct subjects taught in the logged-in student's section. */
+export async function getMySubjects(): Promise<string[]> {
+  const data = await schoolFetch<{ subjects: string[] }>("/my-subjects/");
+  return data.subjects;
+}

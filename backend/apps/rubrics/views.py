@@ -15,6 +15,7 @@ from .serializers import (
     QuestionRubricSerializer
 )
 from .pdf_parser import parse_rubric_document
+from .services import evaluate_answer
 
 
 class RubricSetViewSet(viewsets.ModelViewSet):
@@ -36,8 +37,15 @@ class RubricSetViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     
     def get_queryset(self):
-        """Return all rubric sets with prefetched questions."""
-        return RubricSet.objects.all().prefetch_related('questions', 'versions')
+        """Return rubric sets, optionally filtered by state and/or subject."""
+        qs = RubricSet.objects.all().prefetch_related('questions', 'versions')
+        state = self.request.query_params.get('state')
+        subject = self.request.query_params.get('subject')
+        if state:
+            qs = qs.filter(state=state)
+        if subject:
+            qs = qs.filter(subject__iexact=subject)
+        return qs
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -176,7 +184,116 @@ class RubricSetViewSet(viewsets.ModelViewSet):
         versions = instance.versions.all()
         serializer = RubricSetVersionSerializer(versions, many=True)
         return Response(serializer.data)
-    
+
+    @action(detail=False, methods=['post'], url_path='test')
+    def test(self, request):
+        """
+        Test rubric evaluation logic against sample answers without saving.
+
+        Request body:
+        {
+            "rubric_set": {
+                "questions": [
+                    {
+                        "question_number": 1,
+                        "question_text": "...",
+                        "max_marks": 10.0,
+                        "evaluation_rules": [...]
+                    }
+                ]
+            },
+            "answers": { "1": "Student answer for question 1." }
+        }
+
+        Response:
+        {
+            "total_score": 7.5,
+            "max_score": 10.0,
+            "percentage": 75.0,
+            "question_results": [
+                {
+                    "question_number": 1,
+                    "question_text": "...",
+                    "score": 7.5,
+                    "max_marks": 10.0,
+                    "percentage": 75.0,
+                    "rule_results": [...],
+                    "feedback": "..."
+                }
+            ],
+            "feedback": "Overall Score: ..."
+        }
+        """
+        rubric_set = request.data.get("rubric_set")
+        answers = request.data.get("answers", {})
+
+        if not rubric_set:
+            return Response(
+                {"detail": "Missing required field: 'rubric_set'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        questions = rubric_set.get("questions")
+        if not isinstance(questions, list) or not questions:
+            return Response(
+                {"detail": "'rubric_set.questions' must be a non-empty list."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(answers, dict):
+            return Response(
+                {"detail": "'answers' must be an object mapping question_number to answer text."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            question_results = []
+            total_score = 0.0
+            max_score = 0.0
+
+            for question in questions:
+                q_num = question.get("question_number", 0)
+                q_text = question.get("question_text", "")
+                q_max = float(question.get("max_marks", 0))
+                rules = question.get("evaluation_rules", [])
+
+                # Look up the answer by question_number (may be int or str key)
+                answer_text = answers.get(q_num) or answers.get(str(q_num)) or ""
+
+                rubric_dict = {
+                    "evaluation_rules": rules,
+                    "total_marks": q_max,
+                }
+                result = evaluate_answer(rubric_dict, answer_text)
+
+                question_results.append({
+                    "question_number": q_num,
+                    "question_text": q_text,
+                    "score": result["total_score"],
+                    "max_marks": q_max,
+                    "percentage": result["percentage"],
+                    "rule_results": result["rule_results"],
+                    "feedback": result["feedback"],
+                })
+                total_score += result["total_score"]
+                max_score += q_max
+
+            total_score = round(total_score, 2)
+            max_score = round(max_score, 2)
+            overall_percentage = round((total_score / max_score * 100), 1) if max_score > 0 else 0.0
+
+            return Response({
+                "total_score": total_score,
+                "max_score": max_score,
+                "percentage": overall_percentage,
+                "question_results": question_results,
+                "feedback": f"Overall Score: {total_score}/{max_score} ({overall_percentage}%)",
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"detail": f"Evaluation error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
     def parse_document(self, request):
         """
