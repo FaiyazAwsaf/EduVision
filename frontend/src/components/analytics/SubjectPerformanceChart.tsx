@@ -14,7 +14,7 @@ import type { SubjectPerformance } from "@/api/analytics";
 
 interface Props {
   data: SubjectPerformance[];
-  onBarClick?: () => void;
+  onBarClick?: (subject: string) => void;
 }
 
 const COLORS = [
@@ -61,7 +61,7 @@ export default function SubjectPerformanceChart({ data, onBarClick }: Props) {
           dataKey="avg_percentage"
           radius={[6, 6, 0, 0]}
           name="Avg Score"
-          onClick={onBarClick}
+          onClick={(entry) => onBarClick?.(entry.subject as string)}
           style={onBarClick ? { cursor: "pointer" } : undefined}
         >
           {data.map((_, i) => (

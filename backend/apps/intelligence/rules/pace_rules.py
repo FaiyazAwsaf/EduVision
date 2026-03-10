@@ -12,7 +12,7 @@ Evaluates learning pace using deterministic rules based on:
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -80,7 +80,7 @@ class RuleBasedPaceEvaluator(PaceEvaluator):
         if time_window is None:
             time_window = timedelta(days=window_days)
         
-        cutoff = datetime.now() - time_window
+        cutoff = datetime.now(timezone.utc) - time_window
         filtered_events = [e for e in events if e.timestamp >= cutoff]
         
         if not filtered_events:

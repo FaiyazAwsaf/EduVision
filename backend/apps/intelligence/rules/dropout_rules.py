@@ -13,7 +13,7 @@ Assesses dropout risk using deterministic rules based on:
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -188,7 +188,7 @@ class RuleBasedDropoutRiskAssessor(DropoutRiskAssessor):
         
         More days inactive → higher risk factor.
         """
-        days_inactive = (datetime.now() - last_activity).days
+        days_inactive = (datetime.now(timezone.utc) - last_activity).days
         
         low_threshold = self.config.get_param("inactivity_low_risk_days", 3)
         medium_threshold = self.config.get_param("inactivity_medium_risk_days", 7)
@@ -242,7 +242,7 @@ class RuleBasedDropoutRiskAssessor(DropoutRiskAssessor):
             return 0.5  # Neutral if insufficient data
         
         trend_window = self.config.get_param("trend_window_days", 14)
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         
         # Split events into two halves of the trend window
         midpoint = now - timedelta(days=trend_window // 2)
@@ -282,7 +282,7 @@ class RuleBasedDropoutRiskAssessor(DropoutRiskAssessor):
     ) -> str:
         """Build human-readable explanation."""
         category = self.categorize_risk(risk_score)
-        days_inactive = (datetime.now() - last_activity).days
+        days_inactive = (datetime.now(timezone.utc) - last_activity).days
         
         parts = [f"{category.replace('_', ' ').title()} dropout risk"]
         

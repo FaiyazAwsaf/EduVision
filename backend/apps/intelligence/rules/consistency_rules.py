@@ -12,7 +12,7 @@ Analyzes learning consistency using deterministic rules based on:
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import UUID
 import statistics
@@ -78,7 +78,7 @@ class RuleBasedConsistencyAnalyzer(ConsistencyAnalyzer):
         if time_window is None:
             time_window = timedelta(days=window_days)
         
-        cutoff = datetime.now() - time_window
+        cutoff = datetime.now(timezone.utc) - time_window
         filtered_events = [e for e in events if e.timestamp >= cutoff]
         
         if len(filtered_events) < 2:
@@ -225,7 +225,7 @@ class RuleBasedConsistencyAnalyzer(ConsistencyAnalyzer):
         """
         Detect if there's been a change in consistency pattern.
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         
         # Get baseline events
         baseline_start = now - baseline_window - comparison_window

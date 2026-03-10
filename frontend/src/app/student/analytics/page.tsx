@@ -7,6 +7,8 @@ import Sidebar from "@/components/shared/Sidebar";
 import StatCard from "@/components/insights/StatCard";
 import StudentProgressChart from "@/components/analytics/StudentProgressChart";
 import SubjectPerformanceChart from "@/components/analytics/SubjectPerformanceChart";
+import ScoreDistributionChart from "@/components/analytics/ScoreDistributionChart";
+import ConsistencyChart from "@/components/analytics/ConsistencyChart";
 import { getMyAnalytics, type MyAnalytics } from "@/api/analytics";
 import {
   BarChart3,
@@ -227,7 +229,7 @@ export default function StudentAnalyticsPage() {
                                 {s.avg_percentage}%
                               </span>
                               <button
-                                onClick={() => router.push("/student/tutoring")}
+                                onClick={() => router.push(`/student/practice?subject=${encodeURIComponent(s.subject)}`)}
                                 className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
                               >
                                 Study <ChevronRight className="w-3 h-3" />
@@ -265,13 +267,41 @@ export default function StudentAnalyticsPage() {
                   Subject Performance
                 </h3>
                 <p className="text-xs text-secondary mb-4">
-                  Average score across each subject — click a bar to start tutoring
+                  Average score across each subject — click a bar to start practice
                 </p>
                 <SubjectPerformanceChart
                   data={analytics.subjects}
-                  onBarClick={() => router.push("/student/tutoring")}
+                  onBarClick={(subjectName) => router.push(`/student/practice?subject=${encodeURIComponent(subjectName)}`)}
                 />
               </section>
+
+              {/* ── Score Distribution & Consistency ── */}
+              {analytics.progress.length > 0 && (
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-primary-dark mb-1">
+                      Score Distribution
+                    </h3>
+                    <p className="text-xs text-secondary mb-4">
+                      How your scores spread across performance bands
+                    </p>
+                    <ScoreDistributionChart data={filteredProgress} />
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-secondary/30 p-6 shadow-sm">
+                    <h3 className="text-base font-semibold text-primary-dark mb-1">
+                      Consistency by Subject
+                    </h3>
+                    <p className="text-xs text-secondary mb-4">
+                      Score range per subject — narrow band means reliable performance
+                    </p>
+                    <ConsistencyChart
+                      progress={analytics.progress}
+                      subjects={analytics.subjects}
+                    />
+                  </div>
+                </section>
+              )}
 
               {/* ── Recent Assessments ── */}
               {filteredProgress.length > 0 && (

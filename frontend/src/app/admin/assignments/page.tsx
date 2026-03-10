@@ -14,7 +14,72 @@ import {
 import { getUsers } from "@/api/admin";
 import type { User } from "@/api/auth";
 import type { SchoolClass, SchoolSection } from "@/api/school";
-import { Plus, Trash2, X, ClipboardCheck, GraduationCap } from "lucide-react";
+import { Plus, Trash2, X, ClipboardCheck, GraduationCap, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 20;
+
+function Pagination({
+  total,
+  page,
+  onChange,
+}: {
+  total: number;
+  page: number;
+  onChange: (p: number) => void;
+}) {
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) return null;
+
+  const getPages = (): (number | "...")[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages: (number | "...")[] = [1, 2, 3, 4];
+    if (page > 5) pages.push("...");
+    if (page > 4 && page < totalPages - 3) pages.push(page - 1, page, page + 1);
+    if (page <= 5) {
+      pages.splice(0, pages.length, 1, 2, 3, 4, 5);
+    }
+    if (page >= totalPages - 4) {
+      pages.splice(0, pages.length, 1);
+      pages.push("...");
+      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push("...");
+      pages.push(totalPages - 2, totalPages - 1, totalPages);
+    }
+    return [...new Set(pages)];
+  };
+
+  return (
+    <div className="flex items-center gap-1 justify-end px-5 py-4">
+      {getPages().map((p, i) =>
+        p === "..." ? (
+          <span key={`ellipsis-${i}`} className="w-8 text-center text-muted text-sm">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p as number)}
+            className={`w-8 h-8 rounded-lg text-sm font-medium transition ${
+              p === page
+                ? "bg-primary-dark text-white"
+                : "text-muted hover:bg-background"
+            }`}
+          >
+            {p}
+          </button>
+        ),
+      )}
+      <button
+        onClick={() => onChange(Math.min(page + 1, totalPages))}
+        disabled={page === totalPages}
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:bg-background disabled:opacity-30 transition"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
 function Modal({
   open,
@@ -51,6 +116,7 @@ export default function AssignmentsPage() {
     [],
   );
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] =
     useState<TeacherSubjectAssignment | null>(null);
@@ -60,6 +126,7 @@ export default function AssignmentsPage() {
     try {
       const data = await getAssignments();
       setAssignments(data);
+      setPage(1);
     } catch {
       // ignore
     } finally {
@@ -114,10 +181,10 @@ export default function AssignmentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-secondary/20">
-              {assignments.map((a) => (
+              {assignments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((a) => (
                 <tr
                   key={a.id}
-                  className="hover:bg-primary/[0.02] transition-colors"
+                  className="hover:bg-primary/2 transition-colors"
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
@@ -164,6 +231,7 @@ export default function AssignmentsPage() {
               ))}
             </tbody>
           </table>
+          <Pagination total={assignments.length} page={page} onChange={setPage} />
         </div>
       )}
 

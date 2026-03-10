@@ -13,7 +13,6 @@ import {
   type Recommendation,
 } from "@/api/intelligence";
 import {
-  Brain,
   TrendingUp,
   Activity,
   Zap,
@@ -21,10 +20,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
-  Star,
   BookOpen,
-  Target,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,7 +38,7 @@ function paceLabel(pace: LearnerInsight["learning_pace"]): string {
 
 function paceColor(pace: LearnerInsight["learning_pace"]): string {
   const map: Record<string, string> = {
-    very_slow: "text-red-600",
+    very_slow: "text-red-500",
     slow: "text-orange-500",
     moderate: "text-yellow-500",
     fast: "text-emerald-500",
@@ -51,19 +47,25 @@ function paceColor(pace: LearnerInsight["learning_pace"]): string {
   return map[pace] ?? "text-gray-600";
 }
 
-function scoreBar(value: number, colorClass = "bg-primary") {
-  const pct = Math.round(value * 100);
+function safePct(value: number | null | undefined): number {
+  const n = Math.round((value ?? 0) * 100);
+  return isNaN(n) ? 0 : n;
+}
+
+function MiniBar({
+  value,
+  colorClass = "bg-primary",
+}: {
+  value: number | null | undefined;
+  colorClass?: string;
+}) {
+  const pct = safePct(value);
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full ${colorClass}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs font-medium text-gray-600 w-8 text-right">
-        {pct}%
-      </span>
+    <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full ${colorClass}`}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -75,56 +77,40 @@ function RecommendationCard({
   rec: Recommendation;
   onAction: (id: string, action: "view" | "accept" | "dismiss") => void;
 }) {
-  const priorityColors = [
-    "border-red-300 bg-red-50",
-    "border-orange-300 bg-orange-50",
-    "border-yellow-300 bg-yellow-50",
-    "border-blue-300 bg-blue-50",
-    "border-gray-200 bg-gray-50",
-  ];
-  const borderClass = priorityColors[rec.priority - 1] ?? priorityColors[4];
-
   return (
-    <div className={`rounded-xl border p-4 ${borderClass}`}>
+    <div className="bg-white rounded-xl border border-secondary/30 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-800 capitalize">
             {rec.recommendation_type.replace(/_/g, " ")}
           </p>
           {rec.target_entity_name && (
-            <p className="text-xs text-gray-500 mt-0.5 truncate">
-              {rec.target_entity_name}
-            </p>
+            <p className="text-xs text-gray-500 mt-0.5">{rec.target_entity_name}</p>
           )}
           <p className="text-sm text-gray-600 mt-1 leading-snug">
             {rec.justification}
           </p>
-          <div className="mt-2 flex items-center gap-1">
-            <div className="text-xs text-gray-400">
-              Confidence: {Math.round(rec.confidence_score * 100)}%
-            </div>
-          </div>
         </div>
-        <div className="flex flex-col gap-1 shrink-0">
+        <div className="shrink-0">
           {rec.status === "active" && (
-            <>
+            <div className="flex flex-col gap-1">
               <button
                 onClick={() => onAction(rec.id, "accept")}
-                className="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors"
               >
                 Accept
               </button>
               <button
                 onClick={() => onAction(rec.id, "dismiss")}
-                className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
               >
                 Dismiss
               </button>
-            </>
+            </div>
           )}
           {rec.status === "accepted" && (
             <span className="text-xs text-emerald-600 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Accepted
+              <CheckCircle2 className="w-3 h-3" /> Done
             </span>
           )}
           {rec.status === "dismissed" && (
@@ -218,37 +204,31 @@ export default function StudentInsightsPage() {
         {/* Header */}
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-secondary/30">
           <div className="flex items-center justify-between px-8 py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-primary-dark flex items-center gap-2">
-                <Brain className="w-6 h-6 text-primary" />
-                My Learning Insights
-              </h1>
-              <p className="text-sm text-primary">
-                AI-powered analysis of your learning patterns
-              </p>
-            </div>
+            <h1 className="text-xl font-bold text-primary-dark">
+              Learning Insights
+            </h1>
             <button
               onClick={handleRefresh}
               disabled={isRefreshing || isLoading}
-              className="px-4 py-2 text-sm text-primary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm text-primary border border-secondary/50 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
               />
               Refresh
             </button>
           </div>
         </header>
 
-        <main className="flex-1 px-8 py-6 space-y-8">
-          {/* Loading state */}
+        <main className="flex-1 px-8 py-6 space-y-6">
+          {/* Loading */}
           {isLoading && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           )}
 
-          {/* Error state */}
+          {/* Error */}
           {!isLoading && error && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
               <AlertCircle className="w-5 h-5 shrink-0" />
@@ -256,180 +236,114 @@ export default function StudentInsightsPage() {
             </div>
           )}
 
-          {/* No data */}
+          {/* Empty */}
           {!isLoading && !error && !insight && (
             <div className="text-center py-20 text-gray-400">
-              <Brain className="w-12 h-12 mx-auto mb-3 opacity-40" />
-              <p className="text-lg font-medium">No insights yet</p>
-              <p className="text-sm mt-1">
-                Complete some activities to generate your learning insights.
-              </p>
+              <p className="text-base font-medium">No insights yet</p>
+              <p className="text-sm mt-1">Complete some activities to generate your learning insights.</p>
             </div>
           )}
 
-          {/* Insight data */}
+          {/* Data */}
           {!isLoading && insight && (
             <>
               {/* ── KPI Cards ── */}
-              <section>
-                <h2 className="text-lg font-semibold text-primary-dark mb-4">
-                  Learning Overview
-                </h2>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Learning Pace */}
-                  <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2 text-primary">
-                      <Zap className="w-4 h-4" />
-                      <span className="text-xs font-medium uppercase tracking-wide">
-                        Learning Pace
-                      </span>
-                    </div>
-                    <p
-                      className={`text-2xl font-bold ${paceColor(insight.learning_pace)}`}
-                    >
-                      {paceLabel(insight.learning_pace)}
-                    </p>
-                    <div className="mt-2">
-                      {scoreBar(insight.pace_score, "bg-blue-500")}
-                    </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span className="text-xs uppercase tracking-wide">Pace</span>
                   </div>
-
-                  {/* Consistency */}
-                  <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2 text-primary">
-                      <Activity className="w-4 h-4" />
-                      <span className="text-xs font-medium uppercase tracking-wide">
-                        Consistency
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-primary-dark">
-                      {Math.round(insight.consistency_score * 100)}%
-                    </p>
-                    <div className="mt-2">
-                      {scoreBar(insight.consistency_score, "bg-emerald-500")}
-                    </div>
-                  </div>
-
-                  {/* Retry Frequency */}
-                  <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2 text-primary">
-                      <RefreshCw className="w-4 h-4" />
-                      <span className="text-xs font-medium uppercase tracking-wide">
-                        Retry Rate
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-primary-dark">
-                      {Math.round(insight.retry_frequency * 100)}%
-                    </p>
-                    <div className="mt-2">
-                      {scoreBar(insight.retry_frequency, "bg-amber-500")}
-                    </div>
-                  </div>
-
-                  {/* Overall Health */}
-                  <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2 text-primary">
-                      <TrendingUp className="w-4 h-4" />
-                      <span className="text-xs font-medium uppercase tracking-wide">
-                        Health Score
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-primary-dark">
-                      {Math.round(insight.overall_health_score * 100)}%
-                    </p>
-                    <div className="mt-2">
-                      {scoreBar(insight.overall_health_score, "bg-primary")}
-                    </div>
-                  </div>
+                  <p className={`text-xl font-bold ${paceColor(insight.learning_pace)}`}>
+                    {paceLabel(insight.learning_pace)}
+                  </p>
+                  <MiniBar value={insight.pace_score} colorClass="bg-blue-400" />
                 </div>
-              </section>
 
-              {/* ── Topic Breakdown ── */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Weak Topics */}
-                {insight.weak_topics.length > 0 && (
-                  <div className="bg-white rounded-xl border border-red-100 p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold text-red-700 flex items-center gap-2 mb-3">
-                      <Target className="w-4 h-4" />
-                      Topics Needing Attention
-                    </h3>
-                    <ul className="space-y-2">
-                      {insight.weak_topics.map((topic) => (
-                        <li
-                          key={topic}
-                          className="flex items-center gap-2 text-sm text-gray-700"
-                        >
-                          <ChevronRight className="w-3 h-3 text-red-400 shrink-0" />
-                          <span className="truncate">{topic}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                    <Activity className="w-3.5 h-3.5" />
+                    <span className="text-xs uppercase tracking-wide">Consistency</span>
                   </div>
-                )}
+                  <p className="text-xl font-bold text-primary-dark">
+                    {safePct(insight.consistency_score)}%
+                  </p>
+                  <MiniBar value={insight.consistency_score} colorClass="bg-emerald-400" />
+                </div>
 
-                {/* Strong Topics */}
-                {insight.strong_topics.length > 0 && (
-                  <div className="bg-white rounded-xl border border-emerald-100 p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold text-emerald-700 flex items-center gap-2 mb-3">
-                      <Star className="w-4 h-4" />
-                      Strong Topics
-                    </h3>
-                    <ul className="space-y-2">
-                      {insight.strong_topics.map((topic) => (
-                        <li
-                          key={topic}
-                          className="flex items-center gap-2 text-sm text-gray-700"
-                        >
-                          <ChevronRight className="w-3 h-3 text-emerald-400 shrink-0" />
-                          <span className="truncate">{topic}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span className="text-xs uppercase tracking-wide">Retry Rate</span>
                   </div>
-                )}
+                  <p className="text-xl font-bold text-primary-dark">
+                    {safePct(insight.retry_frequency)}%
+                  </p>
+                  <MiniBar value={insight.retry_frequency} colorClass="bg-amber-400" />
+                </div>
+
+                <div className="bg-white rounded-xl border border-secondary/30 p-5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span className="text-xs uppercase tracking-wide">Health</span>
+                  </div>
+                  <p className="text-xl font-bold text-primary-dark">
+                    {safePct(insight.overall_health_score)}%
+                  </p>
+                  <MiniBar value={insight.overall_health_score} colorClass="bg-primary" />
+                </div>
               </div>
 
-              {/* ── Topic Metrics Table ── */}
+              {/* ── Topic Metrics ── */}
               {Object.keys(insight.topic_metrics).length > 0 && (
                 <section className="bg-white rounded-xl border border-secondary/30 shadow-sm overflow-hidden">
-                  <div className="px-5 py-4 border-b border-secondary/20">
-                    <h3 className="text-sm font-semibold text-primary-dark flex items-center gap-2">
-                      <BookOpen className="w-4 h-4" />
-                      Per-Topic Metrics
-                    </h3>
+                  <div className="px-5 py-3.5 border-b border-secondary/20 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-primary" />
+                    <h2 className="text-sm font-semibold text-primary-dark">Topics</h2>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                      <thead className="bg-gray-50 text-xs text-gray-400 uppercase tracking-wide">
                         <tr>
                           <th className="text-left px-5 py-3">Topic</th>
-                          <th className="text-left px-4 py-3">Mastery</th>
-                          <th className="text-left px-4 py-3">Difficulty</th>
+                          <th className="text-left px-4 py-3 w-36">Mastery</th>
+                          <th className="text-left px-4 py-3 w-36">Difficulty</th>
                           <th className="text-left px-4 py-3">Retries</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {Object.entries(insight.topic_metrics).map(
-                          ([topic, metrics]) => (
-                            <tr
-                              key={topic}
-                              className="hover:bg-gray-50 transition-colors"
-                            >
-                              <td className="px-5 py-3 font-medium text-gray-700 max-w-xs truncate">
-                                {topic}
-                              </td>
-                              <td className="px-4 py-3 w-32">
-                                {scoreBar(metrics.mastery, "bg-emerald-500")}
-                              </td>
-                              <td className="px-4 py-3 w-32">
-                                {scoreBar(metrics.difficulty, "bg-amber-500")}
-                              </td>
-                              <td className="px-4 py-3 text-gray-600">
-                                {metrics.retry_count}
-                              </td>
-                            </tr>
-                          ),
-                        )}
+                        {Object.entries(insight.topic_metrics).map(([topic, metrics]) => (
+                          <tr key={topic} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-5 py-3 font-medium text-gray-700">{topic}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-emerald-400"
+                                    style={{ width: `${safePct(metrics.mastery)}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-500 w-7 text-right">
+                                  {safePct(metrics.mastery)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-amber-400"
+                                    style={{ width: `${safePct(metrics.difficulty)}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-500 w-7 text-right">
+                                  {safePct(metrics.difficulty)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{metrics.retry_count}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -439,9 +353,7 @@ export default function StudentInsightsPage() {
               {/* ── Recommendations ── */}
               {recommendations.length > 0 && (
                 <section>
-                  <h2 className="text-lg font-semibold text-primary-dark mb-4">
-                    Recommendations
-                  </h2>
+                  <h2 className="text-sm font-semibold text-primary-dark mb-3">Recommendations</h2>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {recommendations.map((rec) => (
                       <RecommendationCard
@@ -454,10 +366,8 @@ export default function StudentInsightsPage() {
                 </section>
               )}
 
-              {/* Footer meta */}
-              <p className="text-xs text-gray-400 text-right">
-                Insight computed from {insight.events_analyzed_count} events ·
-                Last updated{" "}
+              <p className="text-xs text-gray-400 text-right pb-2">
+                {insight.events_analyzed_count} events ·{" "}
                 {insight.computed_at
                   ? new Date(insight.computed_at).toLocaleDateString()
                   : "—"}

@@ -373,22 +373,25 @@ class InsightService:
             topic: metrics.to_dict()
             for topic, metrics in insight_data.topic_metrics.items()
         }
-        
-        return LearnerInsight.objects.create(
+
+        insight, _ = LearnerInsight.objects.update_or_create(
             user_id=insight_data.user_id,
-            computation_rules_version=insight_data.computation_rules_version,
-            events_analyzed_count=insight_data.total_events_analyzed,
-            learning_pace=insight_data.learning_pace.value,
-            pace_score=insight_data.pace_score,
-            consistency_score=insight_data.consistency_score,
-            retry_frequency=insight_data.retry_frequency,
-            average_difficulty=insight_data.average_difficulty,
-            average_mastery=insight_data.average_mastery,
-            overall_health_score=insight_data.overall_health_score,
-            weak_topics=insight_data.weak_topics,
-            strong_topics=insight_data.strong_topics,
-            topic_metrics=topic_metrics_dict,
+            defaults=dict(
+                computation_rules_version=insight_data.computation_rules_version,
+                events_analyzed_count=insight_data.total_events_analyzed,
+                learning_pace=insight_data.learning_pace.value,
+                pace_score=insight_data.pace_score,
+                consistency_score=insight_data.consistency_score,
+                retry_frequency=insight_data.retry_frequency,
+                average_difficulty=insight_data.average_difficulty,
+                average_mastery=insight_data.average_mastery,
+                overall_health_score=insight_data.overall_health_score,
+                weak_topics=insight_data.weak_topics,
+                strong_topics=insight_data.strong_topics,
+                topic_metrics=topic_metrics_dict,
+            ),
         )
+        return insight
     
     def _db_to_domain(self, db_insight: LearnerInsight) -> LearnerInsightData:
         """
