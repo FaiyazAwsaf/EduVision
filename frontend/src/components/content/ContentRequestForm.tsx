@@ -32,6 +32,8 @@ import {
 } from "@/api/school";
 import ErrorMessage from "@/components/shared/ErrorMessage";
 import LearningContextForm from "./LearningContextForm";
+import CurriculumTopicPicker from "@/components/curriculum/CurriculumTopicPicker";
+import type { TopicSearchResult } from "@/types/curriculum";
 import {
   ContentType,
   Style,
@@ -255,6 +257,8 @@ export default function ContentRequestForm({
   const [learningContext, setLearningContext] =
     useState<LearningContextPayload | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedCurriculumTopic, setSelectedCurriculumTopic] =
+    useState<TopicSearchResult | null>(null);
 
   // ─── Teacher-specific state ───────────────────────────────────────────
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(
@@ -391,6 +395,9 @@ export default function ContentRequestForm({
       };
       if (!payload.notes?.trim()) delete payload.notes;
       if (!payload.subject?.trim()) delete payload.subject;
+      if (selectedCurriculumTopic) {
+        payload.curriculum_topic_id = selectedCurriculumTopic.id;
+      }
 
       const response = await createContentRequest(payload);
 
@@ -527,6 +534,21 @@ export default function ContentRequestForm({
           className="block w-full rounded-lg border border-secondary px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-gray-100 placeholder:text-secondary"
           required
         />
+        {/* Curriculum topic link */}
+        <div className="mt-2">
+          <p className="text-xs text-muted mb-1">
+            Link to a curriculum topic (optional):
+          </p>
+          <CurriculumTopicPicker
+            selected={selectedCurriculumTopic}
+            onSelect={(topic) => {
+              setSelectedCurriculumTopic(topic);
+              if (topic) {
+                setFormData((prev) => ({ ...prev, topic: topic.title }));
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* ── Subject + Class/Section (Teacher) ──────────────────────────── */}
@@ -827,7 +849,7 @@ export default function ContentRequestForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="flex-1 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">

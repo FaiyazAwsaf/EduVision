@@ -221,10 +221,10 @@ export default function SampleAnswerTester({
                 <div
                   className={`text-5xl font-bold ${getScoreColor(percentage)}`}
                 >
-                  {percentage.toFixed(1)}%
+                  {percentage.toFixed(2)}%
                 </div>
                 <div className="mt-2 text-lg text-primary">
-                  {testResult.total_score.toFixed(1)} / {testResult.max_score}{" "}
+                  {testResult.total_score.toFixed(2)} / {testResult.max_score}{" "}
                   marks
                 </div>
                 <div
@@ -271,7 +271,7 @@ export default function SampleAnswerTester({
                         (result.score_awarded / result.max_marks) * 100,
                       )}`}
                     >
-                      {result.score_awarded.toFixed(1)} / {result.max_marks}
+                      {(+result.score_awarded).toFixed(2)} / {result.max_marks}
                     </div>
                     <div className="text-xs text-primary">marks</div>
                   </div>

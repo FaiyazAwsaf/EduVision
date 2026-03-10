@@ -1,5 +1,7 @@
 from django.shortcuts import render
 from django.db import transaction
+from django.db.models.deletion import Collector
+from django.contrib.admin.models import LogEntry
 from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,9 +16,14 @@ from .serializers import (
 from .models import CustomUser
 from secrets import randbelow
 from uuid import uuid4
+import os
 
 
 WS_TICKET_TTL_SECONDS = 60
+
+# Cookie settings: use SameSite=None + Secure in production (cross-origin deploy)
+_SECURE_COOKIES = not os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
+_SAMESITE_POLICY = "None" if _SECURE_COOKIES else "Lax"
 
 # Create your views here.
 class RegisterView(APIView):
@@ -66,8 +73,8 @@ class LoginView(APIView):
                 key="refresh_token",
                 value=str(refresh),
                 httponly=True,
-                secure=False,
-                samesite="Lax",
+                secure=_SECURE_COOKIES,
+                samesite=_SAMESITE_POLICY,
                 path="/"
             )
 
@@ -106,8 +113,8 @@ class RefreshView(APIView):
                 key="refresh_token",
                 value=new_refresh,
                 httponly=True,
-                secure=False,
-                samesite="Lax",
+                secure=_SECURE_COOKIES,
+                samesite=_SAMESITE_POLICY,
                 path="/"
             )
             
@@ -169,7 +176,11 @@ class LogoutView(APIView):
                 {"message": "Logged out successfully"},
                 status=status.HTTP_200_OK,
             )
-            response.delete_cookie("refresh_token", path="/")
+            response.delete_cookie(
+                "refresh_token",
+                path="/",
+                samesite=_SAMESITE_POLICY,
+            )
             return response
         except Exception as e:
             return self.handle_exception(e)
@@ -264,12 +275,16 @@ class AdminUserDetailView(APIView):
         if not user:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = AdminUserUpdateSerializer(data=request.data)
+        serializer = AdminUserUpdateSerializer(data=request.data, context={'user_id': user_id})
         serializer.is_valid(raise_exception=True)
 
+        changed_fields = []
         for field, value in serializer.validated_data.items():
             setattr(user, field, value)
-        user.save()
+            changed_fields.append(field)
+
+        if changed_fields:
+            user.save(update_fields=changed_fields)
 
         return Response({"message": "User updated", "payload": UserSerializer(user).data})
 
@@ -284,9 +299,16 @@ class AdminUserDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.is_active = False
-        user.save()
-        return Response({"message": "User deactivated"})
+        # django_admin_log has an integer user_id FK that is incompatible
+        # with our UUID primary key — skip that cascade step explicitly.
+        collector = Collector(using='default')
+        collector.collect([user], keep_parents=False)
+        collector.fast_deletes = [
+            qs for qs in collector.fast_deletes
+            if qs.model is not LogEntry
+        ]
+        collector.delete()
+        return Response({"message": "User deleted"}, status=status.HTTP_200_OK)
 
 
 class AdminResetPasswordView(APIView):

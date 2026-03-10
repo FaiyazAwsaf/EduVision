@@ -9,6 +9,19 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
+import {
+  Loader2,
+  Plus,
+  Users,
+  Trash2,
+  UserPlus,
+  ArrowRight,
+  PenTool,
+  Calendar,
+  X,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 import Whiteboard from "@/components/whiteboard/Whiteboard";
 import Sidebar from "@/components/shared/Sidebar";
 import { getUserData } from "@/api/auth";
@@ -288,11 +301,12 @@ function WhiteboardContent() {
             </div>
           </main>
         </div>
-      </div>
+      </>
     );
   }
 
   if (showPicker && !session) {
+    const sidebarRole = user?.role === "student" ? "student" : "teacher";
     return (
       <div className="min-h-screen bg-background">
         <Sidebar role={user?.role === "student" ? "student" : "teacher"} />
@@ -359,19 +373,14 @@ function WhiteboardContent() {
                 <button
                   onClick={handleCreateSession}
                   disabled={isCreatingSession}
-                  style={{
-                    padding: "10px 24px",
-                    backgroundColor: "#48A6A7",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "6px",
-                    cursor: isCreatingSession ? "not-allowed" : "pointer",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    opacity: isCreatingSession ? 0.6 : 1,
-                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isCreatingSession ? "Creating..." : "Create New"}
+                  {isCreatingSession ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  {isCreatingSession ? "Creating..." : "New Session"}
                 </button>
               </div>
 
@@ -530,60 +539,59 @@ function WhiteboardContent() {
                         borderTop: "1px solid #d1e5e8",
                       }}
                     >
+                      {/* Session name */}
+                      <h3 className="text-sm font-semibold text-primary mb-1 truncate group-hover:text-primary-dark transition-colors">
+                        {sess.name}
+                      </h3>
+                      <p className="text-xs text-muted mb-3">
+                        Owner: {sess.owner.username}
+                      </p>
+
+                      {/* Meta */}
+                      <div className="flex items-center gap-4 text-xs text-muted mb-4">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" />
+                          {sess.members?.length || 0} members
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(sess.updated_at).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Actions */}
                       {canCreateSession && sess.owner.id === user?.id && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "8px",
-                            marginBottom: "10px",
-                          }}
-                        >
+                        <div className="flex gap-2 mb-3">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               void handleInviteStudents(sess.id);
                             }}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: "6px",
-                              border: "1px solid #48A6A7",
-                              backgroundColor: "transparent",
-                              color: "#48A6A7",
-                              fontSize: "12px",
-                              cursor: "pointer",
-                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/5 transition-colors"
                           >
-                            Invite Students
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Invite
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteSession(sess);
                             }}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: "6px",
-                              border: "1px solid #ff6b6b",
-                              backgroundColor: "transparent",
-                              color: "#ff6b6b",
-                              fontSize: "12px",
-                              cursor: "pointer",
-                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-500 text-xs font-medium hover:bg-red-50 transition-colors"
                           >
-                            Delete Session
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
                           </button>
                         </div>
                       )}
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "13px",
-                          color: "#48A6A7",
-                          fontWeight: "600",
-                        }}
-                      >
-                        Click to open →
-                      </p>
+
+                      {/* Open link */}
+                      <div className="flex items-center justify-end pt-3 border-t border-secondary/20">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:text-primary-dark transition-colors">
+                          Open Session
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -803,97 +811,100 @@ function InviteStudentsModal({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        zIndex: 2000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-5"
       onClick={onClose}
     >
       <div
-        style={{
-          width: "100%",
-          maxWidth: "560px",
-          maxHeight: "80vh",
-          overflow: "auto",
-          backgroundColor: "#1f1f1f",
-          border: "1px solid #405d5d",
-          borderRadius: "10px",
-          padding: "20px",
-          color: "#fff",
-        }}
+        className="w-full max-w-md max-h-[80vh] overflow-auto bg-white rounded-2xl border border-secondary/30 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ marginTop: 0, marginBottom: "12px" }}>Invite Students</h3>
-        {students.length === 0 ? (
-          <div style={{ color: "#aaa" }}>
-            <p style={{ margin: "0 0 8px 0" }}>
-              No students available in your assigned class.
-            </p>
-            <p style={{ margin: 0, fontSize: "13px", color: "#666" }}>
-              Please check that you are assigned as the class teacher for a section in the system.
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-secondary/20">
+          <div>
+            <h2 className="text-lg font-semibold text-primary-dark">
+              Invite Students
+            </h2>
+            <p className="text-sm text-muted mt-0.5">
+              Select students to share this session with
             </p>
           </div>
-        ) : (
-          <div style={{ display: "grid", gap: "8px", marginBottom: "16px" }}>
-            {students.map((student) => (
-              <label
-                key={student.user_id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "10px",
-                  border: "1px solid #2e2e2e",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedStudentIds.includes(student.user_id)}
-                  onChange={() => onToggle(student.user_id)}
-                />
-                <span>
-                  {student.first_name} {student.last_name} ({student.username})
-                </span>
-              </label>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
           <button
             onClick={onClose}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "6px",
-              border: "1px solid #666",
-              backgroundColor: "transparent",
-              color: "#ddd",
-              cursor: "pointer",
-            }}
+            className="p-2 rounded-lg text-muted hover:text-primary-dark hover:bg-background transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4">
+          {students.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-10 h-10 text-secondary mx-auto mb-3" />
+              <p className="text-sm font-medium text-primary-dark mb-1">
+                No students available
+              </p>
+              <p className="text-xs text-muted">
+                Please check that you are assigned as the class teacher for a
+                section.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {students.map((student) => {
+                const isSelected = selectedStudentIds.includes(
+                  student.user_id,
+                );
+                return (
+                  <button
+                    key={student.user_id}
+                    onClick={() => onToggle(student.user_id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                      isSelected
+                        ? "border-primary bg-primary/5"
+                        : "border-secondary/30 hover:border-primary/40 hover:bg-background"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? "bg-primary border-primary"
+                          : "border-secondary/50"
+                      }`}
+                    >
+                      {isSelected && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
+                    </div>
+                    <span className="text-sm text-primary-dark">
+                      {student.first_name} {student.last_name}{" "}
+                      <span className="text-muted">({student.username})</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-secondary/20">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-muted hover:text-primary-dark hover:bg-background transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            disabled={isInviting || students.length === 0}
-            style={{
-              padding: "8px 14px",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: "#48A6A7",
-              color: "#fff",
-              cursor: isInviting ? "not-allowed" : "pointer",
-              opacity: isInviting ? 0.7 : 1,
-            }}
+            disabled={isInviting || students.length === 0 || selectedStudentIds.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-sm font-semibold text-white hover:bg-primary-dark transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
           >
+            {isInviting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <UserPlus className="w-4 h-4" />
+            )}
             {isInviting ? "Inviting..." : "Send Invites"}
           </button>
         </div>

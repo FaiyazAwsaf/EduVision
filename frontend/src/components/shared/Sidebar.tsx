@@ -26,7 +26,10 @@ import {
   Layers,
   UserCog,
   ShieldCheck,
+  Brain,
   PenTool,
+  BookOpenCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -71,11 +74,26 @@ const teacherNavItems: NavEntry[] = [
       { label: "Content History", href: "/content/history", icon: History },
     ],
   },
+  {
+    label: "Curriculum",
+    icon: BookOpenCheck,
+    children: [
+      { label: "Course Outlines", href: "/teacher/curriculum", icon: FileText },
+      {
+        label: "Difficulty Reports",
+        href: "/teacher/curriculum/difficulty",
+        icon: AlertTriangle,
+      },
+    ],
+  },
   { label: "Insights", href: "/teacher/insights", icon: Lightbulb },
+  { label: "Smart Analytics", href: "/teacher/analytics", icon: BarChart3 },
+  { label: "Class Intelligence", href: "/teacher/intelligence", icon: Brain },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
 const studentNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
+  { label: "My Courses", href: "/student/courses", icon: BookOpenCheck },
   {
     label: "Content",
     icon: LibraryBig,
@@ -88,9 +106,9 @@ const studentNavItems: NavEntry[] = [
   { label: "Tutoring", href: "/student/tutoring", icon: MessageSquare },
   { label: "Scripts", href: "/student/scripts", icon: ScrollText },
   { label: "Analytics", href: "/student/analytics", icon: BarChart3 },
+  { label: "My Insights", href: "/student/insights", icon: Brain },
   { label: "Whiteboard", href: "/whiteboard", icon: PenTool },
 ];
-
 
 const adminNavItems: NavEntry[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
