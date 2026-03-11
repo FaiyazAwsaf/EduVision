@@ -1,10 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  evaluateScript,
-  type AnswerScript,
-} from "@/api/evaluation";
+import { evaluateScript, type AnswerScript } from "@/api/evaluation";
 
 interface ScriptListItemProps {
   script: AnswerScript;
@@ -61,7 +58,7 @@ export default function ScriptListItem({
           </div>
 
           <p className="text-sm text-primary mb-2">
-            {typeof script.rubric_set === "object"
+            {script.rubric_set && typeof script.rubric_set === "object"
               ? script.rubric_set.title
               : "Rubric Set"}
           </p>
