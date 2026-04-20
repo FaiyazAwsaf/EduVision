@@ -1,6 +1,20 @@
 # EduVision
 
-A full-stack educational platform built with Django (backend) and Next.js (frontend).
+A full-stack AI-powered learning platform that unifies classroom operations (students, teachers, and admins with role-based workflows), automated rubric-driven script evaluation, real-time tutoring sessions with an AI-powered whiteboard, personalized content generation, and much more in one system. 
+
+EduVision is designed to modernize academic workflows by bringing teaching, assessment, and learning personalization into one integrated platform. 
+
+## What the Project Does
+
+- **Automated answer script evaluation:** <br>Processes uploaded scripts, applies rubric-based scoring, and returns detailed per-question feedback with manual override support.
+- **Real-time tutoring sessions:** <br>Supports live teacher-student sessions with session lifecycle management and real-time collaboration architecture and an AI powered whiteboard.
+- **AI-assisted content generation:** <br>Creates summaries, worked examples, formula sheets, and downloadable learning resources based on topic, style, and difficulty.
+- **Advanced rubric management:** <br>Enables structured rubric authoring with validation, versioning, and lifecycle states (draft, published, archived) for consistent grading.
+- **Personalized study planning:** <br>Helps students create and track study plans with prioritized items, status management, and progress visibility.
+- **Feedback + adaptive intelligence:** <br>Captures structured user feedback, tracks learning events, computes learner insights, and generates advisory recommendations.
+- **Role-based school operations:** <br>Provides admin, teacher, and student workflows with authentication, class/section/subject management, and assignment mapping.
+
+
 
 ## Project Structure
 
