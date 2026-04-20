@@ -16,22 +16,6 @@ EduVision is designed to modernize academic workflows by bringing teaching, asse
 
 
 
-## Project Structure
-
-```
-EduVision/
-├── backend/          # Django REST API
-│   ├── apps/        # Django applications
-│   ├── config/      # Project configuration
-│   ├── manage.py    # Django management script
-│   └── requirements.txt
-└── frontend/        # Next.js application
-    ├── src/
-    │   └── app/    # Next.js app directory
-    ├── public/     # Static assets
-    └── package.json
-```
-
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
