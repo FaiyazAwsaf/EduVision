@@ -1,0 +1,10 @@
+python -m pytest --ds=config.test_settings
+
+python -m pytest tests/test_auth_admin_bugs.py -v --reuse-db
+
+
+cd backend; .\venv\Scripts\Activate.ps1; python manage.py runserver
+
+cd backend; .\venv\Scripts\Activate.ps1; celery -A config worker -l info
+
+cd frontend; npm run dev

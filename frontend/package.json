@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "fabric": "^7.0.0",
@@ -26,9 +28,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/dom-mediacapture-record": "^1.0.22",
     "@types/estree-jsx": "^1.0.5",
     "@types/html2canvas": "^0.5.35",
+    "@types/jest": "^30.0.0",
     "@types/katex": "^0.16.8",
     "@types/mdast": "^4.0.4",
     "@types/node": "^20",
@@ -37,7 +43,10 @@
     "baseline-browser-mapping": "^2.9.11",
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }
