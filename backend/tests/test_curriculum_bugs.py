@@ -1,11 +1,3 @@
-"""
-Bug-based tests for CUR-003: difficulty alerts are spoofable and stale.
-
-1. A student who flags a topic but does NOT belong to the topic's section
-   still gets counted in flag_count / percentage (an "outsider" flag).
-2. Unflagging a topic never re-checks the threshold, so a notification that
-   is no longer justified (enough students unflagged) stays active/unread.
-"""
 import pytest
 
 from apps.authentication.models import CustomUser
@@ -29,17 +21,14 @@ def course_topic_with_outline(teaching_assignment):
     return topic
 
 
+# Checks that a "topic is difficult" flag from a student outside the topic's
+# section is excluded from that section's flag_count, instead of inflating it.
 @pytest.mark.django_db
 def test_cur_003_flag_from_a_student_outside_the_section_is_not_counted(
     course_topic_with_outline, teaching_assignment,
 ):
-    """
-    Only students actually enrolled in the topic's section should count
-    towards flag_count / percentage in the teacher's difficulty report.
-    """
     topic = course_topic_with_outline
 
-    # A student who does NOT belong to the topic's section.
     other_class = SchoolClass.objects.create(
         name="9", stream="Arts", academic_year="2026-2027"
     )

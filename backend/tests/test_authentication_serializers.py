@@ -1,6 +1,3 @@
-"""
-Normal, beginner-style tests for authentication serializers.
-"""
 import pytest
 
 from apps.authentication.serializers import (
@@ -10,6 +7,7 @@ from apps.authentication.serializers import (
 from apps.authentication.models import CustomUser
 
 
+# Checks that registering saves the user with the password hashed, not stored as plain text.
 @pytest.mark.django_db
 def test_register_creates_a_user_with_a_hashed_password():
     serializer = RegisterSerializer(data={
@@ -29,6 +27,7 @@ def test_register_creates_a_user_with_a_hashed_password():
     assert user.check_password("pass1234")
 
 
+# Checks that registration fails if password and password_confirm don't match.
 def test_register_rejects_mismatched_passwords():
     serializer = RegisterSerializer(data={
         "username": "student",
@@ -42,6 +41,7 @@ def test_register_rejects_mismatched_passwords():
     assert serializer.is_valid() is False
 
 
+# Checks that registration fails if the password is too short.
 def test_register_rejects_a_short_password():
     serializer = RegisterSerializer(data={
         "username": "student",
@@ -55,6 +55,7 @@ def test_register_rejects_a_short_password():
     assert serializer.is_valid() is False
 
 
+# Checks that a well-formed change-password request (matching new passwords, different from the current one) is accepted.
 def test_change_password_accepts_a_valid_payload():
     serializer = ChangePasswordSerializer(data={
         "current_password": "pass1234",
@@ -65,6 +66,7 @@ def test_change_password_accepts_a_valid_payload():
     assert serializer.is_valid()
 
 
+# Checks that changing password fails if new_password and new_password_confirm don't match.
 def test_change_password_rejects_mismatched_new_passwords():
     serializer = ChangePasswordSerializer(data={
         "current_password": "pass1234",
@@ -75,6 +77,7 @@ def test_change_password_rejects_mismatched_new_passwords():
     assert serializer.is_valid() is False
 
 
+# Checks that changing password fails if the "new" password is the same as the current one.
 def test_change_password_serializer_rejects_reusing_the_current_password():
     serializer = ChangePasswordSerializer(data={
         "current_password": "pass1234",

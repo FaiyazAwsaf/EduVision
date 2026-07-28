@@ -21,6 +21,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+// Checks that a 401 from an expired token triggers a retry with a refreshed token, instead of failing right away.
 test("getSession retries with a fresh token after a 401 instead of failing immediately", async () => {
   const fetchMock = jest.fn().mockResolvedValue({
     ok: false,

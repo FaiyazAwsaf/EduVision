@@ -1,11 +1,9 @@
-"""
-Bug-based tests for admin-side authentication issues (AUTH-004, AUTH-005).
-"""
 import pytest
 
 from apps.authentication.models import CustomUser
 
 
+# Checks that an admin is blocked from deleting their own account through the admin API.
 @pytest.mark.django_db
 def test_auth_005_admin_cannot_delete_their_own_account(api_client):
     admin_user = CustomUser.objects.create_user(

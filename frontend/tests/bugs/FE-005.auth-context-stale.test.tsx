@@ -33,6 +33,8 @@ function Probe() {
   return <div>{isAuthenticated ? "authenticated" : "logged-out"}</div>;
 }
 
+// Checks that if the background token refresh fails (expired refresh cookie), the UI updates to
+// "logged-out" instead of staying stuck showing an authenticated session forever.
 test("auth state clears after a background refresh failure instead of staying authenticated", async () => {
   render(
     <AuthProvider>

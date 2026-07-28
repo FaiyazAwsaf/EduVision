@@ -27,18 +27,21 @@ beforeEach(() => {
   (authenticatedFetch as jest.Mock).mockReset();
 });
 
+// Checks that deleting a class doesn't crash when the backend responds with an empty 204 body.
 test("deleteClass does not throw when the backend returns 204 No Content", async () => {
   (authenticatedFetch as jest.Mock).mockResolvedValue(mockNoContentResponse());
 
   await expect(deleteClass(1)).resolves.not.toThrow();
 });
 
+// Checks that deleting a section doesn't crash when the backend responds with an empty 204 body.
 test("deleteSection does not throw when the backend returns 204 No Content", async () => {
   (authenticatedFetch as jest.Mock).mockResolvedValue(mockNoContentResponse());
 
   await expect(deleteSection(1)).resolves.not.toThrow();
 });
 
+// Checks that deleting a subject doesn't crash when the backend responds with an empty 204 body.
 test("deleteSubject does not throw when the backend returns 204 No Content", async () => {
   (authenticatedFetch as jest.Mock).mockResolvedValue(mockNoContentResponse());
 

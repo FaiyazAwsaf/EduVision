@@ -44,6 +44,8 @@ afterEach(() => {
   process.env.NEXT_PUBLIC_WS_URL = originalEnv;
 });
 
+// Checks that the WebSocket manager uses the configured NEXT_PUBLIC_WS_URL for its connection
+// URL, instead of silently falling back to "localhost:8000".
 test("connect() honors a configured NEXT_PUBLIC_WS_URL instead of defaulting to localhost", () => {
   process.env.NEXT_PUBLIC_WS_URL = "wss://api.example.com";
 

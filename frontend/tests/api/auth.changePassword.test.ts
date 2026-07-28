@@ -15,6 +15,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+// Checks that changePassword resolves with the success message when the backend accepts the request.
 test("changePassword resolves successfully when the backend accepts the request", async () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
@@ -31,6 +32,7 @@ test("changePassword resolves successfully when the backend accepts the request"
   expect(result.message).toBe("Password updated");
 });
 
+// Checks that changePassword throws a usable error (rather than silently succeeding) when the endpoint returns 404.
 test("changePassword surfaces a clear error instead of a raw 404 when the route is missing", async () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: false,

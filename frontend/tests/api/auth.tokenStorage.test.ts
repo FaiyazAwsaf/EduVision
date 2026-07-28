@@ -22,10 +22,12 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
+// Checks that getAccessToken returns null when no token has been stored yet.
 test("getAccessToken returns null when nothing is stored", () => {
   expect(getAccessToken()).toBeNull();
 });
 
+// Checks that setTokens saves both the access token and the user data so they can be read back.
 test("setTokens stores the access token and user data", () => {
   setTokens("token-abc", sampleUser);
 
@@ -33,6 +35,7 @@ test("setTokens stores the access token and user data", () => {
   expect(getUserData()).toEqual(sampleUser);
 });
 
+// Checks that clearTokens wipes out both the stored access token and user data.
 test("clearTokens removes the stored access token and user data", () => {
   setTokens("token-abc", sampleUser);
 
@@ -42,18 +45,21 @@ test("clearTokens removes the stored access token and user data", () => {
   expect(getUserData()).toBeNull();
 });
 
+// Checks that getUserData returns null (instead of throwing) when the stored value is broken/corrupted JSON.
 test("getUserData returns null when the stored value is corrupted JSON", () => {
   sessionStorage.setItem("eduvision_user", "{not-valid-json");
 
   expect(getUserData()).toBeNull();
 });
 
+// Checks that authHeaders builds an Authorization header with the stored token when one exists.
 test("authHeaders includes a Bearer token when one is stored", () => {
   setTokens("token-abc", sampleUser);
 
   expect(authHeaders()).toEqual({ Authorization: "Bearer token-abc" });
 });
 
+// Checks that authHeaders returns no Authorization header when there's no stored token.
 test("authHeaders returns an empty object when no token is stored", () => {
   expect(authHeaders()).toEqual({});
 });

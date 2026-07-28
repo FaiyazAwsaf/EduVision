@@ -1,12 +1,10 @@
-"""
-Normal, beginner-style tests for the rubrics app models and evaluators.
-"""
 import pytest
 
 from apps.rubrics.models import RubricSet, QuestionRubric
 from apps.rubrics.services import evaluate_keyword_rule, evaluate_numeric_rule
 
 
+# Checks that a newly created rubric set starts in "draft" state at version 1.
 @pytest.mark.django_db
 def test_new_rubric_set_starts_as_draft_at_version_one():
     rubric_set = RubricSet.objects.create(
@@ -19,6 +17,7 @@ def test_new_rubric_set_starts_as_draft_at_version_one():
     assert rubric_set.version == 1
 
 
+# Checks that printing a rubric set shows its title, version, and state (e.g. "Algebra Quiz (v1) - draft").
 @pytest.mark.django_db
 def test_rubric_set_string_representation_includes_version_and_state():
     rubric_set = RubricSet.objects.create(
@@ -30,6 +29,7 @@ def test_rubric_set_string_representation_includes_version_and_state():
     assert str(rubric_set) == "Algebra Quiz (v1) - draft"
 
 
+# Checks that printing a question rubric shows the parent rubric set and question number (e.g. "Algebra Quiz - Q1").
 @pytest.mark.django_db
 def test_question_rubric_string_includes_question_number():
     rubric_set = RubricSet.objects.create(
@@ -45,6 +45,7 @@ def test_question_rubric_string_includes_question_number():
     assert str(question) == "Algebra Quiz - Q1"
 
 
+# Checks that switching a rubric set's state to "published" increments its version number.
 @pytest.mark.django_db
 def test_publishing_a_rubric_set_bumps_its_version():
     rubric_set = RubricSet.objects.create(
@@ -57,6 +58,7 @@ def test_publishing_a_rubric_set_bumps_its_version():
     assert rubric_set.version == 2
 
 
+# Checks that a keyword rule gives full marks when every required keyword appears in the answer.
 def test_keyword_rule_awards_full_marks_when_all_keywords_are_present():
     rule = {
         "id": "rule-1",
@@ -72,6 +74,7 @@ def test_keyword_rule_awards_full_marks_when_all_keywords_are_present():
     assert result["score_awarded"] == 10
 
 
+# Checks that a keyword rule gives zero marks when none of the required keywords appear in the answer.
 def test_keyword_rule_awards_zero_when_no_keywords_are_present():
     rule = {
         "id": "rule-1",
@@ -87,6 +90,7 @@ def test_keyword_rule_awards_zero_when_no_keywords_are_present():
     assert result["score_awarded"] == 0
 
 
+# Checks that a numeric rule accepts an answer whose value is close enough to the expected value (within tolerance).
 def test_numeric_rule_matches_a_value_within_tolerance():
     rule = {
         "id": "rule-1",
@@ -100,6 +104,7 @@ def test_numeric_rule_matches_a_value_within_tolerance():
     assert result["score_awarded"] == 5
 
 
+# Checks that a numeric rule rejects an answer whose value is too far from the expected value (outside tolerance).
 def test_numeric_rule_does_not_match_a_value_outside_tolerance():
     rule = {
         "id": "rule-1",

@@ -3,6 +3,7 @@ import pytest
 from apps.authentication.models import CustomUser
 
 
+# Checks that hitting the register endpoint creates a student.
 @pytest.mark.django_db
 def test_register_creates_a_student_user(api_client):
     response = api_client.post(
@@ -23,6 +24,7 @@ def test_register_creates_a_student_user(api_client):
     assert response.json()["payload"]["role"] == "student"
 
 
+# Checks that the register endpoint rejects the request when passwords don't match.
 @pytest.mark.django_db
 def test_register_rejects_mismatched_passwords(api_client):
     response = api_client.post(
@@ -42,6 +44,7 @@ def test_register_rejects_mismatched_passwords(api_client):
     assert not CustomUser.objects.filter(username="student").exists()
 
 
+# Checks that logging in with correct credentials returns an access token and sets a refresh-token cookie.
 @pytest.mark.django_db
 def test_login_returns_an_access_token_and_refresh_cookie(api_client, student_user):
     response = api_client.post(
